@@ -3,115 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Luyện Trắc Nghiệm Pro</title>
+    <title>Hệ Thống Luyện Trắc Nghiệm Tối Ưu</title>
     <style>
-        /* Định nghĩa các biến màu sắc (CSS Variables) để quản lý Theme */
         :root {
-            --bg-color: #f4f6f9;
-            --text-color: #333333;
-            --card-bg: #ffffff;
-            --title-color: #1a73e8;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            --qbox-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            --border-color: #dadce0;
-            --hover-bg: #f8f9fa;
-            --hover-border: #bcc1c6;
-            --btn-text: #3c4043;
-            --selected-bg: #e8f0fe;
-            --selected-border: #1a73e8;
-            --selected-text: #1a73e8;
-            
-            /* Màu trạng thái đúng/sai */
-            --correct-bg: #e6f4ea;
-            --correct-text: #137333;
-            --correct-border: #137333;
-            --incorrect-bg: #fce8e6;
-            --incorrect-text: #c5221f;
-            --incorrect-border: #c5221f;
+            --bg-color: #f4f6f9; --text-color: #333333; --card-bg: #ffffff;
+            --title-color: #1a73e8; --card-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            --qbox-shadow: 0 2px 8px rgba(0,0,0,0.04); --border-color: #dadce0;
+            --hover-bg: #f8f9fa; --hover-border: #bcc1c6; --btn-text: #3c4043;
+            --selected-bg: #e8f0fe; --selected-border: #1a73e8; --selected-text: #1a73e8;
+            --correct-bg: #e6f4ea; --correct-text: #137333; --correct-border: #137333;
+            --incorrect-bg: #fce8e6; --incorrect-text: #c5221f; --incorrect-border: #c5221f;
         }
 
-        /* Bảng màu dành cho Giao diện Tối (Dark Mode) */
         [data-theme="dark"] {
-            --bg-color: #121212;
-            --text-color: #e8eaed;
-            --card-bg: #1e1e1e;
-            --title-color: #8ab4f8;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            --qbox-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            --border-color: #3c4043;
-            --hover-bg: #2d2e30;
-            --hover-border: #5f6368;
-            --btn-text: #e8eaed;
-            --selected-bg: #1a3b5c;
-            --selected-border: #8ab4f8;
-            --selected-text: #8ab4f8;
-            
-            --correct-bg: #132d19;
-            --correct-text: #81c995;
-            --correct-border: #81c995;
-            --incorrect-bg: #3c1e1e;
-            --incorrect-text: #f28b82;
-            --incorrect-border: #f28b82;
+            --bg-color: #121212; --text-color: #e8eaed; --card-bg: #1e1e1e;
+            --title-color: #8ab4f8; --card-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            --qbox-shadow: 0 2px 8px rgba(0,0,0,0.2); --border-color: #3c4043;
+            --hover-bg: #2d2e30; --hover-border: #5f6368; --btn-text: #e8eaed;
+            --selected-bg: #1a3b5c; --selected-border: #8ab4f8; --selected-text: #8ab4f8;
+            --correct-bg: #132d19; --correct-text: #81c995; --correct-border: #81c995;
+            --incorrect-bg: #3c1e1e; --incorrect-text: #f28b82; --incorrect-border: #f28b82;
         }
 
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            padding: 20px; 
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; }
         
-        /* Thanh điều khiển trên cùng */
-        .top-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
+        .top-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h1 { text-align: center; color: var(--title-color); margin-top: 0; margin-bottom: 30px; }
         
-        .btn-top {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: 500;
-            box-shadow: var(--qbox-shadow);
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .btn-top { background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: 500; box-shadow: var(--qbox-shadow); transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
         .btn-top:hover { background-color: var(--hover-bg); border-color: var(--hover-border); }
+        .theme-icon { font-size: 18px; }
 
-        .card {
-            background: var(--card-bg); 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: var(--card-shadow);
-            margin-bottom: 25px;
-        }
-        
+        .card { background: var(--card-bg); padding: 25px; border-radius: 12px; box-shadow: var(--card-shadow); margin-bottom: 25px; }
         #upload-section { text-align: center; }
         #upload-section p { color: #888; margin-bottom: 20px; }
         
-        .custom-file-upload {
-            border: 2px dashed var(--title-color);
-            background-color: var(--bg-color);
-            color: var(--title-color);
-            padding: 15px 30px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            display: inline-block;
-            transition: all 0.2s;
-        }
+        .custom-file-upload { border: 2px dashed var(--title-color); background-color: var(--bg-color); color: var(--title-color); padding: 15px 30px; border-radius: 8px; cursor: pointer; font-weight: bold; display: inline-block; transition: all 0.2s; }
         .custom-file-upload:hover { opacity: 0.8; }
         input[type="file"] { display: none; }
 
@@ -119,72 +46,38 @@
         .config-group { margin-bottom: 15px; }
         .config-group label { font-weight: 600; display: block; margin-bottom: 8px; }
         .radio-group, .checkbox-group { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .hint-text { display: block; font-size: 13px; color: #888; margin-top: 5px; font-style: italic; }
         
-        .btn-start {
-            background-color: #1a73e8; color: white; border: none;
-            padding: 12px 25px; font-size: 16px; font-weight: bold;
-            border-radius: 6px; cursor: pointer; width: 100%; margin-top: 15px;
-        }
+        .btn-start { background-color: #1a73e8; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 15px; }
         .btn-start:hover { background-color: #1557b0; }
 
-        /* Giao diện câu hỏi */
         .question-box { background: var(--card-bg); padding: 25px; margin-bottom: 20px; border-radius: 12px; box-shadow: var(--qbox-shadow); }
-        .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; line-height: 1.4; }
+        .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; line-height: 1.5; }
         .options { display: flex; flex-direction: column; gap: 10px; }
         
-        .option-btn {
-            padding: 12px 15px; border: 1px solid var(--border-color); background: var(--card-bg);
-            border-radius: 8px; cursor: pointer; text-align: left; font-size: 16px;
-            transition: all 0.15s ease; color: var(--btn-text); line-height: 1.4;
-        }
+        .option-btn { padding: 12px 15px; border: 1px solid var(--border-color); background: var(--card-bg); border-radius: 8px; cursor: pointer; text-align: left; font-size: 16px; transition: all 0.15s ease; color: var(--btn-text); line-height: 1.4; }
         .option-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--hover-border); }
         
-        /* Trạng thái đáp án */
         .selected { background: var(--selected-bg) !important; border-color: var(--selected-border) !important; color: var(--selected-text) !important; font-weight: 500; }
         .correct { background: var(--correct-bg) !important; color: var(--correct-text) !important; border-color: var(--correct-border) !important; font-weight: bold; }
         .incorrect { background: var(--incorrect-bg) !important; color: var(--incorrect-text) !important; border-color: var(--incorrect-border) !important; text-decoration: line-through; }
         
         #action-section { text-align: center; margin-top: 30px; display: none; }
-        .btn-submit {
-            background-color: #34a853; color: white; border: none; padding: 15px 40px;
-            font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(52, 168, 83, 0.3);
-            transition: background-color 0.2s;
-        }
+        .btn-submit { background-color: #34a853; color: white; border: none; padding: 15px 40px; font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 10px rgba(52, 168, 83, 0.3); transition: background-color 0.2s; }
         .btn-submit:hover { background-color: #2b8c44; }
         
-        #result-box {
-            display: none; text-align: center; background: var(--selected-bg); border: 1px solid var(--selected-border);
-            color: var(--selected-text); padding: 20px; border-radius: 12px; font-size: 20px; font-weight: bold;
-            margin-bottom: 30px; animation: fadeIn 0.5s;
-        }
+        #result-box { display: none; text-align: center; background: var(--selected-bg); border: 1px solid var(--selected-border); color: var(--selected-text); padding: 20px; border-radius: 12px; font-size: 20px; font-weight: bold; margin-bottom: 30px; animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Nút quay về đầu trang */
-        #backToTopBtn {
-            display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99;
-            font-size: 20px; border: none; background-color: var(--title-color); color: white;
-            cursor: pointer; padding: 15px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            width: 55px; height: 55px; transition: background-color 0.3s, transform 0.2s;
-            align-items: center; justify-content: center; opacity: 0;
-        }
-        #backToTopBtn.show { display: flex; opacity: 1; }
-        #backToTopBtn:hover { transform: translateY(-5px); background-color: #1557b0; }
+        /* Lên Đầu Trang - Thêm transform/scale cho mượt */
+        #backToTopBtn { display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99; font-size: 20px; border: none; background-color: var(--title-color); color: white; cursor: pointer; padding: 15px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 55px; height: 55px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); align-items: center; justify-content: center; opacity: 0; transform: scale(0.8); }
+        #backToTopBtn.show { display: flex; opacity: 1; transform: scale(1); }
+        #backToTopBtn:hover { transform: scale(1.1) translateY(-5px); background-color: #1557b0; }
 
-        /* Popup Modal Cảnh Báo */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(3px);
-            z-index: 1000; display: flex; align-items: center; justify-content: center;
-            opacity: 0; visibility: hidden; transition: all 0.3s ease;
-        }
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(3px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
         .modal-overlay.show { opacity: 1; visibility: visible; }
-        .modal-box {
-            background: var(--card-bg); color: var(--text-color);
-            padding: 30px; border-radius: 15px; max-width: 450px; width: 90%;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;
-            transform: scale(0.9); transition: transform 0.3s ease;
-        }
+        .modal-box { background: var(--card-bg); color: var(--text-color); padding: 30px; border-radius: 15px; max-width: 450px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; transform: scale(0.9); transition: transform 0.3s ease; }
         .modal-overlay.show .modal-box { transform: scale(1); }
         .modal-icon { font-size: 40px; margin-bottom: 15px; }
         .modal-title { font-size: 22px; font-weight: bold; color: var(--incorrect-text); margin-bottom: 10px; }
@@ -192,49 +85,36 @@
         .modal-desc b { color: var(--incorrect-border); font-size: 18px; }
         .modal-actions { display: flex; justify-content: center; gap: 15px; }
         
-        .btn-modal-cancel {
-            background: var(--bg-color); color: var(--text-color); border: 2px solid var(--border-color);
-            padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.2s;
-        }
+        .btn-modal-cancel { background: var(--bg-color); color: var(--text-color); border: 2px solid var(--border-color); padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.2s; }
         .btn-modal-cancel:hover { background: var(--hover-border); }
-        
-        .btn-modal-submit {
-            background: #e53935; color: white; border: none;
-            padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.2s;
-        }
+        .btn-modal-submit { background: #e53935; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.2s; }
         .btn-modal-submit:hover { background: #c62828; }
-    </style>
 
+        /* Toast Message */
+        #toast { visibility: hidden; min-width: 250px; background-color: #323232; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; transform: translateX(-50%); box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, bottom 0.3s; font-weight: 500; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+    </style>
     <script>
-        /* Xử lý Theme ngay khi tải trang để không bị chớp trắng */
-        function getSystemTheme() {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
+        function getSystemTheme() { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
         const savedMode = localStorage.getItem('themeMode') || 'auto';
-        const activeTheme = savedMode === 'auto' ? getSystemTheme() : savedMode;
-        document.documentElement.setAttribute('data-theme', activeTheme);
+        document.documentElement.setAttribute('data-theme', savedMode === 'auto' ? getSystemTheme() : savedMode);
     </script>
 </head>
 <body>
 
-    <!-- Thanh điều khiển trên cùng -->
     <div class="top-controls">
         <button class="btn-top" onclick="goHome()">🏠 Trang chủ</button>
-        <button id="themeToggleBtn" class="btn-top" onclick="toggleTheme()">🌓 Giao diện: Hệ thống</button>
+        <button id="themeToggleBtn" class="btn-top" onclick="toggleTheme()">
+            <span class="theme-icon" id="themeIcon">🌓</span> <span id="themeText">Hệ thống</span>
+        </button>
     </div>
 
-    <h1>Hệ Thống Trắc Nghiệm</h1>
+    <h1>Hệ Thống Trắc Nghiệm Tối Ưu</h1>
     
-    <!-- Bước 1: Tải file -->
     <div id="upload-card" class="card">
         <div id="upload-section">
             <h2>Tải lên file câu hỏi (.txt)</h2>
             <p>Định dạng: Đánh dấu đáp án đúng bằng dấu <b>**</b> ở hai đầu đáp án.</p>
-            <p>VD: Câu 1: Thủ đô của Việt Nam là thành phố nào?<p>
-                      <p>A. Thành phố Hồ Chí Minh</p>
-                      <p>B. <b>**</b>Hà Nội<b>**</b></p>
-                      <p>C. Đà Nẵng</p>
-                      <p>D. Cần Thơ</p>
             <label class="custom-file-upload">
                 <input type="file" id="fileInput" accept=".txt">
                 Chọn file câu hỏi .txt
@@ -242,7 +122,6 @@
         </div>
     </div>
 
-    <!-- Bước 2: Tùy chỉnh cài đặt -->
     <div id="config-section" class="card">
         <h2>Cấu hình bài trắc nghiệm</h2>
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin-bottom: 20px;">
@@ -250,44 +129,39 @@
         <div class="config-group">
             <label>Chế độ hiển thị kết quả:</label>
             <div class="radio-group">
-                <label><input type="radio" name="viewMode" value="immediate" checked> Xem đúng/sai ngay khi bấm</label>
-                <label><input type="radio" name="viewMode" value="end"> Làm hết mới hiện câu đúng (Nộp bài)</label>
+                <div>
+                    <label><input type="radio" name="viewMode" value="immediate" checked> Xem đúng/sai ngay khi bấm</label>
+                    <span class="hint-text">*Chỉ được chọn 1 lần cho mỗi câu</span>
+                </div>
+                <label><input type="radio" name="viewMode" value="end"> Làm hết mới nộp bài</label>
             </div>
         </div>
 
         <div class="config-group" style="margin-top: 20px;">
             <label>Tùy chọn trộn dữ liệu:</label>
             <div class="checkbox-group">
-                <label><input type="checkbox" id="shuffleQuestions" checked> Trộn thứ tự các câu hỏi</label>
-                <label><input type="checkbox" id="shuffleOptions" checked> Trộn thứ tự các đáp án</label>
+                <label><input type="checkbox" id="shuffleQuestions" checked> Trộn thứ tự câu hỏi</label>
+                <label><input type="checkbox" id="shuffleOptions" checked> Trộn thứ tự đáp án</label>
             </div>
         </div>
 
         <button class="btn-start" onclick="startQuiz()">Bắt Đầu Làm Bài</button>
     </div>
 
-    <!-- Bảng hiển thị điểm số -->
     <div id="result-box"></div>
-
-    <!-- Nơi chứa các câu hỏi trắc nghiệm -->
     <div id="quizContainer"></div>
 
-    <!-- Bước 3: Nút nộp bài -->
     <div id="action-section">
         <button class="btn-submit" onclick="submitQuiz()">Nộp Bài & Xem Kết Quả</button>
     </div>
 
-    <!-- Nút Lên Đầu Trang -->
     <button id="backToTopBtn" onclick="scrollToTop()" title="Lên đầu trang">▲</button>
 
-    <!-- Modal Cảnh báo chưa làm hết -->
     <div class="modal-overlay" id="warningModal">
         <div class="modal-box">
             <div class="modal-icon">⚠️</div>
             <div class="modal-title">Bạn chưa làm xong!</div>
-            <div class="modal-desc" id="missingQuestionsText">
-                Bạn còn các câu chưa chọn đáp án: <b>1, 3, 5</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?
-            </div>
+            <div class="modal-desc" id="missingQuestionsText"></div>
             <div class="modal-actions">
                 <button class="btn-modal-cancel" onclick="closeModal()">Tiếp tục làm bài</button>
                 <button class="btn-modal-submit" onclick="forceSubmit()">Vẫn Nộp Bài</button>
@@ -295,18 +169,47 @@
         </div>
     </div>
 
+    <div id="toast">Thông báo</div>
+
     <script>
+        // DOM Cache
+        const UI = {
+            uploadCard: document.getElementById('upload-card'),
+            configSection: document.getElementById('config-section'),
+            actionSection: document.getElementById('action-section'),
+            resultBox: document.getElementById('result-box'),
+            quizContainer: document.getElementById('quizContainer'),
+            fileInput: document.getElementById('fileInput'),
+            missingText: document.getElementById('missingQuestionsText'),
+            modal: document.getElementById('warningModal'),
+            toast: document.getElementById('toast'),
+            themeIcon: document.getElementById('themeIcon'),
+            themeText: document.getElementById('themeText'),
+            backToTopBtn: document.getElementById("backToTopBtn")
+        };
+
         let originalQuestions = []; 
         let finalQuestions = [];    
-        let selectedAnswers = {};   
+        let selectedAnswers = {};
+        let answeredCount = 0; // Tối ưu biến đếm cho chế độ Xem ngay
+
+        /* ================= TIỆN ÍCH ================= */
+        function showToast(message, duration = 3000) {
+            UI.toast.textContent = message;
+            UI.toast.classList.add("show");
+            setTimeout(() => UI.toast.classList.remove("show"), duration);
+        }
 
         /* ================= CUỘN LÊN ĐẦU TRANG ================= */
-        const backToTopBtn = document.getElementById("backToTopBtn");
+        let ticking = false;
         window.addEventListener('scroll', function() {
-            if (window.scrollY > 150) {
-                backToTopBtn.classList.add("show");
-            } else {
-                backToTopBtn.classList.remove("show");
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    if (window.scrollY > 150) UI.backToTopBtn.classList.add("show");
+                    else UI.backToTopBtn.classList.remove("show");
+                    ticking = false;
+                });
+                ticking = true;
             }
         });
 
@@ -316,67 +219,47 @@
 
         /* ================= QUAY VỀ TRANG CHỦ ================= */
         function goHome() {
-            document.getElementById('upload-card').style.display = 'block';
-            document.getElementById('config-section').style.display = 'none';
-            document.getElementById('action-section').style.display = 'none';
-            document.getElementById('result-box').style.display = 'none';
-            document.getElementById('quizContainer').innerHTML = '';
-            document.getElementById('fileInput').value = '';
-            
-            // Tắt modal nếu đang mở
+            UI.uploadCard.style.display = 'block';
+            UI.configSection.style.display = 'none';
+            UI.actionSection.style.display = 'none';
+            UI.resultBox.style.display = 'none';
+            UI.quizContainer.innerHTML = '';
+            UI.fileInput.value = '';
             closeModal();
-            
-            originalQuestions = [];
-            finalQuestions = [];
-            selectedAnswers = {};
-            
+            originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = 0;
             scrollToTop();
         }
 
         /* ================= XỬ LÝ THEME ================= */
         function updateThemeUI(mode) {
-            const btn = document.getElementById('themeToggleBtn');
             const actualTheme = mode === 'auto' ? getSystemTheme() : mode;
-            
             document.documentElement.setAttribute('data-theme', actualTheme);
             
-            if (mode === 'light') btn.innerHTML = '☀️ Giao diện: Sáng';
-            else if (mode === 'dark') btn.innerHTML = '🌙 Giao diện: Tối';
-            else btn.innerHTML = '🌓 Giao diện: Hệ thống';
+            if (mode === 'light') { UI.themeIcon.textContent = '☀️'; UI.themeText.textContent = 'Sáng'; }
+            else if (mode === 'dark') { UI.themeIcon.textContent = '🌙'; UI.themeText.textContent = 'Tối'; }
+            else { UI.themeIcon.textContent = '🌓'; UI.themeText.textContent = 'Hệ thống'; }
         }
 
         function toggleTheme() {
             const currentMode = localStorage.getItem('themeMode') || 'auto';
-            let nextMode = 'light';
-            
-            if (currentMode === 'auto') nextMode = 'light';
-            else if (currentMode === 'light') nextMode = 'dark';
-            else if (currentMode === 'dark') nextMode = 'auto';
-            
+            const nextMode = currentMode === 'auto' ? 'light' : (currentMode === 'light' ? 'dark' : 'auto');
             localStorage.setItem('themeMode', nextMode);
             updateThemeUI(nextMode);
         }
 
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-            const currentMode = localStorage.getItem('themeMode') || 'auto';
-            if (currentMode === 'auto') {
-                updateThemeUI('auto');
-            }
+            if ((localStorage.getItem('themeMode') || 'auto') === 'auto') updateThemeUI('auto');
         });
+        document.addEventListener('DOMContentLoaded', () => updateThemeUI(localStorage.getItem('themeMode') || 'auto'));
 
-        document.addEventListener('DOMContentLoaded', () => {
-            updateThemeUI(localStorage.getItem('themeMode') || 'auto');
-        });
-
-        /* ================= LOGIC XỬ LÝ TRẮC NGHIỆM ================= */
-        document.getElementById('fileInput').addEventListener('change', function(e) {
+        /* ================= XỬ LÝ FILE & PARSE DỮ LIỆU (ĐÃ FIX MULTILINE) ================= */
+        UI.fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
-                parseQuizData(e.target.result);
-            };
+            reader.onload = e => parseQuizData(e.target.result);
+            reader.onerror = () => showToast("Lỗi: Không thể đọc file. Vui lòng thử lại!");
             reader.readAsText(file);
         });
 
@@ -384,41 +267,64 @@
             const lines = text.split('\n');
             originalQuestions = [];
             let currentQ = null;
+            
+            // Regex nhận diện tiêu đề và đáp án
             const questionRegex = /^(Câu|Q|Bài)?\s*\d+[:\.]?\s*(.*)/i;
+            const optionRegex = /^([A-F0-9a-f][\.\)\s-])\s*/; 
 
             lines.forEach(line => {
-                line = line.trim();
-                if (!line) return;
+                const trimmedLine = line.trim();
+                if (!trimmedLine) return;
 
-                if (questionRegex.test(line)) {
+                if (questionRegex.test(trimmedLine)) {
                     if (currentQ) originalQuestions.push(currentQ);
-                    let cleanTitle = line.replace(/^(Câu|Q|Bài)?\s*\d+[:\.]?\s*/i, '').trim();
+                    let cleanTitle = trimmedLine.replace(/^(Câu|Q|Bài)?\s*\d+[:\.]?\s*/i, '');
                     currentQ = { title: cleanTitle, options: [] };
                 } else if (currentQ) {
-                    let isCorrect = false;
-                    let optionText = line;
+                    // Kiểm tra xem dòng này là Đáp án hay là dòng tiếp nối của Câu hỏi/Đáp án dài
+                    let isOption = optionRegex.test(trimmedLine) || trimmedLine.includes('**');
 
-                    if (optionText.includes('**')) {
-                        isCorrect = true;
-                        optionText = optionText.replace(/\*\*/g, '');
+                    if (isOption) {
+                        let isCorrect = false;
+                        let optionText = trimmedLine;
+                        if (optionText.includes('**')) {
+                            isCorrect = true;
+                            optionText = optionText.replace(/\*\*/g, '');
+                        }
+                        optionText = optionText.replace(optionRegex, '').trim();
+                        currentQ.options.push({ text: optionText, isCorrect: isCorrect });
+                    } else {
+                        // Nối dòng (Multiline)
+                        if (currentQ.options.length === 0) {
+                            currentQ.title += '<br>' + trimmedLine; // Nối vào câu hỏi
+                        } else {
+                            currentQ.options[currentQ.options.length - 1].text += '<br>' + trimmedLine; // Nối vào đáp án trước đó
+                        }
                     }
-                    optionText = optionText.replace(/^[A-F0-9a-f][\.\)\s-]\s*/, '').trim();
-                    currentQ.options.push({ text: optionText, isCorrect: isCorrect });
                 }
             });
             if (currentQ) originalQuestions.push(currentQ);
 
+            // Xử lý Validate: Lọc bỏ các câu không có đáp án
+            const validQuestions = originalQuestions.filter(q => q.options.length > 0);
+            const invalidCount = originalQuestions.length - validQuestions.length;
+            
+            if (invalidCount > 0) {
+                showToast(`Đã bỏ qua ${invalidCount} khối dữ liệu lỗi/không có đáp án.`, 5000);
+            }
+            originalQuestions = validQuestions;
+
             if (originalQuestions.length > 0) {
-                document.getElementById('upload-card').style.display = 'none';
-                document.getElementById('config-section').style.display = 'block';
+                UI.uploadCard.style.display = 'none';
+                UI.configSection.style.display = 'block';
             } else {
-                alert("Không tìm thấy câu hỏi hợp lệ! Vui lòng kiểm tra lại file.");
+                showToast("Không tìm thấy câu hỏi hợp lệ trong file!");
             }
         }
 
         function shuffle(array) {
             let currentIndex = array.length, randomIndex;
-            while (currentIndex != 0) {
+            while (currentIndex > 0) { // Tối ưu > 0
                 randomIndex = Math.floor(Math.random() * currentIndex);
                 currentIndex--;
                 [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
@@ -426,24 +332,31 @@
             return array;
         }
 
+        /* ================= RENDER & LOGIC TRẮC NGHIỆM ================= */
         function startQuiz() {
             const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
             const isShuffleQ = document.getElementById('shuffleQuestions').checked;
             const isShuffleO = document.getElementById('shuffleOptions').checked;
 
-            finalQuestions = JSON.parse(JSON.stringify(originalQuestions));
+            // Dùng structuredClone native (Tối ưu performance)
+            try {
+                finalQuestions = structuredClone(originalQuestions);
+            } catch (e) {
+                finalQuestions = JSON.parse(JSON.stringify(originalQuestions)); // Fallback trình duyệt cũ
+            }
 
             if (isShuffleQ) shuffle(finalQuestions);
             if (isShuffleO) finalQuestions.forEach(q => shuffle(q.options));
 
-            document.getElementById('config-section').style.display = 'none';
+            UI.configSection.style.display = 'none';
             selectedAnswers = {};
+            answeredCount = 0;
             renderQuiz(viewMode);
         }
 
         function renderQuiz(mode) {
-            const container = document.getElementById('quizContainer');
-            container.innerHTML = '';
+            UI.quizContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment(); // Tối ưu DOM Reflow
             
             finalQuestions.forEach((q, qIndex) => {
                 const qBox = document.createElement('div');
@@ -452,7 +365,7 @@
 
                 const qTitle = document.createElement('div');
                 qTitle.className = 'question-title';
-                qTitle.textContent = `Câu ${qIndex + 1}: ${q.title}`;
+                qTitle.innerHTML = `Câu ${qIndex + 1}: ${q.title}`; // Dùng innerHTML để render thẻ <br>
                 qBox.appendChild(qTitle);
 
                 const optionsDiv = document.createElement('div');
@@ -462,19 +375,18 @@
                     const btn = document.createElement('button');
                     btn.className = 'option-btn';
                     const prefix = String.fromCharCode(65 + oIndex); 
-                    btn.textContent = `${prefix}. ${opt.text}`;
+                    btn.innerHTML = `<b>${prefix}.</b> ${opt.text}`; // Dùng innerHTML cho thẻ <br>
                     
                     btn.onclick = () => handleSelection(btn, optionsDiv, qIndex, oIndex, mode);
                     optionsDiv.appendChild(btn);
                 });
 
                 qBox.appendChild(optionsDiv);
-                container.appendChild(qBox);
+                fragment.appendChild(qBox); // Gắn vào fragment
             });
 
-            if (mode === 'end') {
-                document.getElementById('action-section').style.display = 'block';
-            }
+            UI.quizContainer.appendChild(fragment); // Gắn 1 lần duy nhất vào DOM
+            if (mode === 'end') UI.actionSection.style.display = 'block';
         }
 
         function handleSelection(clickedBtn, optionsContainer, qIndex, oIndex, mode) {
@@ -491,7 +403,8 @@
                     });
                 }
                 selectedAnswers[qIndex] = oIndex;
-                checkImmediateScore();
+                answeredCount++;
+                if (answeredCount === finalQuestions.length) forceSubmit(); // Tái sử dụng logic chấm điểm
             } else {
                 buttons.forEach(btn => btn.classList.remove('selected'));
                 clickedBtn.classList.add('selected');
@@ -499,82 +412,52 @@
             }
         }
 
-        function checkImmediateScore() {
-            let answeredCount = Object.keys(selectedAnswers).length;
-            if (answeredCount === finalQuestions.length) {
-                let correctCount = 0;
-                finalQuestions.forEach((q, qIdx) => {
-                    let oIdx = selectedAnswers[qIdx];
-                    if (q.options[oIdx] && q.options[oIdx].isCorrect) correctCount++;
-                });
-                showScore(correctCount, finalQuestions.length);
-            }
-        }
-
         /* ================= QUẢN LÝ NỘP BÀI VÀ MODAL ================= */
         function submitQuiz() {
-            // Kiểm tra xem có câu nào chưa làm không
             let missingQuestions = [];
             for (let i = 0; i < finalQuestions.length; i++) {
-                if (selectedAnswers[i] === undefined) {
-                    missingQuestions.push(i + 1); // Đẩy số thứ tự câu vào mảng (Câu 1, 2, 3...)
-                }
+                if (selectedAnswers[i] === undefined) missingQuestions.push(i + 1);
             }
 
-            // Nếu có câu chưa làm, hiện thông báo
             if (missingQuestions.length > 0) {
-                const missingText = document.getElementById('missingQuestionsText');
-                missingText.innerHTML = `Bạn còn chưa chọn đáp án cho các câu: <b>${missingQuestions.join(', ')}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`;
-                document.getElementById('warningModal').classList.add('show');
+                UI.missingText.innerHTML = `Bạn còn chưa chọn đáp án cho các câu: <b>${missingQuestions.join(', ')}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`;
+                UI.modal.classList.add('show');
             } else {
-                // Nếu làm hết rồi thì nộp luôn
                 forceSubmit();
             }
         }
 
-        function closeModal() {
-            document.getElementById('warningModal').classList.remove('show');
-        }
+        function closeModal() { UI.modal.classList.remove('show'); }
 
         function forceSubmit() {
-            closeModal(); // Đóng thông báo nếu đang mở
+            closeModal();
             
-            let correctCount = 0;
-            
+            // Tối ưu hàm tính điểm bằng reduce
+            const correctCount = finalQuestions.reduce((acc, q, qIndex) => {
+                const userChoice = selectedAnswers[qIndex];
+                if (userChoice !== undefined && q.options[userChoice].isCorrect) return acc + 1;
+                return acc;
+            }, 0);
+
+            // Render lại màu sắc nút (dành cho chế độ nộp cuối)
             finalQuestions.forEach((q, qIndex) => {
                 const qBox = document.getElementById(`qbox-${qIndex}`);
                 const buttons = qBox.querySelectorAll('.option-btn');
                 const userChoice = selectedAnswers[qIndex];
 
                 buttons.forEach((btn, oIndex) => {
-                    btn.disabled = true; // Khóa nút
-                    btn.classList.remove('selected'); // Xóa màu xanh chọn tạm thời
-
-                    // Bôi xanh lá câu đúng
-                    if (q.options[oIndex].isCorrect) {
-                        btn.classList.add('correct');
-                    }
-                    // Bôi đỏ gạch ngang câu sai mà người dùng đã chọn
-                    if (userChoice === oIndex && !q.options[oIndex].isCorrect) {
-                        btn.classList.add('incorrect');
-                    }
+                    btn.disabled = true;
+                    btn.classList.remove('selected');
+                    if (q.options[oIndex].isCorrect) btn.classList.add('correct');
+                    if (userChoice === oIndex && !q.options[oIndex].isCorrect) btn.classList.add('incorrect');
                 });
-
-                if (userChoice !== undefined && q.options[userChoice].isCorrect) {
-                    correctCount++;
-                }
             });
 
-            showScore(correctCount, finalQuestions.length);
-            document.getElementById('action-section').style.display = 'none';
+            const percentage = Math.round((correctCount / finalQuestions.length) * 100);
+            UI.resultBox.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correctCount}/${finalQuestions.length}</span> câu đúng (Đạt ${percentage}%)`;
+            UI.resultBox.style.display = 'block';
+            UI.actionSection.style.display = 'none';
             scrollToTop();
-        }
-
-        function showScore(correct, total) {
-            const resultBox = document.getElementById('result-box');
-            const percentage = Math.round((correct / total) * 100);
-            resultBox.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correct}/${total}</span> câu đúng (Đạt ${percentage}%)`;
-            resultBox.style.display = 'block';
         }
     </script>
 </body>
