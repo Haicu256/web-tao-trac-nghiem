@@ -69,9 +69,9 @@
         #result-box { display: none; text-align: center; background: var(--selected-bg); border: 1px solid var(--selected-border); color: var(--selected-text); padding: 20px; border-radius: 12px; font-size: 20px; font-weight: bold; margin-bottom: 30px; animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Lên Đầu Trang - Thêm transform/scale cho mượt */
-        #backToTopBtn { display: none; position: fixed; bottom: 30px; right: 30px; z-index: 99; font-size: 20px; border: none; background-color: var(--title-color); color: white; cursor: pointer; padding: 15px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 55px; height: 55px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); align-items: center; justify-content: center; opacity: 0; transform: scale(0.8); }
-        #backToTopBtn.show { display: flex; opacity: 1; transform: scale(1); }
+        /* Lên Đầu Trang - dùng visibility thay display:none để transition hoạt động */
+        #backToTopBtn { display: flex; align-items: center; justify-content: center; position: fixed; bottom: 30px; right: 30px; z-index: 99; font-size: 20px; border: none; background-color: var(--title-color); color: white; cursor: pointer; padding: 15px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 55px; height: 55px; transition: opacity 0.3s, transform 0.3s, background-color 0.3s; opacity: 0; transform: scale(0.8); visibility: hidden; pointer-events: none; }
+        #backToTopBtn.show { opacity: 1; transform: scale(1); visibility: visible; pointer-events: auto; }
         #backToTopBtn:hover { transform: scale(1.1) translateY(-5px); background-color: #1557b0; }
 
         /* Modal */
@@ -148,7 +148,10 @@
         <button class="btn-start" onclick="startQuiz()">Bắt Đầu Làm Bài</button>
     </div>
 
-    <div id="result-box"></div>
+    <div id="result-box">
+        <div id="resultText"></div>
+        <button id="retryBtn" class="btn-top" style="display:none; margin-top: 15px; padding: 10px 22px;" onclick="retryQuiz()">🔄 Làm lại bài này</button>
+    </div>
     <div id="quizContainer"></div>
 
     <div id="action-section">
@@ -159,12 +162,12 @@
 
     <div class="modal-overlay" id="warningModal">
         <div class="modal-box">
-            <div class="modal-icon">⚠️</div>
-            <div class="modal-title">Bạn chưa làm xong!</div>
+            <div class="modal-icon" id="modalIcon">⚠️</div>
+            <div class="modal-title" id="modalTitle">Bạn chưa làm xong!</div>
             <div class="modal-desc" id="missingQuestionsText"></div>
             <div class="modal-actions">
-                <button class="btn-modal-cancel" onclick="closeModal()">Tiếp tục làm bài</button>
-                <button class="btn-modal-submit" onclick="forceSubmit()">Vẫn Nộp Bài</button>
+                <button class="btn-modal-cancel" id="modalCancelBtn" onclick="closeModal()">Tiếp tục làm bài</button>
+                <button class="btn-modal-submit" id="modalConfirmBtn">Vẫn Nộp Bài</button>
             </div>
         </div>
     </div>
@@ -178,14 +181,20 @@
             configSection: document.getElementById('config-section'),
             actionSection: document.getElementById('action-section'),
             resultBox: document.getElementById('result-box'),
+            resultText: document.getElementById('resultText'),
             quizContainer: document.getElementById('quizContainer'),
             fileInput: document.getElementById('fileInput'),
             missingText: document.getElementById('missingQuestionsText'),
             modal: document.getElementById('warningModal'),
+            modalIcon: document.getElementById('modalIcon'),
+            modalTitle: document.getElementById('modalTitle'),
+            modalCancelBtn: document.getElementById('modalCancelBtn'),
+            modalConfirmBtn: document.getElementById('modalConfirmBtn'),
             toast: document.getElementById('toast'),
             themeIcon: document.getElementById('themeIcon'),
             themeText: document.getElementById('themeText'),
-            backToTopBtn: document.getElementById("backToTopBtn")
+            backToTopBtn: document.getElementById("backToTopBtn"),
+            retryBtn: document.getElementById("retryBtn")
         };
 
         let originalQuestions = []; 
@@ -219,13 +228,34 @@
 
         /* ================= QUAY VỀ TRANG CHỦ ================= */
         function goHome() {
+            const isInProgress = finalQuestions.length > 0
+                && Object.keys(selectedAnswers).length > 0
+                && UI.resultBox.style.display !== 'block';
+            if (isInProgress) {
+                showModal({
+                    icon: '🏠',
+                    title: 'Về trang chủ?',
+                    desc: 'Tiến độ làm bài hiện tại sẽ bị mất. Bạn có chắc muốn quay về không?',
+                    cancelText: 'Tiếp tục làm',
+                    confirmText: 'Về trang chủ',
+                    onConfirm: _doGoHome
+                });
+            } else {
+                _doGoHome();
+            }
+        }
+
+        function _doGoHome() {
+            const oldBadge = document.getElementById('questionCountBadge');
+            if (oldBadge) oldBadge.remove();
+            UI.retryBtn.style.display = 'none';
             UI.uploadCard.style.display = 'block';
             UI.configSection.style.display = 'none';
             UI.actionSection.style.display = 'none';
             UI.resultBox.style.display = 'none';
+            UI.resultText.innerHTML = '';
             UI.quizContainer.innerHTML = '';
             UI.fileInput.value = '';
-            closeModal();
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = 0;
             scrollToTop();
         }
@@ -252,6 +282,11 @@
         });
         document.addEventListener('DOMContentLoaded', () => updateThemeUI(localStorage.getItem('themeMode') || 'auto'));
 
+        /* ================= PHÍM TẮT ================= */
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
         /* ================= XỬ LÝ FILE & PARSE DỮ LIỆU (ĐÃ FIX MULTILINE) ================= */
         UI.fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -270,7 +305,15 @@
             
             // Regex nhận diện tiêu đề và đáp án
             const questionRegex = /^(Câu|Q|Bài)?\s*\d+[:\.]?\s*(.*)/i;
-            const optionRegex = /^([A-F0-9a-f][\.\)\s-])\s*/; 
+            const optionRegex = /^([a-zA-Z0-9][\.\)\-\/])\s*/;
+
+            // Sanitize input: escape HTML rồi mới cho phép <br> từ nối dòng
+            const escapeHTML = (str) => str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
 
             lines.forEach(line => {
                 const trimmedLine = line.trim();
@@ -279,10 +322,11 @@
                 if (questionRegex.test(trimmedLine)) {
                     if (currentQ) originalQuestions.push(currentQ);
                     let cleanTitle = trimmedLine.replace(/^(Câu|Q|Bài)?\s*\d+[:\.]?\s*/i, '');
-                    currentQ = { title: cleanTitle, options: [] };
+                    currentQ = { title: escapeHTML(cleanTitle), options: [] };
                 } else if (currentQ) {
-                    // Kiểm tra xem dòng này là Đáp án hay là dòng tiếp nối của Câu hỏi/Đáp án dài
-                    let isOption = optionRegex.test(trimmedLine) || trimmedLine.includes('**');
+                    const hasOptionPrefix = optionRegex.test(trimmedLine);
+                    const hasCorrectMarker = trimmedLine.includes('**') && (hasOptionPrefix || currentQ.options.length > 0);
+                    let isOption = hasOptionPrefix || hasCorrectMarker;
 
                     if (isOption) {
                         let isCorrect = false;
@@ -291,14 +335,14 @@
                             isCorrect = true;
                             optionText = optionText.replace(/\*\*/g, '');
                         }
-                        optionText = optionText.replace(optionRegex, '').trim();
+                        optionText = escapeHTML(optionText.replace(optionRegex, '').trim());
                         currentQ.options.push({ text: optionText, isCorrect: isCorrect });
                     } else {
-                        // Nối dòng (Multiline)
+                        // Nối dòng (Multiline) — dùng <br> an toàn vì nội dung đã được escape
                         if (currentQ.options.length === 0) {
-                            currentQ.title += '<br>' + trimmedLine; // Nối vào câu hỏi
+                            currentQ.title += '<br>' + escapeHTML(trimmedLine);
                         } else {
-                            currentQ.options[currentQ.options.length - 1].text += '<br>' + trimmedLine; // Nối vào đáp án trước đó
+                            currentQ.options[currentQ.options.length - 1].text += '<br>' + escapeHTML(trimmedLine);
                         }
                     }
                 }
@@ -317,6 +361,14 @@
             if (originalQuestions.length > 0) {
                 UI.uploadCard.style.display = 'none';
                 UI.configSection.style.display = 'block';
+                // Hiển thị số câu hỏi tìm được
+                const existingBadge = document.getElementById('questionCountBadge');
+                if (existingBadge) existingBadge.remove();
+                const badge = document.createElement('p');
+                badge.id = 'questionCountBadge';
+                badge.style.cssText = 'text-align:center; color: var(--correct-text); font-weight: 600; margin-bottom: 0;';
+                badge.textContent = `✅ Đã tải ${originalQuestions.length} câu hỏi thành công!`;
+                UI.configSection.querySelector('hr').insertAdjacentElement('afterend', badge);
             } else {
                 showToast("Không tìm thấy câu hỏi hợp lệ trong file!");
             }
@@ -404,7 +456,21 @@
                 }
                 selectedAnswers[qIndex] = oIndex;
                 answeredCount++;
-                if (answeredCount === finalQuestions.length) forceSubmit(); // Tái sử dụng logic chấm điểm
+                if (answeredCount === finalQuestions.length) {
+                    // Delay nhỏ để người dùng thấy kết quả câu cuối, KHÔNG scroll — tránh giật màn hình
+                    setTimeout(() => {
+                        const correctCount = finalQuestions.reduce((acc, q, i) => {
+                            const choice = selectedAnswers[i];
+                            return acc + (choice !== undefined && q.options[choice].isCorrect ? 1 : 0);
+                        }, 0);
+                        const percentage = Math.round((correctCount / finalQuestions.length) * 100);
+                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correctCount}/${finalQuestions.length}</span> câu đúng (Đạt ${percentage}%)`;
+                        UI.resultBox.style.display = 'block';
+                        UI.retryBtn.style.display = 'inline-block';
+                        // Scroll nhẹ đến result-box thay vì giật lên đầu trang
+                        UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 600);
+                }
             } else {
                 buttons.forEach(btn => btn.classList.remove('selected'));
                 clickedBtn.classList.add('selected');
@@ -413,21 +479,36 @@
         }
 
         /* ================= QUẢN LÝ NỘP BÀI VÀ MODAL ================= */
+        function showModal({ icon, title, desc, cancelText, confirmText, onConfirm }) {
+            UI.modalIcon.textContent = icon;
+            UI.modalTitle.textContent = title;
+            UI.missingText.innerHTML = desc;
+            UI.modalCancelBtn.textContent = cancelText;
+            UI.modalConfirmBtn.textContent = confirmText;
+            UI.modalConfirmBtn.onclick = () => { closeModal(); onConfirm(); };
+            UI.modal.classList.add('show');
+        }
+
+        function closeModal() { UI.modal.classList.remove('show'); }
+
         function submitQuiz() {
             let missingQuestions = [];
             for (let i = 0; i < finalQuestions.length; i++) {
                 if (selectedAnswers[i] === undefined) missingQuestions.push(i + 1);
             }
-
             if (missingQuestions.length > 0) {
-                UI.missingText.innerHTML = `Bạn còn chưa chọn đáp án cho các câu: <b>${missingQuestions.join(', ')}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`;
-                UI.modal.classList.add('show');
+                showModal({
+                    icon: '⚠️',
+                    title: 'Bạn chưa làm xong!',
+                    desc: `Bạn còn chưa chọn đáp án cho các câu: <b>${missingQuestions.join(', ')}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`,
+                    cancelText: 'Tiếp tục làm bài',
+                    confirmText: 'Vẫn Nộp Bài',
+                    onConfirm: forceSubmit
+                });
             } else {
                 forceSubmit();
             }
         }
-
-        function closeModal() { UI.modal.classList.remove('show'); }
 
         function forceSubmit() {
             closeModal();
@@ -454,9 +535,23 @@
             });
 
             const percentage = Math.round((correctCount / finalQuestions.length) * 100);
-            UI.resultBox.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correctCount}/${finalQuestions.length}</span> câu đúng (Đạt ${percentage}%)`;
+            UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correctCount}/${finalQuestions.length}</span> câu đúng (Đạt ${percentage}%)`;
             UI.resultBox.style.display = 'block';
             UI.actionSection.style.display = 'none';
+            UI.retryBtn.style.display = 'inline-block';
+            scrollToTop();
+        }
+
+        /* ================= LÀM LẠI BÀI (GIỮ NGUYÊN FILE) ================= */
+        function retryQuiz() {
+            UI.retryBtn.style.display = 'none';
+            UI.resultBox.style.display = 'none';
+            UI.resultText.innerHTML = '';
+            UI.configSection.style.display = 'block';
+            UI.quizContainer.innerHTML = '';
+            UI.actionSection.style.display = 'none';
+            selectedAnswers = {};
+            answeredCount = 0;
             scrollToTop();
         }
     </script>
