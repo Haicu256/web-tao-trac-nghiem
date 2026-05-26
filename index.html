@@ -13,6 +13,7 @@
             --selected-bg: #e8f0fe; --selected-border: #1a73e8; --selected-text: #1a73e8;
             --correct-bg: #e6f4ea; --correct-text: #137333; --correct-border: #137333;
             --incorrect-bg: #fce8e6; --incorrect-text: #c5221f; --incorrect-border: #c5221f;
+            --bg-secondary: #f1f3f4;
         }
 
         [data-theme="dark"] {
@@ -23,6 +24,7 @@
             --selected-bg: #1a3b5c; --selected-border: #8ab4f8; --selected-text: #8ab4f8;
             --correct-bg: #132d19; --correct-text: #81c995; --correct-border: #81c995;
             --incorrect-bg: #3c1e1e; --incorrect-text: #f28b82; --incorrect-border: #f28b82;
+            --bg-secondary: #2d2e30;
         }
 
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: var(--bg-color); color: var(--text-color); transition: background-color 0.3s, color 0.3s; }
@@ -75,12 +77,14 @@
         #backToTopBtn:hover { transform: scale(1.1) translateY(-5px); background-color: #1557b0; }
 
         /* Modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(3px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        @supports (backdrop-filter: blur(3px)) { .modal-overlay { backdrop-filter: blur(3px); } }
+        @supports not (backdrop-filter: blur(3px)) { .modal-overlay { background: rgba(0, 0, 0, 0.65); } }
         .modal-overlay.show { opacity: 1; visibility: visible; }
         .modal-box { background: var(--card-bg); color: var(--text-color); padding: 30px; border-radius: 15px; max-width: 450px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; transform: scale(0.9); transition: transform 0.3s ease; }
         .modal-overlay.show .modal-box { transform: scale(1); }
         .modal-icon { font-size: 40px; margin-bottom: 15px; }
-        .modal-title { font-size: 22px; font-weight: bold; color: var(--incorrect-text); margin-bottom: 10px; }
+        .modal-title { font-size: 22px; font-weight: bold; color: var(--text-color); margin-bottom: 10px; }
         .modal-desc { font-size: 16px; margin-bottom: 25px; line-height: 1.5; color: var(--btn-text); }
         .modal-desc b { color: var(--incorrect-border); font-size: 18px; }
         .modal-actions { display: flex; justify-content: center; gap: 15px; }
@@ -114,7 +118,13 @@
     <div id="upload-card" class="card">
         <div id="upload-section">
             <h2>Tải lên file câu hỏi (.txt)</h2>
-            <p>Định dạng: Đánh dấu đáp án đúng bằng dấu <b>**</b> ở hai đầu đáp án.</p>
+            <p>Định dạng: Đánh dấu đáp án đúng bằng dấu <b>*</b> ở đầu đáp án.</p>
+            <pre style="display:block; width:fit-content; max-width:100%; box-sizing:border-box; text-align:left; margin: 8px auto 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 20px; font-size: 13px; line-height: 1.8; font-family: monospace; color: var(--text-color); white-space: pre-wrap; word-break: break-word;"><b>Ví dụ:</b>
+Câu 2: Trình duyệt web nào sau đây do Google phát triển?
+A. Safari
+B. Firefox
+C. Edge
+*D. Chrome</pre>
             <label class="custom-file-upload">
                 <input type="file" id="fileInput" accept=".txt">
                 Chọn file câu hỏi .txt
@@ -131,7 +141,7 @@
             <div class="radio-group">
                 <div>
                     <label><input type="radio" name="viewMode" value="immediate" checked> Xem đúng/sai ngay khi bấm</label>
-                    <span class="hint-text">*Chỉ được chọn 1 lần cho mỗi câu</span>
+                    <span class="hint-text">Chỉ được chọn 1 lần cho mỗi câu</span>
                 </div>
                 <label><input type="radio" name="viewMode" value="end"> Làm hết mới nộp bài</label>
             </div>
@@ -220,7 +230,7 @@
                 });
                 ticking = true;
             }
-        });
+        }, { passive: true });
 
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -292,10 +302,26 @@
             const file = e.target.files[0];
             if (!file) return;
 
+            const MAX_SIZE_MB = 5;
+            if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+                showToast(`File quá lớn! Vui lòng chọn file nhỏ hơn ${MAX_SIZE_MB}MB.`);
+                UI.fileInput.value = '';
+                return;
+            }
+
             const reader = new FileReader();
-            reader.onload = e => parseQuizData(e.target.result);
+            reader.onload = e => {
+                const text = e.target.result;
+                // Kiểm tra encoding: nếu có ký tự replacement (U+FFFD) thì file không phải UTF-8
+                if (text.includes('\uFFFD')) {
+                    showToast('File có ký tự không hợp lệ. Vui lòng lưu file dưới dạng UTF-8.', 5000);
+                    UI.fileInput.value = '';
+                    return;
+                }
+                parseQuizData(text);
+            };
             reader.onerror = () => showToast("Lỗi: Không thể đọc file. Vui lòng thử lại!");
-            reader.readAsText(file);
+            reader.readAsText(file, 'UTF-8');
         });
 
         function parseQuizData(text) {
@@ -303,9 +329,9 @@
             originalQuestions = [];
             let currentQ = null;
             
-            // Regex nhận diện tiêu đề và đáp án
-            const questionRegex = /^(Câu|Q|Bài)?\s*\d+[:\.]?\s*(.*)/i;
-            const optionRegex = /^([a-zA-Z0-9][\.\)\-\/])\s*/;
+            // Regex hoist ra ngoài loop để tránh compile lại mỗi vòng
+            const QUESTION_KEYWORD_REGEX = /^(Câu|Q|Bài)\s*\d+/i;
+            const OPTION_REGEX = /^([a-zA-Z0-9][\.\)\-\/])\s*/;
 
             // Sanitize input: escape HTML rồi mới cho phép <br> từ nối dòng
             const escapeHTML = (str) => str
@@ -319,24 +345,21 @@
                 const trimmedLine = line.trim();
                 if (!trimmedLine) return;
 
-                if (questionRegex.test(trimmedLine)) {
+                const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine);
+
+                if (isNewQuestion) {
                     if (currentQ) originalQuestions.push(currentQ);
                     let cleanTitle = trimmedLine.replace(/^(Câu|Q|Bài)?\s*\d+[:\.]?\s*/i, '');
                     currentQ = { title: escapeHTML(cleanTitle), options: [] };
                 } else if (currentQ) {
-                    const hasOptionPrefix = optionRegex.test(trimmedLine);
-                    const hasCorrectMarker = trimmedLine.includes('**') && (hasOptionPrefix || currentQ.options.length > 0);
-                    let isOption = hasOptionPrefix || hasCorrectMarker;
+                    // Dấu * đầu dòng = đáp án đúng
+                    const isCorrect = trimmedLine.startsWith('*');
+                    const cleanLine = isCorrect ? trimmedLine.slice(1).trimStart() : trimmedLine;
+                    const hasOptionPrefix = OPTION_REGEX.test(cleanLine);
 
-                    if (isOption) {
-                        let isCorrect = false;
-                        let optionText = trimmedLine;
-                        if (optionText.includes('**')) {
-                            isCorrect = true;
-                            optionText = optionText.replace(/\*\*/g, '');
-                        }
-                        optionText = escapeHTML(optionText.replace(optionRegex, '').trim());
-                        currentQ.options.push({ text: optionText, isCorrect: isCorrect });
+                    if (hasOptionPrefix || isCorrect) {
+                        const optionText = escapeHTML(cleanLine.replace(OPTION_REGEX, '').trim());
+                        currentQ.options.push({ text: optionText, isCorrect });
                     } else {
                         // Nối dòng (Multiline) — dùng <br> an toàn vì nội dung đã được escape
                         if (currentQ.options.length === 0) {
@@ -426,8 +449,10 @@
                 q.options.forEach((opt, oIndex) => {
                     const btn = document.createElement('button');
                     btn.className = 'option-btn';
-                    const prefix = String.fromCharCode(65 + oIndex); 
-                    btn.innerHTML = `<b>${prefix}.</b> ${opt.text}`; // Dùng innerHTML cho thẻ <br>
+                    const prefix = String.fromCharCode(65 + oIndex);
+                    const plainText = opt.text.replace(/<br\s*\/?>/gi, ' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
+                    btn.setAttribute('aria-label', `Câu ${qIndex + 1}, đáp án ${prefix}: ${plainText}`);
+                    btn.innerHTML = `<b>${prefix}.</b> ${opt.text}`;
                     
                     btn.onclick = () => handleSelection(btn, optionsDiv, qIndex, oIndex, mode);
                     optionsDiv.appendChild(btn);
