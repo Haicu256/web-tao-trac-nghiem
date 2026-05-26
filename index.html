@@ -19,6 +19,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ Thống Tạo Đề Trắc Nghiệm Bằng File txt</title>
 <meta name="description" content="Website miễn phí giúp bạn tự tải file câu hỏi .txt để tạo đề và luyện thi trắc nghiệm online.">
+    <meta name="keywords" content="tạo đề trắc nghiệm, luyện thi trắc nghiệm, quiz online, thi trắc nghiệm, ôn thi, câu hỏi trắc nghiệm, tạo bài kiểm tra">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://web-tao-trac-nghiem.haicu25699652.workers.dev/">
+
+    <!-- Open Graph (Facebook, Zalo, Messenger hiện preview đẹp) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/">
+    <meta property="og:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
+    <meta property="og:description" content="Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online. Hỗ trợ trộn câu hỏi, xem kết quả ngay, hoàn toàn miễn phí.">
+    <meta property="og:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/lgw.png">
+    <meta property="og:locale" content="vi_VN">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
+    <meta name="twitter:description" content="Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online.">
+    <meta name="twitter:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/lgw.png">
     <style>
         :root {
             --bg-color: #f4f6f9; --text-color: #333333; --card-bg: #ffffff;
@@ -112,11 +129,31 @@
         /* Toast Message */
         #toast { visibility: hidden; min-width: 250px; background-color: #323232; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; transform: translateX(-50%); box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, bottom 0.3s; font-weight: 500; }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+
+        /* Footer góc dưới phải */
+        #site-footer { position: fixed; bottom: 14px; right: 18px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 98; }
+        #bmc-btn { font-size: 12px; font-weight: 600; color: #fff; background: #f7c948; border-radius: 20px; padding: 5px 12px; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transition: transform 0.15s, opacity 0.15s; white-space: nowrap; }
+        #bmc-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+        #copyright { font-size: 11px; color: var(--btn-text); opacity: 0.55; }
     </style>
     <script>
         function getSystemTheme() { return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
         const savedMode = localStorage.getItem('themeMode') || 'auto';
         document.documentElement.setAttribute('data-theme', savedMode === 'auto' ? getSystemTheme() : savedMode);
+    </script>
+    <!-- Structured Data: giúp Google hiểu trang là WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Tạo Đề Trắc Nghiệm Bằng File txt",
+      "url": "https://web-tao-trac-nghiem.haicu25699652.workers.dev/",
+      "description": "Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online. Hỗ trợ trộn câu hỏi, xem kết quả ngay, hoàn toàn miễn phí.",
+      "applicationCategory": "EducationApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "VND" },
+      "inLanguage": "vi"
+    }
     </script>
 </head>
 <body>
@@ -197,7 +234,11 @@ C. Edge
         </div>
     </div>
 
-    <div id="toast">Thông báo</div>
+    <!-- Footer góc dưới phải -->
+    <div id="site-footer">
+        <a href="https://youtu.be/dQw4w9WgXcQ?si=B2JcO9Bs3ho7YsLd" target="_blank" rel="noopener" id="bmc-btn">☕ Buy me a coffee</a>
+        <span id="copyright">© 2025 HN256</span>
+    </div>
 
     <script>
         // DOM Cache
@@ -215,11 +256,12 @@ C. Edge
             modalTitle: document.getElementById('modalTitle'),
             modalCancelBtn: document.getElementById('modalCancelBtn'),
             modalConfirmBtn: document.getElementById('modalConfirmBtn'),
-            toast: document.getElementById('toast'),
             themeIcon: document.getElementById('themeIcon'),
             themeText: document.getElementById('themeText'),
             backToTopBtn: document.getElementById("backToTopBtn"),
-            retryBtn: document.getElementById("retryBtn")
+            retryBtn: document.getElementById("retryBtn"),
+            toast: document.getElementById("toast"),
+            footer: document.getElementById("site-footer")
         };
 
         let originalQuestions = []; 
@@ -282,6 +324,7 @@ C. Edge
             UI.quizContainer.innerHTML = '';
             UI.fileInput.value = '';
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = 0;
+            UI.footer.style.display = 'flex';
             scrollToTop();
         }
 
@@ -424,6 +467,7 @@ C. Edge
 
         /* ================= RENDER & LOGIC TRẮC NGHIỆM ================= */
         function startQuiz() {
+            UI.footer.style.display = 'none';
             const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
             const isShuffleQ = document.getElementById('shuffleQuestions').checked;
             const isShuffleO = document.getElementById('shuffleOptions').checked;
@@ -595,5 +639,6 @@ C. Edge
             scrollToTop();
         }
     </script>
+
 </body>
 </html>
