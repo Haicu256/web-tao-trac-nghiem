@@ -1034,7 +1034,7 @@ D. Không</pre>
                     return docxResult.value;
 
                 case 'pdf':
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
                     let fullText = '';
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
@@ -1123,7 +1123,7 @@ D. Không</pre>
                     for (const line of lines) {
                         if (/^Câu\s*\d+\s*[:\.]?/i.test(line.trim()) || /^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/i.test(line.trim())) count++;
                     }
-                    currentIndex += count || 50;
+                    currentIndex += count;
 
                     if (i < chunks.length - 1) await sleep(1000);
                 }
