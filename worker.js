@@ -74,6 +74,11 @@ function buildPrompt(rawText, startIndex) {
 Bạn là công cụ chuyển đổi bố cục văn bản thành câu hỏi trắc nghiệm (Multiple Choice) hoặc trắc nghiệm đúng/sai.
 Nhiệm vụ: Sắp xếp lại văn bản thành định dạng chuẩn:
 
+QUY TẮC BẮT BUỘC VỀ XUỐNG DÒNG (áp dụng cho mọi câu hỏi, mọi loại):
+- Dù văn bản gốc trình bày các lựa chọn theo kiểu gì (nằm ngang trên cùng một dòng, cách nhau bằng khoảng trắng/tab, viết liền nhau, hay bất kỳ định dạng nào khác), khi xuất ra BẮT BUỘC mỗi lựa chọn A, B, C, D phải nằm trên MỘT DÒNG RIÊNG BIỆT (xuống dòng thật giữa các lựa chọn).
+- TUYỆT ĐỐI không để 2 lựa chọn trở lên nằm chung một dòng trong kết quả xuất ra, kể cả khi input gốc viết chung dòng.
+- Quy tắc này áp dụng tương tự cho dòng "Câu X:" — luôn bắt đầu một dòng mới, không dính vào lựa chọn trước đó.
+
 QUAN TRỌNG:
 Đối với trắc nghiệm đúng/sai
 - Phân loại câu hỏi: nếu câu hỏi có dạng đúng/sai (True/False) (ví dụ: "Đúng hay Sai", "True/False", "Nhận định nào đúng/sai", ...), hãy thêm tiêu đề "câu hỏi đúng sai: câu X:" trước nội dung câu hỏi.
