@@ -13,8 +13,5 @@
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ],
-  "secrets": {
-    "required": ["GEMINI_API_KEY"]
-  }
+  ]
 }
