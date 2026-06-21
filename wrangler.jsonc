@@ -1,14 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "web-tao-trac-nghiem",
+  "main": "worker.js",
   "compatibility_date": "2026-05-25",
+  "keep_vars": true,
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "secrets": {
+    "required": ["GEMINI_API_KEY"]
+  }
 }
