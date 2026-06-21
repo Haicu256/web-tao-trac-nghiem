@@ -95,9 +95,9 @@ D. [nội dung lựa chọn D]
 
 
 Đối với trắc nghiệm lựa chọn:
-1. GIỮ NGUYÊN số thứ tự câu hỏi từ văn bản gốc nếu có. Nếu văn bản có "Bài 1:", "1.", "1/", "Câu hỏi 1:" thì chuyển thành "Câu 1:". KHÔNG tự động đánh lại số thứ tự.
-2. Nếu văn bản không có số thứ tự, hãy đánh số tăng dần từ 1.
-3. sửa tiền tố (Bài, 1., 1/, Câu hỏi, ...) thành "Câu X:".
+1. GIỮ NGUYÊN số thứ tự câu hỏi từ văn bản gốc nếu có. Nếu văn bản có "Bài 1:", "1.", "1/", "Câu hỏi 1:" thì chuyển thành "Câu 1:". KHÔNG tự động đánh lại số thứ tự trong trường hợp này.
+2. Nếu văn bản KHÔNG có số thứ tự, hãy đánh số tăng dần bắt đầu từ ${startIndex}.
+3. Sửa tiền tố (Bài, 1., 1/, Câu hỏi, ...) thành "Câu X:".
 4. Không thay đổi nội dung câu hỏi, không thêm bớt từ.
 5. Đảm bảo mỗi câu hỏi có đúng 4 lựa chọn A, B, C, D.
 6. Nếu gặp đoạn văn không phải câu hỏi trắc nghiệm (không có 4 lựa chọn), hãy giữ nguyên nhưng không đánh số.
