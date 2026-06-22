@@ -751,7 +751,7 @@ D. Không</pre>
                 fragment.appendChild(qBox);
             });
             UI.quizContainer.appendChild(fragment);
-            if (mode === 'end') UI.actionSection.style.display = 'block';
+            UI.actionSection.style.display = 'block';
         }
 
         // ===== KIỂM TRA ĐÃ TRẢ LỜI HẾT CHO TRUE/FALSE (IMMEDIATE) =====
@@ -775,8 +775,9 @@ D. Không</pre>
                 if (totalAnswered === finalQuestions.length) {
                     setTimeout(() => {
                         const result = calculateScoreImmediate();
-                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.correct}/${result.total}</span> câu đúng (Đạt ${result.percentage}%)`;
+                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
                         UI.resultBox.style.display = 'block';
+                        UI.actionSection.style.display = 'none';
                         UI.retryBtn.style.display = 'inline-block';
                         UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }, 600);
@@ -810,8 +811,9 @@ D. Không</pre>
                 if (totalAnswered === finalQuestions.length) {
                     setTimeout(() => {
                         const result = calculateScoreImmediate();
-                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.correct}/${result.total}</span> câu đúng (Đạt ${result.percentage}%)`;
+                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
                         UI.resultBox.style.display = 'block';
+                        UI.actionSection.style.display = 'none';
                         UI.retryBtn.style.display = 'inline-block';
                         UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }, 600);
@@ -824,31 +826,48 @@ D. Không</pre>
         }
 
         // ===== CHẤM ĐIỂM CHO IMMEDIATE =====
+        // Thang điểm câu hỏi Đúng/Sai theo Quyết định 764/QĐ-BGDĐT (áp dụng từ kỳ thi tốt nghiệp THPT 2025):
+        // đúng 1 ý = 0.1đ, 2 ý = 0.25đ, 3 ý = 0.5đ, đúng cả 4 ý = 1đ (mỗi câu Đúng/Sai tối đa 1 điểm).
+        function getTFPoints(correctCount, totalCount) {
+            if (totalCount === 4) {
+                switch (correctCount) {
+                    case 1: return 0.1;
+                    case 2: return 0.25;
+                    case 3: return 0.5;
+                    case 4: return 1.0;
+                    default: return 0;
+                }
+            }
+            // Câu Đúng/Sai không đúng 4 ý (ngoài chuẩn đề thi): tính tỉ lệ tương ứng, tối đa 1 điểm/câu
+            return totalCount > 0 ? (correctCount / totalCount) : 0;
+        }
+
+        function countTFCorrect(q, qIndex) {
+            let correctCount = 0;
+            for (let i = 0; i < q.options.length; i++) {
+                const state = selectedAnswers[qIndex]?.[i];
+                const isCorrectAnswer = q.options[i].isCorrect;
+                const userDung = state?.dung || false;
+                const userSai = state?.sai || false;
+                const userCorrect = isCorrectAnswer ? (userDung && !userSai) : (userSai && !userDung);
+                if (userCorrect) correctCount++;
+            }
+            return correctCount;
+        }
+
         function calculateScoreImmediate() {
-            let correct = 0;
-            const total = finalQuestions.length;
+            let earnedPoints = 0;
+            const total = finalQuestions.length; // mỗi câu tối đa 1 điểm
             finalQuestions.forEach((q, qIndex) => {
                 if (q.type === 'true_false') {
-                    let allCorrect = true;
-                    for (let i = 0; i < q.options.length; i++) {
-                        const state = selectedAnswers[qIndex]?.[i];
-                        const isCorrectAnswer = q.options[i].isCorrect;
-                        let userDung = state?.dung || false;
-                        let userSai = state?.sai || false;
-                        if (isCorrectAnswer) {
-                            if (!userDung || userSai) { allCorrect = false; break; }
-                        } else {
-                            if (!userSai || userDung) { allCorrect = false; break; }
-                        }
-                    }
-                    if (allCorrect) correct++;
+                    earnedPoints += getTFPoints(countTFCorrect(q, qIndex), q.options.length);
                 } else {
                     const choice = selectedAnswers[qIndex];
-                    if (choice !== undefined && q.options[choice].isCorrect) correct++;
+                    if (choice !== undefined && q.options[choice].isCorrect) earnedPoints += 1;
                 }
             });
-            const percentage = Math.round((correct / total) * 100);
-            return { correct, total, percentage };
+            const percentage = Math.round((earnedPoints / total) * 100);
+            return { points: Math.round(earnedPoints * 100) / 100, total, percentage };
         }
 
         // ===== BẮT ĐẦU QUIZ =====
@@ -895,10 +914,14 @@ D. Không</pre>
                 }
             }
             if (missing.length > 0) {
+                let missingText = missing.join(', ');
+                if (missing.length > 10) {
+                    missingText = missing.slice(0, 10).join(', ') + ` và ${missing.length - 10} câu khác`;
+                }
                 showModal({
                     icon: '⚠️',
                     title: 'Bạn chưa làm xong!',
-                    desc: `Bạn còn chưa chọn đáp án cho các câu: <b>${missing.join(', ')}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`,
+                    desc: `Bạn còn chưa chọn đáp án cho các câu: <b>${missingText}</b>.<br><br>Bạn có chắc chắn muốn nộp bài lúc này không?`,
                     cancelText: 'Tiếp tục làm bài',
                     confirmText: 'Vẫn Nộp Bài',
                     onConfirm: forceSubmit
@@ -911,26 +934,14 @@ D. Không</pre>
         function forceSubmit() {
             closeModal();
             // Tính điểm
-            let correct = 0;
-            const total = finalQuestions.length;
+            let earnedPoints = 0;
+            const total = finalQuestions.length; // mỗi câu tối đa 1 điểm
             finalQuestions.forEach((q, qIndex) => {
                 if (q.type === 'true_false') {
-                    let allCorrect = true;
-                    for (let i = 0; i < q.options.length; i++) {
-                        const state = selectedAnswers[qIndex]?.[i];
-                        const isCorrectAnswer = q.options[i].isCorrect;
-                        let userDung = state?.dung || false;
-                        let userSai = state?.sai || false;
-                        if (isCorrectAnswer) {
-                            if (!userDung || userSai) { allCorrect = false; break; }
-                        } else {
-                            if (!userSai || userDung) { allCorrect = false; break; }
-                        }
-                    }
-                    if (allCorrect) correct++;
+                    earnedPoints += getTFPoints(countTFCorrect(q, qIndex), q.options.length);
                 } else {
                     const choice = selectedAnswers[qIndex];
-                    if (choice !== undefined && q.options[choice].isCorrect) correct++;
+                    if (choice !== undefined && q.options[choice].isCorrect) earnedPoints += 1;
                 }
             });
 
@@ -975,8 +986,9 @@ D. Không</pre>
                 }
             });
 
-            const percentage = Math.round((correct / total) * 100);
-            UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${correct}/${total}</span> câu đúng (Đạt ${percentage}%)`;
+            const percentage = Math.round((earnedPoints / total) * 100);
+            const displayPoints = Math.round(earnedPoints * 100) / 100;
+            UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${displayPoints}/${total}</span> điểm (Đạt ${percentage}%)`;
             UI.resultBox.style.display = 'block';
             UI.actionSection.style.display = 'none';
             UI.retryBtn.style.display = 'inline-block';
@@ -1070,8 +1082,14 @@ D. Không</pre>
             const chunks = [];
             let current = '';
             const lines = text.split('\n');
+            // Nhận diện dòng có khả năng là điểm bắt đầu 1 câu hỏi mới trong văn bản gốc
+            // (văn bản đầu vào chưa chuẩn hoá nên chấp nhận nhiều kiểu đánh số khác nhau)
+            const QUESTION_START_REGEX = /^((câu\s*hỏi|câu|bài|q)\s*\d+|\d+\s*[\.\)\/:]\s)/i;
             for (const line of lines) {
-                if ((current.length + line.length + 1) > maxChars && current.length > 0) {
+                const trimmed = line.trim();
+                const isQuestionStart = QUESTION_START_REGEX.test(trimmed);
+                // Chỉ cắt chunk khi gặp đúng điểm bắt đầu câu hỏi mới, không cắt giữa thân câu hỏi và đáp án
+                if (isQuestionStart && current.length > 0 && (current.length + line.length + 1) > maxChars) {
                     chunks.push(current.trim());
                     current = '';
                 }
