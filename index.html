@@ -63,7 +63,7 @@
         .card { background: var(--card-bg); padding: 25px; border-radius: 12px; box-shadow: var(--card-shadow); margin-bottom: 25px; }
         #upload-section { text-align: center; }
         #upload-section p { color: #888; margin-bottom: 20px; }
-        .file-upload-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 10px; }
+        .file-upload-row { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 10px; }
         .custom-file-upload, .convert-file-upload {
             border: 2px dashed var(--title-color);
             background-color: var(--bg-color);
@@ -84,6 +84,10 @@
             background-color: var(--convert-bg);
         }
         input[type="file"] { display: none; }
+        .btn-guide-link { background-color: var(--bg-color); color: var(--title-color); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; margin: 4px auto 20px; transition: all 0.2s; }
+        .btn-guide-link:hover { background-color: var(--hover-bg); border-color: var(--hover-border); }
+        .btn-guide-link .arrow-bounce { display: inline-block; animation: bounceDown 1.4s infinite; }
+        @keyframes bounceDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 
         #config-section { display: none; }
         .config-group { margin-bottom: 15px; }
@@ -259,19 +263,7 @@
             <div id="upload-section">
                 <h2>Tải lên file câu hỏi (.txt)</h2>
                 <p>Định dạng: Đánh dấu đáp án đúng bằng dấu <b>*</b> ở đầu đáp án.</p>
-                <pre style="display:block; width:fit-content; max-width:100%; box-sizing:border-box; text-align:left; margin: 8px auto 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 20px; font-size: 13px; line-height: 1.8; font-family: monospace; color: var(--text-color); white-space: pre-wrap; word-break: break-word;"><b>Ví dụ:</b>
-Câu 2: Trình duyệt web nào sau đây do Google phát triển?
-A. Safari
-B. Firefox
-C. Edge
-*D. Chrome
-
-<b>Câu hỏi đúng/sai:</b>
-câu hỏi đúng sai: câu 1:
-*A. Đúng
-B. Sai
-*C. Có thể
-D. Không</pre>
+                <button type="button" class="btn-guide-link" onclick="scrollToGuide()">📖 Hướng dẫn sử dụng <span class="arrow-bounce">⬇️</span></button>
                 <div class="file-upload-row">
                     <label class="custom-file-upload">
                         <input type="file" id="fileInput" accept=".txt">
@@ -297,6 +289,24 @@ D. Không</pre>
 
         <div id="free-message" class="free-message-outside">
             ✨ công cụ mình làm miễn phí, mới chỉ có ít chức năng mong có thể giúp các bạn ôn bài dễ dàng hơn.
+        </div>
+
+        <div id="usage-guide" class="card">
+            <h2>📖 Hướng dẫn sử dụng</h2>
+            <p>Định dạng: Đánh dấu đáp án đúng bằng dấu <b>*</b> ở đầu đáp án.</p>
+            <pre style="display:block; width:fit-content; max-width:100%; box-sizing:border-box; text-align:left; margin: 8px auto 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 20px; font-size: 13px; line-height: 1.8; font-family: monospace; color: var(--text-color); white-space: pre-wrap; word-break: break-word;"><b>Ví dụ:</b>
+Câu 2: Trình duyệt web nào sau đây do Google phát triển?
+A. Safari
+B. Firefox
+C. Edge
+*D. Chrome
+
+<b>Câu hỏi đúng/sai:</b>
+câu hỏi đúng sai: câu 1:
+*A. Đúng
+B. Sai
+*C. Có thể
+D. Không</pre>
         </div>
 
         <div id="config-section" class="card">
@@ -378,6 +388,7 @@ D. Không</pre>
             toast: document.getElementById("toast"),
             footer: document.getElementById("site-footer"),
             freeMessage: document.getElementById("free-message"),
+            usageGuide: document.getElementById("usage-guide"),
             musicBtn: document.getElementById("musicToggleBtn"),
             convertFileInput: document.getElementById('convertFileInput'),
             convertResultCard: document.getElementById('convert-result-card'),
@@ -440,6 +451,7 @@ D. Không</pre>
             }
         }, { passive: true });
         function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+        function scrollToGuide() { UI.usageGuide.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
         function goHome() {
             const isInProgress = finalQuestions.length > 0 && Object.keys(selectedAnswers).length > 0 && UI.resultBox.style.display !== 'block';
@@ -473,6 +485,7 @@ D. Không</pre>
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = {};
             UI.footer.style.display = 'flex';
             UI.freeMessage.style.display = 'block';
+            UI.usageGuide.style.display = 'block';
             scrollToTop();
         }
 
@@ -708,17 +721,21 @@ D. Không</pre>
                                 if (userChoice === 'dung' && isCorrect) correct = true;
                                 else if (userChoice === 'sai' && !isCorrect) correct = true;
                                 const resultEl = document.getElementById(`tf-result-${qIndex}-${optIndex}`);
+                                const statementDiv = document.getElementById(`tf-${qIndex}-${optIndex}`);
                                 if (cb.checked) {
                                     if (correct) {
                                         resultEl.innerHTML = '<span class="correct-icon">✔</span>';
+                                        statementDiv.classList.add('correct-highlight');
                                     } else {
                                         resultEl.innerHTML = '<span class="incorrect-icon">✘</span>';
+                                        statementDiv.classList.add('incorrect-highlight');
                                     }
                                     // Khoá lại lựa chọn của phát biểu này, không cho đổi đáp án nữa
                                     cbDung.disabled = true;
                                     cbSai.disabled = true;
                                 } else {
                                     resultEl.innerHTML = '';
+                                    statementDiv.classList.remove('correct-highlight', 'incorrect-highlight');
                                 }
                                 // Kiểm tra tất cả phát biểu đã có lựa chọn chưa
                                 checkAllAnsweredTF(qIndex);
@@ -874,6 +891,7 @@ D. Không</pre>
         function startQuiz() {
             UI.footer.style.display = 'none';
             UI.freeMessage.style.display = 'none';
+            UI.usageGuide.style.display = 'none';
             showMusicButton();
 
             const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
@@ -1006,6 +1024,7 @@ D. Không</pre>
             selectedAnswers = {};
             answeredCount = {};
             UI.freeMessage.style.display = 'block';
+            UI.usageGuide.style.display = 'block';
             UI.footer.style.display = 'flex';
             scrollToTop();
         }
@@ -1085,11 +1104,17 @@ D. Không</pre>
             // Nhận diện dòng có khả năng là điểm bắt đầu 1 câu hỏi mới trong văn bản gốc
             // (văn bản đầu vào chưa chuẩn hoá nên chấp nhận nhiều kiểu đánh số khác nhau)
             const QUESTION_START_REGEX = /^((câu\s*hỏi|câu|bài|q)\s*\d+|\d+\s*[\.\)\/:]\s)/i;
+            // Giới hạn an toàn: nếu chunk vượt quá xa maxChars mà vẫn chưa gặp điểm bắt đầu câu hỏi nào
+            // (ví dụ văn bản là văn xuôi thuần, không có cấu trúc câu hỏi rõ ràng), buộc phải cắt
+            // để tránh chunk phình to vô hạn.
+            const hardMaxChars = maxChars * 1.5;
             for (const line of lines) {
                 const trimmed = line.trim();
                 const isQuestionStart = QUESTION_START_REGEX.test(trimmed);
-                // Chỉ cắt chunk khi gặp đúng điểm bắt đầu câu hỏi mới, không cắt giữa thân câu hỏi và đáp án
-                if (isQuestionStart && current.length > 0 && (current.length + line.length + 1) > maxChars) {
+                const wouldExceed = (current.length + line.length + 1) > maxChars;
+                // Ưu tiên cắt đúng tại điểm bắt đầu câu hỏi mới; nếu không có điểm an toàn nào
+                // trong phạm vi hardMaxChars thì buộc cắt để không cắt giữa thân câu hỏi và đáp án.
+                if (current.length > 0 && wouldExceed && (isQuestionStart || current.length > hardMaxChars)) {
                     chunks.push(current.trim());
                     current = '';
                 }
