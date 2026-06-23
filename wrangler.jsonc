@@ -16,5 +16,12 @@
   ],
   "secrets": {
     "required": ["GEMINI_API_KEY"]
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "CONVERT_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ]
 }

@@ -150,6 +150,8 @@
         .btn-download:hover { background: #1557b0; }
         .btn-convert-cancel { background: var(--border-color); color: var(--text-color); }
         .btn-convert-cancel:hover { background: var(--hover-border); }
+        .btn-use-now { background: #34a853; color: white; }
+        .btn-use-now:hover { background: #2b8c44; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
         @supports (backdrop-filter: blur(3px)) { .modal-overlay { backdrop-filter: blur(3px); } }
@@ -282,6 +284,7 @@
             <div id="convertStatus" style="margin-bottom:10px; font-weight:500;"></div>
             <textarea id="convertedText" readonly></textarea>
             <div class="convert-actions">
+                <button class="btn-convert-action btn-use-now" onclick="useConvertedTextImmediately()">🚀 Làm bài ngay</button>
                 <button class="btn-convert-action btn-download" onclick="downloadConvertedTxt()">⬇️ Tải xuống .txt</button>
                 <button class="btn-convert-action btn-convert-cancel" onclick="closeConvertResult()">❌ Đóng</button>
             </div>
@@ -590,11 +593,13 @@ D. Không</pre>
             if (currentQ) originalQuestions.push(currentQ);
 
             const validQuestions = originalQuestions.filter(q => q.options.length > 0);
-            const withCorrectAnswer = validQuestions.filter(q => {
-                if (q.type === 'true_false') return true;
-                return q.options.some(o => o.isCorrect);
-            });
+            const withCorrectAnswer = validQuestions.filter(q => q.options.some(o => o.isCorrect));
+            const droppedTFCount = validQuestions.filter(q => q.type === 'true_false' && !q.options.some(o => o.isCorrect)).length;
             originalQuestions = withCorrectAnswer;
+
+            if (droppedTFCount > 0) {
+                showToast(`⚠️ Đã bỏ ${droppedTFCount} câu Đúng/Sai vì không có ý nào được đánh dấu * đáp án đúng.`, 4500);
+            }
 
             if (originalQuestions.length > 0) {
                 UI.uploadCard.style.display = 'none';
@@ -1199,6 +1204,17 @@ D. Không</pre>
             UI.convertStatus.innerHTML = '';
             convertedContent = '';
             UI.convertFileInput.value = '';
+        }
+
+        function useConvertedTextImmediately() {
+            if (!convertedContent) {
+                showToast('Không có nội dung để xử lý!', 3000);
+                return;
+            }
+            const content = convertedContent;
+            closeConvertResult();
+            parseQuizData(content);
+            scrollToTop();
         }
 
         function downloadConvertedTxt() {

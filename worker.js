@@ -13,12 +13,27 @@ export default {
 
 async function handleConvert(request, env) {
     try {
+        // Chặn spam: giới hạn số request theo IP (nếu binding rate limiter đã được cấu hình)
+        if (env.CONVERT_LIMITER) {
+            const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+            const { success } = await env.CONVERT_LIMITER.limit({ key: ip });
+            if (!success) {
+                return jsonResponse({ error: 'Bạn đang gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút.' }, 429);
+            }
+        }
+
         const body = await request.json().catch(() => null);
         const rawText = body?.text;
         const startIndex = Number.isInteger(body?.startIndex) ? body.startIndex : 1;
 
         if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
             return jsonResponse({ error: 'Thiếu nội dung văn bản.' }, 400);
+        }
+
+        // Chặn payload quá lớn gửi trực tiếp vào API (bỏ qua giới hạn chunk ở frontend)
+        const MAX_INPUT_SIZE = 50_000; // ~8x lớn hơn 1 chunk hợp lệ lớn nhất từ frontend
+        if (rawText.length > MAX_INPUT_SIZE) {
+            return jsonResponse({ error: `Văn bản quá lớn (tối đa ${MAX_INPUT_SIZE.toLocaleString('vi-VN')} ký tự mỗi lần).` }, 413);
         }
 
         const apiKey = env.GEMINI_API_KEY;
