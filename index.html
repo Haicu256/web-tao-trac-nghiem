@@ -97,6 +97,21 @@
         .btn-start { background-color: #1a73e8; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 15px; }
         .btn-start:hover { background-color: #1557b0; }
 
+        /* ===== Chia sẻ link ===== */
+        .share-box { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-color); }
+        .share-box h3 { margin: 0 0 6px; font-size: 16px; }
+        .share-desc { font-size: 13px; color: #888; margin: 0 0 12px; }
+        .btn-share-create { background: var(--bg-secondary); color: var(--text-color); border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.2s; }
+        .btn-share-create:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--hover-border); }
+        .btn-share-create:disabled { opacity: 0.6; cursor: wait; }
+        .share-link-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-color); font-size: 14px; font-family: monospace; }
+        .share-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .btn-share-action { flex: 1 1 140px; padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .btn-share-copy { background: #1a73e8; color: white; }
+        .btn-share-copy:hover { background: #1557b0; }
+        .btn-share-native { background: #34a853; color: white; }
+        .btn-share-native:hover { background: #2b8c44; }
+
         .question-box { background: var(--card-bg); padding: 25px; margin-bottom: 20px; border-radius: 12px; box-shadow: var(--qbox-shadow); }
         .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; line-height: 1.5; }
         .options { display: flex; flex-direction: column; gap: 10px; }
@@ -333,6 +348,19 @@ D. Không</pre>
                 </div>
             </div>
             <button type="button" class="btn-start" onclick="startQuiz()">Bắt Đầu Làm Bài</button>
+
+            <div id="share-box" class="share-box">
+                <h3>🔗 Chia sẻ đề này</h3>
+                <p class="share-desc">Tạo link để bạn bè bấm vào là có sẵn đề, không cần tải file. Bất kỳ ai có link đều mở được đề.</p>
+                <button type="button" id="shareCreateBtn" class="btn-share-create" onclick="createShareLink()">🔗 Tạo link chia sẻ</button>
+                <div id="shareResult" style="display:none;">
+                    <input type="text" id="shareLinkInput" class="share-link-input" readonly aria-label="Link chia sẻ" onfocus="this.select()">
+                    <div class="share-actions">
+                        <button type="button" class="btn-share-action btn-share-copy" onclick="copyShareLink()">📋 Sao chép link</button>
+                        <button type="button" id="shareNativeBtn" class="btn-share-action btn-share-native" onclick="nativeShareLink()" style="display:none;">📤 Gửi cho bạn bè</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="result-box">
@@ -397,6 +425,10 @@ D. Không</pre>
             convertResultCard: document.getElementById('convert-result-card'),
             convertedText: document.getElementById('convertedText'),
             convertStatus: document.getElementById('convertStatus'),
+            shareCreateBtn: document.getElementById('shareCreateBtn'),
+            shareResult: document.getElementById('shareResult'),
+            shareLinkInput: document.getElementById('shareLinkInput'),
+            shareNativeBtn: document.getElementById('shareNativeBtn'),
         };
 
         // ===== Nhạc =====
@@ -408,11 +440,19 @@ D. Không</pre>
         let selectedAnswers = {};
         let answeredCount = {};
         let convertedContent = '';
+        let sourceText = ''; // nội dung gốc của đề đang mở — dùng để tạo link chia sẻ
 
+        // Phải khớp SHARE_ID_REGEX / MAX_SHARE_CHARS trong worker.js
+        const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
+        const SHARE_MAX_CHARS = 300000;
+        const SHARE_BTN_LABEL = '🔗 Tạo link chia sẻ';
+
+        let toastTimer = null;
         function showToast(message, duration = 3000) {
             UI.toast.textContent = message;
             UI.toast.classList.add("show");
-            setTimeout(() => UI.toast.classList.remove("show"), duration);
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => UI.toast.classList.remove("show"), duration);
         }
 
         function toggleMusic() {
@@ -486,6 +526,11 @@ D. Không</pre>
             UI.fileInput.value = '';
             closeConvertResult();
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = {};
+            sourceText = '';
+            resetShareUI();
+            if (new URLSearchParams(location.search).has('s')) {
+                try { history.replaceState(null, '', location.pathname); } catch (e) { /* bỏ qua */ }
+            }
             UI.footer.style.display = 'flex';
             UI.freeMessage.style.display = 'block';
             UI.usageGuide.style.display = 'block';
@@ -549,7 +594,7 @@ D. Không</pre>
             reader.readAsText(file, 'UTF-8');
         });
 
-        function parseQuizData(text) {
+        function parseQuizData(text, shareId = null) {
             const lines = text.split('\n');
             originalQuestions = [];
             let currentQ = null;
@@ -602,6 +647,8 @@ D. Không</pre>
             }
 
             if (originalQuestions.length > 0) {
+                sourceText = text;
+                resetShareUI(shareId);
                 UI.uploadCard.style.display = 'none';
                 UI.configSection.style.display = 'block';
                 const existingBadge = document.getElementById('questionCountBadge');
@@ -1232,6 +1279,103 @@ D. Không</pre>
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
+
+        // ===== CHIA SẺ LINK =====
+        function resetShareUI(shareId = null) {
+            UI.shareCreateBtn.disabled = false;
+            UI.shareCreateBtn.textContent = SHARE_BTN_LABEL;
+            if (shareId) {
+                showShareLink(shareId);
+            } else {
+                UI.shareLinkInput.value = '';
+                UI.shareResult.style.display = 'none';
+                UI.shareCreateBtn.style.display = 'block';
+            }
+        }
+
+        function showShareLink(id) {
+            UI.shareLinkInput.value = `${location.origin}/?s=${id}`;
+            UI.shareCreateBtn.style.display = 'none';
+            UI.shareResult.style.display = 'block';
+            UI.shareNativeBtn.style.display = (typeof navigator.share === 'function') ? '' : 'none';
+        }
+
+        async function createShareLink() {
+            if (!sourceText) return;
+            if (sourceText.length > SHARE_MAX_CHARS) {
+                showToast(`Đề quá lớn để chia sẻ (tối đa ${SHARE_MAX_CHARS.toLocaleString('vi-VN')} ký tự).`, 4500);
+                return;
+            }
+            UI.shareCreateBtn.disabled = true;
+            UI.shareCreateBtn.textContent = '⏳ Đang tạo link...';
+            try {
+                const res = await fetch('/api/share', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: sourceText })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || typeof data.id !== 'string' || !SHARE_ID_REGEX.test(data.id)) {
+                    throw new Error(data.error || `Lỗi ${res.status}`);
+                }
+                showShareLink(data.id);
+                showToast('✅ Đã tạo link chia sẻ.');
+            } catch (err) {
+                console.error(err);
+                UI.shareCreateBtn.disabled = false;
+                UI.shareCreateBtn.textContent = SHARE_BTN_LABEL;
+                showToast('Không tạo được link chia sẻ: ' + err.message, 5000);
+            }
+        }
+
+        async function copyShareLink() {
+            const url = UI.shareLinkInput.value;
+            if (!url) return;
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast('✅ Đã sao chép link.');
+            } catch (e) {
+                UI.shareLinkInput.focus();
+                UI.shareLinkInput.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (e2) { /* bỏ qua */ }
+                showToast(ok ? '✅ Đã sao chép link.' : 'Không tự sao chép được — hãy giữ vào ô link để sao chép.', 4000);
+            }
+        }
+
+        async function nativeShareLink() {
+            const url = UI.shareLinkInput.value;
+            if (!url || typeof navigator.share !== 'function') return;
+            try {
+                await navigator.share({ title: 'Đề trắc nghiệm', text: 'Làm thử đề trắc nghiệm này nhé:', url });
+            } catch (e) {
+                if (e.name !== 'AbortError') showToast('Không mở được bảng chia sẻ — hãy dùng nút sao chép link.', 4000);
+            }
+        }
+
+        // Mở đề từ link dạng /?s=<id>
+        async function loadSharedQuiz() {
+            const id = new URLSearchParams(location.search).get('s');
+            if (!id) return;
+            if (!SHARE_ID_REGEX.test(id)) {
+                showToast('Link chia sẻ không hợp lệ.', 4000);
+                return;
+            }
+            showToast('⏳ Đang tải đề được chia sẻ...', 10000);
+            try {
+                const res = await fetch(`/api/share/${id}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || typeof data.text !== 'string') {
+                    throw new Error(data.error || `Lỗi ${res.status}`);
+                }
+                parseQuizData(data.text, id);
+                if (originalQuestions.length > 0) showToast('✅ Đã mở đề được chia sẻ.');
+            } catch (err) {
+                console.error(err);
+                showToast('Không mở được đề: ' + err.message, 6000);
+            }
+        }
+        loadSharedQuiz();
 
         // Khởi tạo pdf worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';

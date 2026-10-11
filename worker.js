@@ -1,9 +1,23 @@
+// ===== Cấu hình chia sẻ link =====
+const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90; // link tự hết hạn sau 90 ngày (KV tự xóa)
+const MAX_SHARE_CHARS = 300_000;             // giới hạn độ dài nội dung đề được chia sẻ (khớp SHARE_MAX_CHARS ở index.html)
+const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;  // khớp SHARE_ID_REGEX ở index.html
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
         if (url.pathname === '/api/convert' && request.method === 'POST') {
             return handleConvert(request, env);
+        }
+
+        if (url.pathname === '/api/share' && request.method === 'POST') {
+            return handleShareCreate(request, env);
+        }
+
+        const shareMatch = url.pathname.match(/^\/api\/share\/([^/]+)$/);
+        if (shareMatch && request.method === 'GET') {
+            return handleShareGet(shareMatch[1], env);
         }
 
         // Không khớp route API nào -> trả 404 (asset tĩnh đã được Cloudflare xử lý trước khi tới đây)
@@ -76,11 +90,114 @@ async function handleConvert(request, env) {
     }
 }
 
-function jsonResponse(obj, status = 200) {
+function jsonResponse(obj, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(obj), {
         status,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...extraHeaders }
     });
+}
+
+// ===== CHIA SẺ LINK =====
+async function handleShareCreate(request, env) {
+    try {
+        if (!env.SHARES) {
+            return jsonResponse({ error: 'Server chưa cấu hình tính năng chia sẻ (thiếu KV binding SHARES).' }, 500);
+        }
+
+        // Chặn spam: giới hạn số lần tạo link theo IP (nếu binding rate limiter đã được cấu hình)
+        if (env.SHARE_LIMITER) {
+            const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+            const { success } = await env.SHARE_LIMITER.limit({ key: ip });
+            if (!success) {
+                return jsonResponse({ error: 'Bạn tạo link quá nhanh, vui lòng thử lại sau ít phút.' }, 429);
+            }
+        }
+
+        // Chặn sớm payload quá lớn trước khi đọc body (UTF-8 tối đa 4 byte/ký tự)
+        const declaredLength = Number(request.headers.get('content-length'));
+        if (declaredLength > MAX_SHARE_CHARS * 4 + 1024) {
+            return jsonResponse({ error: tooLargeMessage() }, 413);
+        }
+
+        const body = await request.json().catch(() => null);
+        const text = body?.text;
+
+        if (typeof text !== 'string' || text.trim().length === 0) {
+            return jsonResponse({ error: 'Thiếu nội dung đề.' }, 400);
+        }
+        if (text.length > MAX_SHARE_CHARS) {
+            return jsonResponse({ error: tooLargeMessage() }, 413);
+        }
+        if (!looksLikeQuiz(text)) {
+            return jsonResponse({ error: 'Nội dung không giống một đề trắc nghiệm nên không thể chia sẻ.' }, 400);
+        }
+
+        const id = await makeShareId(text);
+
+        try {
+            // Cùng nội dung -> cùng link, không ghi lại KV (gói free chỉ có 1.000 lượt ghi/ngày)
+            const existing = await env.SHARES.get(id);
+            if (existing === null) {
+                await env.SHARES.put(id, text, { expirationTtl: SHARE_TTL_SECONDS });
+            }
+        } catch (kvErr) {
+            console.error('KV share error:', kvErr);
+            return jsonResponse({ error: 'Không lưu được link chia sẻ lúc này (có thể đã hết lượt ghi trong ngày). Vui lòng thử lại sau.' }, 503);
+        }
+
+        return jsonResponse({ id });
+
+    } catch (err) {
+        return jsonResponse({ error: err.message || 'Lỗi không xác định.' }, 500);
+    }
+}
+
+async function handleShareGet(id, env) {
+    try {
+        if (!env.SHARES) {
+            return jsonResponse({ error: 'Server chưa cấu hình tính năng chia sẻ (thiếu KV binding SHARES).' }, 500);
+        }
+        if (!SHARE_ID_REGEX.test(id)) {
+            return jsonResponse({ error: 'Link chia sẻ không hợp lệ.' }, 400);
+        }
+
+        const text = await env.SHARES.get(id);
+        if (text === null) {
+            return jsonResponse({ error: 'Không tìm thấy đề này. Link có thể đã hết hạn hoặc bị sai.' }, 404);
+        }
+
+        // Nội dung theo id không bao giờ đổi -> cho phép trình duyệt cache ngắn hạn
+        return jsonResponse({ text }, 200, { 'Cache-Control': 'public, max-age=300' });
+
+    } catch (err) {
+        console.error('KV share read error:', err);
+        return jsonResponse({ error: 'Không đọc được đề lúc này. Vui lòng thử lại sau.' }, 500);
+    }
+}
+
+function tooLargeMessage() {
+    return `Đề quá lớn để chia sẻ (tối đa ${MAX_SHARE_CHARS.toLocaleString('vi-VN')} ký tự).`;
+}
+
+// Nhận diện giống parseQuizData ở frontend — tránh biến endpoint này thành nơi lưu file tùy ý
+function looksLikeQuiz(text) {
+    return /^\s*(câu\s*hỏi|câu|q|bài)\s*\d+/im.test(text)
+        || /^\s*câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(text);
+}
+
+// Id = 64 bit đầu của SHA-256 nội dung, mã hóa base62 (11 ký tự).
+// Cùng một đề luôn ra cùng một link; không đoán được link nếu không biết nội dung.
+const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+async function makeShareId(text) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    let n = 0n;
+    for (const b of new Uint8Array(digest).slice(0, 8)) n = (n << 8n) | BigInt(b);
+    let id = '';
+    while (n > 0n) {
+        id = BASE62[Number(n % 62n)] + id;
+        n /= 62n;
+    }
+    return id.padStart(11, '0');
 }
 
 // Giữ NGUYÊN nội dung prompt gốc, chỉ chuyển từ index.html sang đây

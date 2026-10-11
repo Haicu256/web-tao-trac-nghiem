@@ -17,11 +17,21 @@
   "secrets": {
     "required": ["GEMINI_API_KEY"]
   },
+  // Lưu đề được chia sẻ. Không có "id" -> wrangler tự tạo KV khi deploy (beta, cần wrangler >= 4.45.0).
+  // Nếu deploy báo lỗi: tạo KV thủ công rồi thêm "id": "<ID của namespace>" vào đây.
+  "kv_namespaces": [
+    { "binding": "SHARES" }
+  ],
   "ratelimits": [
     {
       "name": "CONVERT_LIMITER",
       "namespace_id": "1001",
       "simple": { "limit": 20, "period": 60 }
+    },
+    {
+      "name": "SHARE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 10, "period": 60 }
     }
   ]
 }
