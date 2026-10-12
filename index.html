@@ -17,6 +17,7 @@
     <meta property="og:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
     <meta property="og:description" content="Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online. Hỗ trợ trộn câu hỏi, xem kết quả ngay, hoàn toàn miễn phí.">
     <meta property="og:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/lgw.png">
+    <meta property="og:image:alt" content="Hệ thống tạo đề trắc nghiệm bằng file txt">
     <meta property="og:locale" content="vi_VN">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
@@ -539,7 +540,7 @@ D. Không</pre>
             renderQuizTitle();
             resetShareUI();
             if (new URLSearchParams(location.search).has('s')) {
-                try { history.replaceState(null, '', location.pathname); } catch (e) { /* bỏ qua */ }
+                try { history.replaceState(null, '', '/'); } catch (e) { /* bỏ qua */ }
             }
             UI.footer.style.display = 'flex';
             UI.freeMessage.style.display = 'block';
@@ -1332,7 +1333,7 @@ D. Không</pre>
         }
 
         function showShareLink(id) {
-            UI.shareLinkInput.value = `${location.origin}/?s=${id}`;
+            UI.shareLinkInput.value = `${location.origin}/share?s=${id}`;
             UI.shareCreateBtn.style.display = 'none';
             UI.shareResult.style.display = 'block';
             UI.shareNativeBtn.style.display = (typeof navigator.share === 'function') ? '' : 'none';
@@ -1395,7 +1396,7 @@ D. Không</pre>
             }
         }
 
-        // Mở đề từ link dạng /?s=<id>
+        // Mở đề từ link dạng /share?s=<id> (link cũ dạng /?s=<id> vẫn mở được)
         async function loadSharedQuiz() {
             const id = new URLSearchParams(location.search).get('s');
             if (!id) return;

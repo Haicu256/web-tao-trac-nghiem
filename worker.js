@@ -16,6 +16,11 @@ export default {
             return handleShareCreate(request, env);
         }
 
+        // Trang mở link chia sẻ: /share?s=<id> (Worker chèn tên đề vào thẻ xem trước link)
+        if (url.pathname === '/share' && (request.method === 'GET' || request.method === 'HEAD')) {
+            return handleSharePage(request, env, url);
+        }
+
         const shareMatch = url.pathname.match(/^\/api\/share\/([^/]+)$/);
         if (shareMatch && request.method === 'GET') {
             return handleShareGet(shareMatch[1], env);
@@ -200,6 +205,58 @@ function parseStoredShare(stored) {
         }
     } catch (e) { /* không phải JSON -> link cũ */ }
     return { text: stored, title: '' };
+}
+
+// ===== TRANG CHIA SẺ: /share?s=<id> =====
+// Trả lại chính trang index.html. Nếu đề có tên thì thay các thẻ tiêu đề / xem trước link (og:title...)
+// bằng tên đề, vì Zalo/Messenger đọc các thẻ này từ HTML gốc (họ không chạy JavaScript).
+// Không có tên đề / link sai / KV lỗi -> vẫn trả trang gốc để trang tự báo lỗi cho người dùng.
+async function handleSharePage(request, env, url) {
+    const page = await env.ASSETS.fetch(new Request(`${url.origin}/`, { headers: { Accept: 'text/html' } }));
+    if (!page.ok) return new Response('Not Found', { status: 404 });
+
+    try {
+        const id = url.searchParams.get('s') || '';
+        if (env.SHARES && SHARE_ID_REGEX.test(id)) {
+            const stored = await env.SHARES.get(id);
+            if (stored !== null) {
+                const { title } = parseStoredShare(stored);
+                if (title) return withShareMeta(page, title, `${url.origin}/share?s=${id}`);
+            }
+        }
+    } catch (err) {
+        console.error('Share page meta error:', err);
+    }
+    return page;
+}
+
+function withShareMeta(page, title, shareUrl) {
+    const pageTitle = `Đề trắc nghiệm: ${title}`;
+    const description = 'Bấm vào để mở đề và làm bài trắc nghiệm ngay, không cần tải file.';
+
+    // Tự escape khi ghi giá trị vào thuộc tính: HTMLRewriter.setAttribute không escape ký tự "&"
+    // (đã thử trên runtime thật: tên đề "AT&amp;T" bị đọc thành "AT&T"), nên thay nguyên cả thẻ.
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const metaTag = (attr, key, value) => ({
+        element(el) { el.replace(`<meta ${attr}="${key}" content="${esc(value)}">`, { html: true }); }
+    });
+
+    const rewritten = new HTMLRewriter()
+        .on('title', { element(el) { el.setInnerContent(pageTitle); } })   // nội dung văn bản: runtime escape đúng
+        .on('meta[name="description"]', metaTag('name', 'description', description))
+        .on('meta[property="og:title"]', metaTag('property', 'og:title', pageTitle))
+        .on('meta[property="og:description"]', metaTag('property', 'og:description', description))
+        .on('meta[property="og:url"]', metaTag('property', 'og:url', shareUrl))   // mỗi link một địa chỉ riêng, nếu không Facebook sẽ gộp chung xem trước
+        .on('meta[name="twitter:title"]', metaTag('name', 'twitter:title', pageTitle))
+        .on('meta[name="twitter:description"]', metaTag('name', 'twitter:description', description))
+        .on('link[rel="canonical"]', { element(el) { el.replace(`<link rel="canonical" href="${esc(shareUrl)}">`, { html: true }); } })
+        .transform(page);
+
+    const headers = new Headers(rewritten.headers);
+    headers.delete('ETag');            // nội dung đã bị thay -> không dùng validator của file gốc
+    headers.delete('Content-Length');
+    headers.set('Cache-Control', 'public, max-age=300');
+    return new Response(rewritten.body, { status: rewritten.status, headers });
 }
 
 function tooLargeMessage() {
