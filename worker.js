@@ -2,6 +2,7 @@
 const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90; // link tự hết hạn sau 90 ngày (KV tự xóa)
 const MAX_SHARE_CHARS = 300_000;             // giới hạn độ dài nội dung đề được chia sẻ (khớp SHARE_MAX_CHARS ở index.html)
 const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;  // khớp SHARE_ID_REGEX ở index.html
+const MAX_TITLE_CHARS = 100;                 // độ dài tối đa của tên đề (khớp SHARE_TITLE_MAX ở index.html)
 
 export default {
     async fetch(request, env) {
@@ -132,20 +133,21 @@ async function handleShareCreate(request, env) {
             return jsonResponse({ error: 'Nội dung không giống một đề trắc nghiệm nên không thể chia sẻ.' }, 400);
         }
 
-        const id = await makeShareId(text);
+        const title = cleanTitle(body?.title);
+        const id = await makeShareId(title, text);
 
         try {
-            // Cùng nội dung -> cùng link, không ghi lại KV (gói free chỉ có 1.000 lượt ghi/ngày)
+            // Cùng tên đề + cùng nội dung -> cùng link, không ghi lại KV (gói free chỉ có 1.000 lượt ghi/ngày)
             const existing = await env.SHARES.get(id);
             if (existing === null) {
-                await env.SHARES.put(id, text, { expirationTtl: SHARE_TTL_SECONDS });
+                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text }), { expirationTtl: SHARE_TTL_SECONDS });
             }
         } catch (kvErr) {
             console.error('KV share error:', kvErr);
             return jsonResponse({ error: 'Không lưu được link chia sẻ lúc này (có thể đã hết lượt ghi trong ngày). Vui lòng thử lại sau.' }, 503);
         }
 
-        return jsonResponse({ id });
+        return jsonResponse({ id, title });
 
     } catch (err) {
         return jsonResponse({ error: err.message || 'Lỗi không xác định.' }, 500);
@@ -161,18 +163,43 @@ async function handleShareGet(id, env) {
             return jsonResponse({ error: 'Link chia sẻ không hợp lệ.' }, 400);
         }
 
-        const text = await env.SHARES.get(id);
-        if (text === null) {
+        const stored = await env.SHARES.get(id);
+        if (stored === null) {
             return jsonResponse({ error: 'Không tìm thấy đề này. Link có thể đã hết hạn hoặc bị sai.' }, 404);
         }
 
+        const { text, title } = parseStoredShare(stored);
+
         // Nội dung theo id không bao giờ đổi -> cho phép trình duyệt cache ngắn hạn
-        return jsonResponse({ text }, 200, { 'Cache-Control': 'public, max-age=300' });
+        return jsonResponse({ text, title }, 200, { 'Cache-Control': 'public, max-age=300' });
 
     } catch (err) {
         console.error('KV share read error:', err);
         return jsonResponse({ error: 'Không đọc được đề lúc này. Vui lòng thử lại sau.' }, 500);
     }
+}
+
+// Làm sạch tên đề: bỏ ký tự điều khiển/ký tự ẩn, gộp khoảng trắng, cắt tối đa MAX_TITLE_CHARS ký tự (theo ký tự, không cắt đôi emoji)
+function cleanTitle(raw) {
+    if (typeof raw !== 'string') return '';
+    const cleaned = raw
+        .slice(0, 1000)
+        .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return Array.from(cleaned).slice(0, MAX_TITLE_CHARS).join('').trim();
+}
+
+// Giá trị lưu trong KV: {"v":1,"title":...,"text":...}.
+// Link tạo trước khi có tên đề lưu thẳng nội dung đề (không phải JSON) -> vẫn đọc được, title rỗng.
+function parseStoredShare(stored) {
+    try {
+        const obj = JSON.parse(stored);
+        if (obj && obj.v === 1 && typeof obj.text === 'string') {
+            return { text: obj.text, title: cleanTitle(obj.title) };
+        }
+    } catch (e) { /* không phải JSON -> link cũ */ }
+    return { text: stored, title: '' };
 }
 
 function tooLargeMessage() {
@@ -185,11 +212,11 @@ function looksLikeQuiz(text) {
         || /^\s*câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(text);
 }
 
-// Id = 64 bit đầu của SHA-256 nội dung, mã hóa base62 (11 ký tự).
-// Cùng một đề luôn ra cùng một link; không đoán được link nếu không biết nội dung.
+// Id = 64 bit đầu của SHA-256 (tên đề + nội dung), mã hóa base62 (11 ký tự).
+// Cùng tên đề + cùng nội dung luôn ra cùng một link; không đoán được link nếu không biết nội dung.
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-async function makeShareId(text) {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+async function makeShareId(title, text) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([title, text])));
     let n = 0n;
     for (const b of new Uint8Array(digest).slice(0, 8)) n = (n << 8n) | BigInt(b);
     let id = '';
