@@ -62,7 +62,7 @@ async function handleConvert(request, env) {
         }
 
         const prompt = buildPrompt(rawText, startIndex);
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/9cfdacf13184881724759ce98fa45d5a/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
 
         const geminiRes = await fetch(geminiUrl, {
             method: 'POST',
