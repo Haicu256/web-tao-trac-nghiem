@@ -82,11 +82,17 @@ async function handleConvert(request, env) {
 
         const data = await geminiRes.json();
         const candidate = data?.candidates?.[0];
-        const resultText = candidate?.content?.parts?.[0]?.text || '';
+        let resultText = candidate?.content?.parts?.[0]?.text || '';
         const truncated = candidate?.finishReason === 'MAX_TOKENS';
 
         if (!resultText) {
             return jsonResponse({ error: 'AI không trả về kết quả.' }, 502);
+        }
+
+        // Loại bỏ markdown code block (``` hoặc ```text ... ```) nếu AI vô tình bọc lại
+        resultText = resultText.trim();
+        if (resultText.startsWith('```')) {
+            resultText = resultText.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
         }
 
         return jsonResponse({ text: resultText, truncated });
@@ -284,48 +290,43 @@ async function makeShareId(title, text) {
     return id.padStart(11, '0');
 }
 
-// Giữ NGUYÊN nội dung prompt gốc, chỉ chuyển từ index.html sang đây
 function buildPrompt(rawText, startIndex) {
     return `
-Bạn là công cụ chuyển đổi bố cục văn bản thành câu hỏi trắc nghiệm (Multiple Choice) hoặc trắc nghiệm đúng/sai.
-Nhiệm vụ: Sắp xếp lại văn bản thành định dạng chuẩn:
+Bạn là công cụ chuẩn hóa và chuyển đổi bố cục văn bản thành đề thi trắc nghiệm.
+Nhiệm vụ: Sắp xếp lại văn bản được cung cấp thành định dạng chuẩn theo các quy tắc nghiêm ngặt sau:
 
-QUY TẮC BẮT BUỘC VỀ XUỐNG DÒNG (áp dụng cho mọi câu hỏi, mọi loại):
-- Dù văn bản gốc trình bày các lựa chọn theo kiểu gì (nằm ngang trên cùng một dòng, cách nhau bằng khoảng trắng/tab, viết liền nhau, hay bất kỳ định dạng nào khác), khi xuất ra BẮT BUỘC mỗi lựa chọn A, B, C, D phải nằm trên MỘT DÒNG RIÊNG BIỆT (xuống dòng thật giữa các lựa chọn).
-- TUYỆT ĐỐI không để 2 lựa chọn trở lên nằm chung một dòng trong kết quả xuất ra, kể cả khi input gốc viết chung dòng.
-- Quy tắc này áp dụng tương tự cho dòng "Câu X:" — luôn bắt đầu một dòng mới, không dính vào lựa chọn trước đó.
+QUY TẮC BẮT BUỘC:
+1. XUỐNG DÒNG: Mỗi câu hỏi bắt đầu bằng một dòng mới. Mỗi lựa chọn đáp án (A., B., C., D.,...) BẮT BUỘC nằm trên MỘT DÒNG RIÊNG BIỆT. Tuyệt đối không để 2 đáp án trở lên trên cùng một dòng.
+2. ĐÁNH DẤU ĐÁP ÁN ĐÚNG:
+   - Nếu trong văn bản gốc CÓ dấu hiệu nhận biết đáp án đúng (in đậm, gạch chân, khoanh tròn, tô màu, có chú thích đáp án hoặc có bảng đáp án đi kèm), BẮT BUỘC đặt một dấu hoa thị * ngay đầu dòng trước chữ cái của đáp án đó (Ví dụ: *A. Nội dung, *B. Nội dung).
+   - NẾU VĂN BẢN GỐC CHƯA CÓ ĐÁP ÁN HOẶC KHÔNG RÕ ĐÁP ÁN: TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ SUY ĐOÁN HOẶC TỰ BỊA ĐÁP ÁN ĐÚNG! Giữ nguyên tiền tố chữ cái thông thường (A., B., C., D.) và KHÔNG thêm bất kỳ dấu * nào. Nhiệm vụ duy nhất của bạn là chuẩn hóa bố cục văn bản, không phải giải đề.
+3. ĐỊNH DẠNG XUẤT:
+   - Chỉ xuất văn bản thô (plain text). TUYỆT ĐỐI KHÔNG bọc kết quả trong khối code markdown (không dùng \`\`\` hoặc \`\`\`text).
+   - KHÔNG thêm bất kỳ lời chào, giải thích, ghi chú hay kết luận nào ngoài các câu hỏi đã chuẩn hóa.
 
-QUAN TRỌNG:
-Đối với trắc nghiệm đúng/sai
-- Phân loại câu hỏi: nếu câu hỏi có dạng đúng/sai (True/False) (ví dụ: "Đúng hay Sai", "True/False", "Nhận định nào đúng/sai", ...), hãy thêm tiêu đề "câu hỏi đúng sai: câu X:" trước nội dung câu hỏi.
-- Với câu hỏi đúng/sai: sắp xếp các lựa chọn thành A, B, C, D (có thể thêm dấu * nếu phát hiện đáp án đúng từ văn bản gốc).
-- Không thay đổi nội dung câu hỏi và lựa chọn.
-- Nếu không có dạng câu hỏi rõ ràng, giữ nguyên văn bản.
-- Đánh số bắt đầu từ ${startIndex}.
-Thành quả phải có dạng như này:
+A. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM ĐÚNG/SAI:
+- Nhận diện: Các câu hỏi yêu cầu xác định Đúng hay Sai cho từng phát biểu/nhận định (True/False).
+- Tiền tố bắt buộc: Thêm "câu hỏi đúng sai: Câu X:" ngay trước nội dung câu hỏi.
+- Đánh số bắt đầu từ ${startIndex} nếu văn bản gốc không có số thứ tự câu.
+- Đặt dấu * trước ý nào là ý Đúng (nếu phát hiện được từ văn bản gốc).
+Mẫu:
 câu hỏi đúng sai: Câu X: [nội dung câu hỏi]
-A. [nội dung lựa chọn A]
-B. [nội dung lựa chọn B]
-C. [nội dung lựa chọn C]
-D. [nội dung lựa chọn D]
+*A. [nội dung ý A - nếu là ý đúng]
+B. [nội dung ý B - nếu là ý sai]
+*C. [nội dung ý C]
+D. [nội dung ý D]
 
-
-Đối với trắc nghiệm lựa chọn:
-1. GIỮ NGUYÊN số thứ tự câu hỏi từ văn bản gốc nếu có. Nếu văn bản có "Bài 1:", "1.", "1/", "Câu hỏi 1:" thì chuyển thành "Câu 1:". KHÔNG tự động đánh lại số thứ tự trong trường hợp này.
-2. Nếu văn bản KHÔNG có số thứ tự, hãy đánh số tăng dần bắt đầu từ ${startIndex}.
-3. Sửa tiền tố (Bài, 1., 1/, Câu hỏi, ...) thành "Câu X:".
-4. Không thay đổi nội dung câu hỏi, không thêm bớt từ.
-5. Đảm bảo mỗi câu hỏi có đúng 4 lựa chọn A, B, C, D.
-6. Nếu gặp đoạn văn không phải câu hỏi trắc nghiệm (không có 4 lựa chọn), hãy giữ nguyên nhưng không đánh số.
-7. Xuất kết quả chỉ gồm các câu hỏi đã chuẩn hóa, không thêm giải thích.
-
-Thành quả phải có dạng như này:
+B. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM LỰA CHỌN THÔNG THƯỜNG:
+- Chuẩn hóa tiền tố câu (Bài 1:, 1., 1/, Câu hỏi 1:, Q1,...) thành "Câu X:".
+- GIỮ NGUYÊN số thứ tự nếu có sẵn; nếu văn bản không có số thứ tự thì đánh số tăng dần bắt đầu từ ${startIndex}.
+- Không thay đổi nội dung từ ngữ của câu hỏi và đáp án.
+- Giữ nguyên số lượng lựa chọn của câu hỏi theo đề bài gốc (thông thường là 4 lựa chọn A, B, C, D).
+Mẫu:
 Câu X: [nội dung câu hỏi]
 A. [nội dung lựa chọn A]
-B. [nội dung lựa chọn B]
+*B. [nội dung lựa chọn B - nếu đây là đáp án đúng]
 C. [nội dung lựa chọn C]
 D. [nội dung lựa chọn D]
-
 
 Văn bản cần xử lý:
 ${rawText}

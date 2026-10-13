@@ -16,13 +16,13 @@
     <meta property="og:url" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/">
     <meta property="og:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
     <meta property="og:description" content="Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online. Hỗ trợ trộn câu hỏi, xem kết quả ngay, hoàn toàn miễn phí.">
-    <meta property="og:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/lgw.png">
+    <meta property="og:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/favicon.png">
     <meta property="og:image:alt" content="Hệ thống tạo đề trắc nghiệm bằng file txt">
     <meta property="og:locale" content="vi_VN">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Tạo Đề Trắc Nghiệm Bằng File txt - Miễn Phí">
     <meta name="twitter:description" content="Tải file câu hỏi .txt lên để tạo đề và luyện thi trắc nghiệm online.">
-    <meta name="twitter:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/lgw.png">
+    <meta name="twitter:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/favicon.png">
 
     <!-- Thư viện xử lý file -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -244,8 +244,10 @@
         }
         .tf-result .correct-icon { color: #34a853; }
         .tf-result .incorrect-icon { color: #ea4335; }
+        .tf-result .unanswered-icon { color: #888; font-size: 14px; }
         .tf-statement.correct-highlight { background: var(--correct-bg) !important; border-color: var(--correct-border) !important; }
         .tf-statement.incorrect-highlight { background: var(--incorrect-bg) !important; border-color: var(--incorrect-border) !important; }
+        .tf-statement.unanswered-highlight { opacity: 0.75; }
     </style>
 
     <script>
@@ -300,7 +302,7 @@
         <div id="convert-result-card" class="card">
             <h3>📝 Kết quả chuyển đổi</h3>
             <div id="convertStatus" style="margin-bottom:10px; font-weight:500;"></div>
-            <textarea id="convertedText" readonly></textarea>
+            <textarea id="convertedText" placeholder="Nội dung sau khi AI chuyển đổi sẽ hiển thị ở đây (bạn có thể chỉnh sửa trực tiếp trước khi dùng)..."></textarea>
             <div class="convert-actions">
                 <button class="btn-convert-action btn-use-now" onclick="useConvertedTextImmediately()">🚀 Làm bài ngay</button>
                 <button class="btn-convert-action btn-download" onclick="downloadConvertedTxt()">⬇️ Tải xuống .txt</button>
@@ -570,13 +572,20 @@ D. Không</pre>
             if (e.key === 'Escape' && UI.modal.classList.contains('show')) closeModal();
         });
 
-        function showModal({ icon, title, desc, cancelText, confirmText, onConfirm }) {
+        function showModal({ icon, title, desc, cancelText, confirmText, onConfirm, onCancel }) {
             UI.modalIcon.textContent = icon;
             UI.modalTitle.textContent = title;
             UI.missingText.innerHTML = desc;
             UI.modalCancelBtn.textContent = cancelText;
+            UI.modalCancelBtn.onclick = () => {
+                closeModal();
+                if (typeof onCancel === 'function') onCancel();
+            };
             UI.modalConfirmBtn.textContent = confirmText;
-            UI.modalConfirmBtn.onclick = () => { closeModal(); onConfirm(); };
+            UI.modalConfirmBtn.onclick = () => {
+                closeModal();
+                if (typeof onConfirm === 'function') onConfirm();
+            };
             UI.modal.classList.add('show');
         }
         function closeModal() { UI.modal.classList.remove('show'); }
@@ -672,8 +681,10 @@ D. Không</pre>
                 UI.configSection.querySelector('hr').insertAdjacentElement('afterend', badge);
                 sourceTitle = title;
                 renderQuizTitle();
+                return true;
             } else {
-                showToast("Không tìm thấy câu hỏi hợp lệ trong file!");
+                showToast("Không tìm thấy câu hỏi hợp lệ trong file (hoặc thiếu dấu * đáp án)!");
+                return false;
             }
         }
 
@@ -976,6 +987,7 @@ D. Không</pre>
             selectedAnswers = {};
             answeredCount = {};
             renderQuiz(viewMode);
+            scrollToTop();
         }
 
         // ===== NỘP BÀI =====
@@ -1043,18 +1055,24 @@ D. Không</pre>
                         const userState = selectedAnswers[qIndex]?.[optIndex];
                         const userDung = userState?.dung || false;
                         const userSai = userState?.sai || false;
-                        let correctChoice = false;
-                        if (isCorrectAnswer) {
-                            if (userDung && !userSai) correctChoice = true;
+                        const hasAnswered = userDung || userSai;
+                        if (!hasAnswered) {
+                            resultEl.innerHTML = '<span class="unanswered-icon" title="Chưa chọn">⚪</span>';
+                            statementEl.classList.add('unanswered-highlight');
                         } else {
-                            if (userSai && !userDung) correctChoice = true;
-                        }
-                        if (correctChoice) {
-                            resultEl.innerHTML = '<span class="correct-icon">✔</span>';
-                            statementEl.classList.add('correct-highlight');
-                        } else {
-                            resultEl.innerHTML = '<span class="incorrect-icon">✘</span>';
-                            statementEl.classList.add('incorrect-highlight');
+                            let correctChoice = false;
+                            if (isCorrectAnswer) {
+                                if (userDung && !userSai) correctChoice = true;
+                            } else {
+                                if (userSai && !userDung) correctChoice = true;
+                            }
+                            if (correctChoice) {
+                                resultEl.innerHTML = '<span class="correct-icon">✔</span>';
+                                statementEl.classList.add('correct-highlight');
+                            } else {
+                                resultEl.innerHTML = '<span class="incorrect-icon">✘</span>';
+                                statementEl.classList.add('incorrect-highlight');
+                            }
                         }
                     });
                 } else {
@@ -1117,9 +1135,9 @@ D. Không</pre>
                         const reader = new FileReader();
                         reader.onload = e => {
                             const html = e.target.result;
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = html;
-                            resolve(tempDiv.textContent || '');
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            resolve(doc.body ? (doc.body.textContent || '') : '');
                         };
                         reader.onerror = reject;
                         reader.readAsText(file, 'UTF-8');
@@ -1191,6 +1209,20 @@ D. Không</pre>
 
         function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+        // Nhận diện xem văn bản thô có chứa dấu hiệu đáp án hay không (dấu *, bảng đáp án, ghi chú đáp án,...)
+        function checkTextHasAnswerHint(text) {
+            if (!text || typeof text !== 'string') return false;
+            // Kiểm tra dấu * đứng trước đáp án hoặc dòng
+            if (/^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(text)) return true;
+            // Kiểm tra các từ khóa đáp án thường gặp trong đề thi tiếng Việt
+            const answerKeywords = [
+                /\b(đáp\s*án|bảng\s*đáp\s*án|key|lời\s*giải|hướng\s*dẫn\s*chấm|chọn\s*đáp\s*án)\b/i,
+                /\b(đúng\s*:\s*[a-d]|sai\s*:\s*[a-d])\b/i,
+                /\b\d+\s*[\.\:\-]\s*[A-D]\b/i // Dạng bảng đáp án: 1.A  2.B  3.C
+            ];
+            return answerKeywords.some(regex => regex.test(text));
+        }
+
         convertFileInput.addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -1211,6 +1243,27 @@ D. Không</pre>
                 const rawText = await extractTextFromFile(file);
                 if (!rawText || rawText.trim().length < 10) {
                     throw new Error('Không trích xuất được văn bản từ file.');
+                }
+
+                // Kiểm tra xem đề thi có dấu hiệu đáp án hay không
+                const hasAnswersHint = checkTextHasAnswerHint(rawText);
+                if (!hasAnswersHint) {
+                    const shouldContinue = await new Promise(resolve => {
+                        showModal({
+                            icon: '❓',
+                            title: 'Đề chưa có đáp án?',
+                            desc: 'Hệ thống nhận thấy tài liệu này có thể <b>chưa có đáp án</b>.<br><br>AI sẽ chỉ chuyển đổi định dạng và <b>không tự điền đáp án</b>.<br>Bạn có muốn tiếp tục chuyển đổi không?',
+                            cancelText: 'Hủy bỏ',
+                            confirmText: 'Vẫn chuyển đổi',
+                            onConfirm: () => resolve(true),
+                            onCancel: () => resolve(false)
+                        });
+                    });
+
+                    if (!shouldContinue) {
+                        closeConvertResult();
+                        return;
+                    }
                 }
 
                 const chunks = splitIntoChunks(rawText, 6000);
@@ -1269,27 +1322,45 @@ D. Không</pre>
         }
 
         function useConvertedTextImmediately() {
-            if (!convertedContent) {
+            const content = UI.convertedText.value.trim();
+            if (!content) {
                 showToast('Không có nội dung để xử lý!', 3000);
                 return;
             }
-            const content = convertedContent;
+
+            // Kiểm tra xem nội dung đã được đánh dấu đáp án bằng dấu * hay chưa
+            const hasMarkedAnswers = /^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(content);
+            if (!hasMarkedAnswers) {
+                showModal({
+                    icon: '🚫',
+                    title: 'Không có đáp án!',
+                    desc: 'Đề thi này <b>chưa có đáp án</b> (không có câu nào được đánh dấu <b>*</b>).<br><br>Hệ thống không thể chấm điểm nếu không có đáp án đúng.<br>Vui lòng thêm dấu <b>*</b> trước đáp án đúng trong khung văn bản phía trên, hoặc tải file .txt về để bổ sung.',
+                    cancelText: 'Đóng',
+                    confirmText: 'Đã hiểu',
+                    onConfirm: () => {}
+                });
+                return;
+            }
+
             const title = convertedTitle;
-            closeConvertResult();
-            parseQuizData(content, null, title);
-            scrollToTop();
+            const success = parseQuizData(content, null, title);
+            if (success) {
+                closeConvertResult();
+                scrollToTop();
+            }
         }
 
         function downloadConvertedTxt() {
-            if (!convertedContent) {
+            const content = UI.convertedText.value.trim();
+            if (!content) {
                 showToast('Không có nội dung để tải!', 3000);
                 return;
             }
-            const blob = new Blob([convertedContent], { type: 'text/plain;charset=utf-8' });
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'de_trac_nghiem.txt';
+            a.download = (convertedTitle ? convertedTitle : 'de_trac_nghiem') + '.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
