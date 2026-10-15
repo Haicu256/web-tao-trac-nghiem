@@ -115,7 +115,7 @@ async function handleConvert(request, env) {
         const prompt = buildPrompt(rawText, startIndex);
         const geminiUrl = `https://gateway.ai.cloudflare.com/v1/9cfdacf13184881724759ce98fa45d5a/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
 
-        const geminiRes = await fetch(geminiUrl, {
+        const geminiRes = await callViaUS(env, geminiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -408,4 +408,31 @@ Văn bản cần xử lý:
 ${rawText}
 </tai_lieu>
 `;
+}
+async function callViaUS(env, url, options) {
+    if (env.US_PROXY) {
+        const id = env.US_PROXY.idFromName('us-west');
+        const stub = env.US_PROXY.get(id, { locationHint: 'wnam' });
+        return stub.fetch('https://us-proxy/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, options })
+        });
+    }
+    return fetch(url, options);
+}
+
+export class USProxy {
+    constructor(state, env) {
+        this.state = state;
+        this.env = env;
+    }
+    async fetch(request) {
+        const { url, options } = await request.json();
+        const res = await fetch(url, options);
+        return new Response(res.body, {
+            status: res.status,
+            headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' }
+        });
+    }
 }

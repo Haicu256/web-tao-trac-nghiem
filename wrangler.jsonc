@@ -17,10 +17,16 @@
   "secrets": {
     "required": ["GEMINI_API_KEY"]
   },
-  // Lưu đề được chia sẻ. Không có "id" -> wrangler tự tạo KV khi deploy (beta, cần wrangler >= 4.45.0).
-  // Nếu deploy báo lỗi: tạo KV thủ công rồi thêm "id": "<ID của namespace>" vào đây.
   "kv_namespaces": [
     { "binding": "SHARES" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "US_PROXY", "class_name": "USProxy" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["USProxy"] }
   ],
   "ratelimits": [
     {
