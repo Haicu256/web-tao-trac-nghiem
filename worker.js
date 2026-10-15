@@ -120,7 +120,7 @@ async function handleConvert(request, env) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-goog-api-key': apiKey,
-                'cf-aig-authorization': 'Bearer cfut_FLEDlPlDbFl4yFs38Y18Gm2v0eOMgwbZ1Rfh88QH9de565d5'
+                'cf-aig-authorization': 'Bearer ' + env.CF_AIG_TOKEN,
             },
             body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
