@@ -15,7 +15,7 @@
     "nodejs_compat"
   ],
   "secrets": {
-    "required": ["GEMINI_API_KEY"]
+    "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN"]
   },
   "kv_namespaces": [
     { "binding": "SHARES" }

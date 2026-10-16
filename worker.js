@@ -111,9 +111,12 @@ async function handleConvert(request, env) {
         if (!apiKey) {
             return jsonResponse({ error: 'Server chưa cấu hình GEMINI_API_KEY.' }, 500);
         }
+        if (!env.CF_AIG_TOKEN) {
+            return jsonResponse({ error: 'Server chưa cấu hình CF_AIG_TOKEN.' }, 500);
+        }
 
         const prompt = buildPrompt(rawText, startIndex);
-        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/9cfdacf13184881724759ce98fa45d5a/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/9cfdacf13184881724759ce98fa45d5a/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
 
         const geminiRes = await callViaUS(env, geminiUrl, {
             method: 'POST',
@@ -133,7 +136,7 @@ async function handleConvert(request, env) {
             const errText = await geminiRes.text().catch(() => '');
             try {
                 const errBody = JSON.parse(errText);
-                if (errBody?.error?.message) message = `Gemini lỗi: ${errBody.error.message}`;
+                const errMsg = errBody?.error?.message || errBody?.error?.[0]?.message || errBody?.errors?.[0]?.message; if (errMsg) message = `Gemini lỗi: ${errMsg}`;
             } catch (e) {
                 if (errText) message = `Gemini lỗi: ${geminiRes.status} (${errText.slice(0, 150).trim()})`;
             }
@@ -429,7 +432,7 @@ export class USProxy {
     }
     async fetch(request) {
         const { url, options } = await request.json();
-        const res = await fetch(url, options);
+        let res; try { res = await fetch(url, options); } catch (e) { return jsonResponse({ error: { message: e.message || "Lỗi kết nối USProxy" } }, 502); }
         return new Response(res.body, {
             status: res.status,
             headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' }

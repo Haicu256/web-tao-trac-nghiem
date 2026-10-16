@@ -641,7 +641,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
         function parseQuizData(text, shareId = null, title = '') {
             const lines = text.split('\n');
-            originalQuestions = [];
+            const parsedQuestions = [];
             let currentQ = null;
             const QUESTION_KEYWORD_REGEX = /^(?:(Câu\s*hỏi|Câu|Bài)\s*\d+|Q\s*\d+\s*[:\.\)\/])/i;
             const TRUE_FALSE_KEYWORD = /^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/i;
@@ -655,7 +655,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse;
 
                 if (isNewQuestion) {
-                    if (currentQ) originalQuestions.push(currentQ);
+                    if (currentQ) parsedQuestions.push(currentQ);
                     let cleanTitle = trimmedLine.replace(/^(Câu\s*hỏi|Câu|Q|Bài)?\s*\d+\s*[:\.\)\/]?\s*/i, '');
                     if (isTrueFalse) {
                         cleanTitle = trimmedLine.replace(/^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+\s*[:\.\)\/]?\s*/i, '').trim();
@@ -680,14 +680,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     }
                 }
             });
-            if (currentQ) originalQuestions.push(currentQ);
+            if (currentQ) parsedQuestions.push(currentQ);
 
-            const validQuestions = originalQuestions.filter(q => q.options.length > 0);
-            const droppedNoOptionCount = originalQuestions.length - validQuestions.length;
-            const withCorrectAnswer = validQuestions.filter(q => q.options.some(o => o.isCorrect));
-            const droppedTFCount = validQuestions.filter(q => q.type === 'true_false' && !q.options.some(o => o.isCorrect)).length;
+            const validQuestions = parsedQuestions.filter(q => q.options.length > 0);
+            const droppedNoOptionCount = parsedQuestions.length - validQuestions.length;
+            const withCorrectAnswer = validQuestions.filter(q => q.type === 'true_false' || q.options.some(o => o.isCorrect));
+            const droppedTFCount = 0;
             const droppedMCCount = validQuestions.filter(q => q.type !== 'true_false' && !q.options.some(o => o.isCorrect)).length;
-            originalQuestions = withCorrectAnswer;
+            if (withCorrectAnswer.length > 0) originalQuestions = withCorrectAnswer;
 
             if (droppedTFCount > 0 || droppedMCCount > 0 || droppedNoOptionCount > 0) {
                 const dropMsgs = [];
@@ -697,7 +697,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 showToast(`⚠️ Đã bỏ ${dropMsgs.join(' và ')}.`, 4500);
             }
 
-            if (originalQuestions.length > 0) {
+            if (withCorrectAnswer.length > 0) {
                 sourceText = text;
                 resetShareUI(shareId);
                 UI.uploadCard.style.display = 'none';
@@ -714,6 +714,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 renderQuizTitle();
                 return true;
             } else {
+                originalQuestions = [];
                 showToast("Không tìm thấy câu hỏi hợp lệ trong file (hoặc thiếu dấu * đáp án)!");
                 return false;
             }
@@ -1015,7 +1016,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             }
 
             if (isShuffleQ) shuffle(finalQuestions);
-            if (isShuffleO) finalQuestions.forEach(q => shuffle(q.options));
+            if (isShuffleO) finalQuestions.forEach(q => { const isAll = o => /^(cả\s*(\d+|hai|ba|bốn)\b|tất\s*cả(\s|$))/i.test(o.text.trim()); if (q.type !== 'true_false' && q.options.some(isAll)) { q.options = [...shuffle(q.options.filter(o => !isAll(o))), ...q.options.filter(isAll)]; } else { shuffle(q.options); } });
 
             UI.configSection.style.display = 'none';
             selectedAnswers = {};
@@ -1293,10 +1294,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
                 let dominantBodyColor = null;
                 const colorKeys = Object.keys(colorCharCounts);
-                if (totalPlainChars === 0 && colorKeys.length >= 2) {
+                if (colorKeys.length >= 2) {
                     colorKeys.sort((a, b) => colorCharCounts[b] - colorCharCounts[a]);
                     const totalColored = colorKeys.reduce((acc, k) => acc + colorCharCounts[k], 0);
-                    if (colorCharCounts[colorKeys[0]] / totalColored > 0.6) {
+                    if (colorCharCounts[colorKeys[0]] / (totalColored + totalPlainChars) > 0.6) {
                         dominantBodyColor = colorKeys[0];
                     }
                 }
@@ -1416,7 +1417,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     inner += walk(child);
                 }
                 if (!inner.trim()) {
-                    return tag === 'br' ? '\n' : inner;
+                    return tag === 'br' ? '\n' : ((tag === 'td' || tag === 'th') ? '\t' : inner);
                 }
 
                 if (tag === 'li' && listItemIndex !== null && listItemIndex < 6) {
@@ -1567,13 +1568,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             }
 
             const chunks = [];
-            let current = '';
+            let current = ''; let lastTableQ = null;
             const lines = bodyText.split('\n');
             const QUESTION_START_REGEX = /^((câu\s*hỏi|câu|bài|q)\s*\d+|\d+\s*[\.\)\/:]\s)/i;
             const hardMaxChars = maxChars * 1.5;
             for (const line of lines) {
                 const plainLine = line.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '').trim();
-                const isQuestionStart = QUESTION_START_REGEX.test(plainLine);
+                const tMatch = plainLine.match(/^(\d+)\t/); const isTableNewQ = tMatch ? (tMatch[1] !== lastTableQ) : false; if (tMatch) lastTableQ = tMatch[1]; const isQuestionStart = QUESTION_START_REGEX.test(plainLine) || isTableNewQ;
                 const wouldExceed = (current.length + line.length + 1) > maxChars;
                 if (current.length > 0 && wouldExceed && (isQuestionStart || current.length > hardMaxChars)) {
                     chunks.push(current.trim());
@@ -1601,11 +1602,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             if (/^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(text)) return true;
 
             const answerKeywords = [
-                /\b(đáp\s*án|bảng\s*đáp\s*án|key|lời\s*giải|hướng\s*dẫn\s*chấm|chọn\s*đáp\s*án)\b/i,
-                /\b(đúng\s*:\s*[a-d]|sai\s*:\s*[a-d])\b/i,
+                /(?:đáp\s*án|bảng\s*đáp\s*án|\bkey\b|lời\s*giải|hướng\s*dẫn\s*chấm|chọn\s*đáp\s*án)\b/i,
+                /(?:[\t|]\s*đúng\b|đúng\s*:\s*[a-d]|sai\s*:\s*[a-d])\b/i,
                 /\b\d+\s*[\.\:\-]\s*[A-D]\b/i
             ];
-            if (answerKeywords.some(regex => regex.test(text))) return true;
+            const plainForHint = text.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, ''); if (/^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(plainForHint)) return true; if (answerKeywords.some(regex => regex.test(plainForHint))) return true;
 
             // Xét độc lập từng ký hiệu U (gạch chân), HL (highlight), CLR (màu chữ)
             for (const tag of ['U', 'HL', 'CLR']) {
@@ -1752,7 +1753,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             }
 
             // Kiểm tra xem nội dung đã được đánh dấu đáp án bằng dấu * hay chưa
-            const hasMarkedAnswers = /^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(content);
+            const hasMarkedAnswers = /^\s*\*([a-zA-Z0-9][\.\)\-\/]|\s)/m.test(content) || /^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(content);
             if (!hasMarkedAnswers) {
                 showModal({
                     icon: '🚫',
