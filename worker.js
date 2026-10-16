@@ -17,7 +17,7 @@ export default {
         }
 
         // Trang mở link chia sẻ: /share?s=<id> (Worker chèn tên đề vào thẻ xem trước link)
-        if (url.pathname === '/share' && (request.method === 'GET' || request.method === 'HEAD')) {
+        if ((url.pathname === '/share' || url.pathname === '/share/') && (request.method === 'GET' || request.method === 'HEAD')) {
             return handleSharePage(request, env, url);
         }
 
@@ -116,14 +116,16 @@ async function handleConvert(request, env) {
         }
 
         const prompt = buildPrompt(rawText, startIndex);
-        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/9cfdacf13184881724759ce98fa45d5a/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
+        const accountId = env.CF_AIG_ACCOUNT_ID || '9cfdacf13184881724759ce98fa45d5a';
+        const gateway = env.CF_AIG_GATEWAY || 'default';
+        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
 
         const geminiRes = await callViaUS(env, geminiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-                'cf-aig-authorization': 'Bearer ' + env.CF_AIG_TOKEN,
+                'x-goog-api-key': apiKey.trim(),
+                'cf-aig-authorization': 'Bearer ' + env.CF_AIG_TOKEN.trim(),
             },
             body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],

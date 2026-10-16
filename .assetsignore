@@ -7,3 +7,4 @@ wrangler.jsonc
 .dev.vars
 .dev.vars.example
 node_modules
+*.md
