@@ -120,8 +120,8 @@ async function handleConvert(request, env) {
         }
 
         const prompt = buildPrompt(normalizedText, startIndex);
-        const accountId = env.CF_AIG_ACCOUNT_ID || '9cfdacf13184881724759ce98fa45d5a';
-        const gateway = env.CF_AIG_GATEWAY || 'default';
+        const accountId = (env.CF_AIG_ACCOUNT_ID && typeof env.CF_AIG_ACCOUNT_ID === 'string' ? env.CF_AIG_ACCOUNT_ID.trim() : '') || '9cfdacf13184881724759ce98fa45d5a';
+        const gateway = (env.CF_AIG_GATEWAY && typeof env.CF_AIG_GATEWAY === 'string' ? env.CF_AIG_GATEWAY.trim() : '') || 'default';
         const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
 
         const geminiRes = await callViaUS(env, geminiUrl, {
@@ -406,6 +406,7 @@ QUY TẮC BẮT BUỘC:
    - Chỉ xuất văn bản thô (plain text). TUYỆT ĐỐI KHÔNG bọc kết quả trong khối code markdown (không dùng \`\`\` hoặc \`\`\`text).
    - BẮT BUỘC xóa bỏ hoàn toàn tất cả các ký hiệu ⟦B⟧, ⟦/B⟧, ⟦U⟧, ⟦/U⟧, ⟦HL⟧, ⟦/HL⟧, ⟦CLR⟧, ⟦/CLR⟧ trong kết quả đầu ra.
    - Nếu cuối văn bản có phần "[BẢNG ĐÁP ÁN CHUNG CỦA ĐỀ ĐỂ TRA CỨU]", hãy dùng bảng đó để gắn dấu * cho các câu hỏi có số thứ tự tương ứng trong phần này, và KHÔNG in lại bảng đáp án đó ở kết quả đầu ra.
+   - LOẠI BỎ LỜI GIẢI / GIẢI THÍCH CHI TIẾT: Nếu sau các phương án có phần lời giải hoặc giải thích chi tiết (ví dụ: "Lời giải:...", "Hướng dẫn giải:...", "Giải thích:...", "Đáp án đúng là B vì..."), hãy sử dụng thông tin đó để xác định và đánh dấu * vào phương án đúng, nhưng TUYỆT ĐỐI KHÔNG xuất lại đoạn văn bản lời giải/giải thích đó ở kết quả đầu ra. Chỉ xuất tiêu đề câu hỏi và các phương án lựa chọn.
    - KHÔNG thêm bất kỳ lời chào, giải thích, ghi chú hay kết luận nào ngoài các câu hỏi đã chuẩn hóa.
 
 A. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM ĐÚNG/SAI:

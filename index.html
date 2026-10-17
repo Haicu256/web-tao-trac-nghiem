@@ -680,6 +680,31 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             reader.readAsText(file, 'UTF-8');
         });
 
+        // Cân bằng các cặp thẻ đánh dấu định dạng ⟦TAG⟧...⟦/TAG⟧ khi tách phương án
+        function balanceTags(parts) {
+            const tags = ['B', 'U', 'HL', 'CLR'];
+            const active = [];
+            return parts.map(part => {
+                let prefix = '';
+                for (const t of active) {
+                    prefix += `⟦${t}⟧`;
+                }
+                let current = prefix + part;
+                for (const t of tags) {
+                    const opens = (current.match(new RegExp(`⟦${t}⟧`, 'g')) || []).length;
+                    const closes = (current.match(new RegExp(`⟦\\/${t}⟧`, 'g')) || []).length;
+                    if (opens > closes) {
+                        current += `⟦/${t}⟧`.repeat(opens - closes);
+                        if (!active.includes(t)) active.push(t);
+                    } else if (closes > opens) {
+                        const idx = active.indexOf(t);
+                        if (idx !== -1) active.splice(idx, 1);
+                    }
+                }
+                return current;
+            });
+        }
+
         // Tách các lựa chọn đáp án nằm trên cùng một dòng (bảng Word, cột PDF, hoặc tab/cách ngang) thành các dòng riêng biệt
         function splitInlineOptions(text) {
             if (!text || typeof text !== 'string') return '';
@@ -693,30 +718,76 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 const hasA = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*[aA][.:)\/\-–—]\s+/;
                 const hasB = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*[bB][.:)\/\-–—]\s+/;
 
+                // Trường hợp 1: Các phương án phân tách bởi tab (\t) hoặc từ 2 dấu cách trở lên
                 if (startOptMatch || (startQMatch && hasA.test(line) && hasB.test(line))) {
-                    const parts = [];
-                    let lastIdx = 0;
                     const inlineRe = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*([a-fA-F])([.:)\/\-–—])\s+/g;
                     let m;
+                    const candidateMatches = [];
                     while ((m = inlineRe.exec(line)) !== null) {
-                        parts.push(line.slice(lastIdx, m.index).trim());
                         const sepLen = m[0].match(/^(?:\t+|[ ]{2,})/)[0].length;
-                        lastIdx = m.index + sepLen;
+                        candidateMatches.push({
+                            index: m.index,
+                            sepLen: sepLen,
+                            letter: m[3].toUpperCase(),
+                            fullMatch: m[0]
+                        });
                     }
-                    if (parts.length > 0) {
-                        parts.push(line.slice(lastIdx).trim());
-                        result.push(...parts.filter(p => p.length > 0));
-                        continue;
+
+                    if (candidateMatches.length > 0) {
+                        let expectedCharCode;
+                        let validSplitIndices = [];
+
+                        if (startOptMatch) {
+                            expectedCharCode = startOptMatch[3].toUpperCase().charCodeAt(0) + 1;
+                            for (const cand of candidateMatches) {
+                                if (cand.letter.charCodeAt(0) === expectedCharCode) {
+                                    validSplitIndices.push(cand.index + cand.sepLen);
+                                    expectedCharCode++;
+                                }
+                            }
+                        } else if (startQMatch) {
+                            let foundA = false;
+                            for (const cand of candidateMatches) {
+                                if (!foundA) {
+                                    if (cand.letter === 'A') {
+                                        foundA = true;
+                                        validSplitIndices.push(cand.index + cand.sepLen);
+                                        expectedCharCode = 'B'.charCodeAt(0);
+                                    }
+                                } else {
+                                    if (cand.letter.charCodeAt(0) === expectedCharCode) {
+                                        validSplitIndices.push(cand.index + cand.sepLen);
+                                        expectedCharCode++;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (validSplitIndices.length > 0) {
+                            const rawParts = [];
+                            let lastIdx = 0;
+                            for (const splitIdx of validSplitIndices) {
+                                rawParts.push(line.slice(lastIdx, splitIdx).trim());
+                                lastIdx = splitIdx;
+                            }
+                            rawParts.push(line.slice(lastIdx).trim());
+                            const filtered = rawParts.filter(p => p.length > 0);
+                            if (filtered.length > 1) {
+                                result.push(...balanceTags(filtered));
+                                continue;
+                            }
+                        }
                     }
                 }
 
+                // Trường hợp 2: Cả 4 phương án A, B, C, D nằm nối tiếp trên 1 dòng phân tách bởi dấu cách đơn
                 if (startOptMatch && /^[aA][.:)\/\-–—]/.test(plainTrimmed.replace(/^\*+\s*/, ''))) {
                     const letters = ['b', 'c', 'd'];
                     let isSequential = true;
                     let checkIdx = 0;
                     for (const l of letters) {
                         const sub = line.slice(checkIdx);
-                        const seqM = sub.match(new RegExp('(?:^|\\s+)(?:\\*+\\s*)?' + l + '[.:)\\-–—]\\s+', 'i'));
+                        const seqM = sub.match(new RegExp('(?:^|[\\t ]+)(?:⟦[^⟧]+⟧\\s*)*(?:\\*+\\s*)*(?:⟦[^⟧]+⟧\\s*)*' + l + '(?:\\*+\\s*)*(?:⟦[^⟧]+⟧\\s*)*[.:)\\-–—\\/]\\s+', 'i'));
                         if (!seqM) { isSequential = false; break; }
                         checkIdx += seqM.index + seqM[0].length;
                     }
@@ -724,21 +795,28 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                         const allLetters = ['a', 'b', 'c', 'd'];
                         const seqMatches = [];
                         let currIdx = 0;
+                        let foundAll = true;
                         for (const l of allLetters) {
                             const sub = line.slice(currIdx);
-                            const m = sub.match(new RegExp('(?:^|\\s+)(?:\\*+\\s*)?' + l + '[.:)\\-–—]\\s+', 'i'));
-                            const mStart = currIdx + m.index + (m[0].match(/^\s+/)?.[0].length || 0);
+                            const m = sub.match(new RegExp('(?:^|[\\t ]+)(?:⟦[^⟧]+⟧\\s*)*(?:\\*+\\s*)*(?:⟦[^⟧]+⟧\\s*)*' + l + '(?:\\*+\\s*)*(?:⟦[^⟧]+⟧\\s*)*[.:)\\-–—\\/]\\s+', 'i'));
+                            if (!m) { foundAll = false; break; }
+                            const mStart = currIdx + m.index + (m[0].match(/^[ \t]+/)?.[0].length || 0);
                             seqMatches.push(mStart);
                             currIdx += m.index + m[0].length;
                         }
-                        const parts = [];
-                        for (let i = 0; i < seqMatches.length; i++) {
-                            const start = seqMatches[i];
-                            const end = (i < seqMatches.length - 1) ? seqMatches[i + 1] : line.length;
-                            parts.push(line.slice(start, end).trim());
+                        if (foundAll && seqMatches.length === 4) {
+                            const rawParts = [];
+                            for (let i = 0; i < seqMatches.length; i++) {
+                                const start = seqMatches[i];
+                                const end = (i < seqMatches.length - 1) ? seqMatches[i + 1] : line.length;
+                                rawParts.push(line.slice(start, end).trim());
+                            }
+                            const filtered = rawParts.filter(p => p.length > 0);
+                            if (filtered.length > 1) {
+                                result.push(...balanceTags(filtered));
+                                continue;
+                            }
                         }
-                        result.push(...parts.filter(p => p.length > 0));
-                        continue;
                     }
                 }
 
@@ -748,18 +826,20 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         }
 
         function parseQuizData(text, shareId = null, title = '') {
-            text = splitInlineOptions((text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+            text = splitInlineOptions((text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')).replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
             const lines = text.split('\n');
             const parsedQuestions = [];
             let currentQ = null;
             const QUESTION_KEYWORD_REGEX = /^(?:(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(Câu\s*hỏi|Câu|Bài|Question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|Q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]))/i;
             const BARE_QUESTION_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/i;
             const TRUE_FALSE_KEYWORD = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$)/i;
-            const LOOSE_QUESTION_REGEX = /^(?:(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(Câu\s*hỏi|Câu|Bài|Question)\s*\d+(?:\.\d+)?\s+)/i;
+            const LOOSE_QUESTION_REGEX = /^(?:(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(Câu\s*hỏi|Câu|Bài|Question)\s*\d+(?:\.\d+)?(?:\s*[:\.\)\/\-–—\(\[]+|\s+(?!(?:trong|của|ở|và|là|is|in|of)(?:\s+|$))[^\s]+|$))/i;
             const OPTION_REGEX = /^([a-fA-F]\*?[\.\):]|[a-fA-F]\*?[\-\/](?=\s|$)|[a-fA-F]\*(?=\s|$))\s*/;
             const STAR_OPTION_REGEX = /^([a-fA-F]\*?[\.\):]|[a-fA-F]\*?[\-\/](?=\s|$)|[a-fA-F](?:\*|\*?\s+|$))\s*/;
-            const END_OF_QUIZ_REGEX = /^(?:[-=_*~#]{2,}\s*(?:hết(?:\s*(?:đề(?:\s*thi)?|toàn\s*bộ\s*đề))?|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\s*[-=_*~#]{2,}|(?:hết|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\.?$|\(?\s*(?:thí\s*sinh\s*không\s*được\s*sử\s*dụng\s*tài\s*liệu|cán\s*bộ\s*coi\s*thi\s*không\s*giải\s*thích\s*gì\s*thêm).*?\.?\)?$|(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải(?:\s*chi\s*tiết)?|đáp\s*án(?:\s*(?:tham\s*khảo|chi\s*tiết))?|phần\s*đáp\s*án|answer\s*key)\s*[:.]?$)/i;
+            const END_OF_QUIZ_REGEX = /^(?:[-=_*~#]{2,}\s*(?:hết(?:\s*(?:đề(?:\s*thi)?|toàn\s*bộ\s*đề))?|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\s*[-=_*~#]{2,}|(?:hết|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\.?$|\(?\s*(?:thí\s*sinh\s*không\s*được\s*sử\s*dụng\s*tài\s*liệu|cán\s*bộ\s*coi\s*thi\s*không\s*giải\s*thích\s*gì\s*thêm).*?\.?\)?$|(?:[-=_*~#]{2,}\s*)?(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|phần\s*đáp\s*án|answer\s*key)\s*[:.]?(?:\s*[-=_*~#]{2,})?$)/i;
             const DIVIDER_REGEX = /^[-=_*~#]{3,}\s*$/;
+            const EXPLANATION_LINE_REGEX = /^(?:lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:giải|chấm)(?:\s*chi\s*tiết)?|giải\s*thích(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*:|đáp\s*án\s*chi\s*tiết)\s*[:.\-–—]?/i;
+            const ANSWER_LINE_REGEX = /^(?:đáp\s*án(?:\s*đúng)?|chọn(?:\s*đáp\s*án)?)\s*[:.\-–—]?\s*([a-fA-F])\b/i;
             const escapeHTML = (str) => str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
             let isEndOfQuiz = false;
 
@@ -776,6 +856,40 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     return;
                 }
                 if (isEndOfQuiz) return;
+
+                // Xử lý dòng đáp án hoặc lời giải giải thích xuất hiện ngay dưới các phương án
+                if (currentQ && currentQ.options.length >= 2) {
+                    const ansMatch = trimmedLine.match(ANSWER_LINE_REGEX);
+                    if (ansMatch) {
+                        if (!currentQ.options.some(o => o.isCorrect)) {
+                            const letter = ansMatch[1].toUpperCase();
+                            const optIdx = letter.charCodeAt(0) - 65;
+                            if (optIdx >= 0 && optIdx < currentQ.options.length) {
+                                currentQ.options[optIdx].isCorrect = true;
+                            }
+                        }
+                        parsedQuestions.push(currentQ);
+                        currentQ = null;
+                        return;
+                    }
+
+                    if (EXPLANATION_LINE_REGEX.test(trimmedLine)) {
+                        if (!currentQ.options.some(o => o.isCorrect)) {
+                            const inlineAns = trimmedLine.match(/(?:đáp\s*án(?:\s*đúng)?|chọn(?:\s*đáp\s*án)?)\s*[:.\-–—]?\s*([a-fA-F])\b/i);
+                            if (inlineAns) {
+                                const letter = inlineAns[1].toUpperCase();
+                                const optIdx = letter.charCodeAt(0) - 65;
+                                if (optIdx >= 0 && optIdx < currentQ.options.length) {
+                                    currentQ.options[optIdx].isCorrect = true;
+                                }
+                            }
+                        }
+                        parsedQuestions.push(currentQ);
+                        currentQ = null;
+                        return;
+                    }
+                }
+
                 const isTrueFalse = TRUE_FALSE_KEYWORD.test(trimmedLine);
                 const isBareQuestion = BARE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length >= 2);
                 const isLooseQuestion = LOOSE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length > 0);
@@ -812,21 +926,29 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                         workingLine = workingLine.replace(/^\*/, '');
                     }
 
-                    const mdBoldMatch = workingLine.match(/^(\*{2,3})\s*([a-fA-F])(?:\s*\*{2,3}\s*([.:)\/\-–—])?|([.:)\/\-–—])\s*\*{2,3})\s*/i);
+                    const mdBoldMatch = workingLine.match(/^(\*{2,3})\s*([a-fA-F])\s*(?:\*{2,3}\s*([.:)\/\-–—])|([.:)\/\-–—])\s*\*{2,3})\s+/i);
                     let isBoldPrefix = false;
+                    let isWholeLineBold = false;
                     if (mdBoldMatch) {
                         isBoldPrefix = true;
                         const letter = mdBoldMatch[2];
-                        const delim = mdBoldMatch[3] || mdBoldMatch[4] || '.';
+                        const delim = mdBoldMatch[3] || mdBoldMatch[4];
                         workingLine = letter + delim + ' ' + workingLine.slice(mdBoldMatch[0].length);
                     } else {
                         const wholeLineBold = workingLine.match(/^(\*{2,3})\s*([a-fA-F])\s*([.:)\/\-–—])\s*([\s\S]*?)\*+\s*$/i);
                         if (wholeLineBold) {
                             isBoldPrefix = true;
+                            isWholeLineBold = true;
                             const letter = wholeLineBold[2];
                             const delim = wholeLineBold[3];
                             const content = wholeLineBold[4].trim();
                             workingLine = letter + delim + ' ' + content;
+                        } else {
+                            const unclosedDoubleStar = workingLine.match(/^\*{2}\s*([a-fA-F])([.:)\/\-–—])\s+/i);
+                            if (unclosedDoubleStar) {
+                                isCorrect = true;
+                                workingLine = unclosedDoubleStar[1] + unclosedDoubleStar[2] + ' ' + workingLine.slice(unclosedDoubleStar[0].length);
+                            }
                         }
                     }
 
@@ -845,8 +967,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                             rawText = rawText.replace(/\s*(\(\*\)|\*)$/, '').trim();
                         }
 
-                        if (isBoldPrefix && rawText.endsWith('**')) {
-                            rawText = rawText.replace(/\*\*\s*$/, '').trim();
+                        if (isWholeLineBold) {
+                            const boldCount = (rawText.match(/\*\*/g) || []).length;
+                            if (boldCount % 2 === 1 && rawText.endsWith('**')) {
+                                rawText = rawText.replace(/\*\*\s*$/, '').trim();
+                            }
                         }
 
                         const optionText = escapeHTML(rawText);
@@ -1873,7 +1998,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             let bodyText = text;
             let answerKeyBlock = '';
 
-            const singleHeadingRegex = /(?:^|\n)[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải(?:\s*chi\s*tiết)?|đáp\s*án(?:\s*(?:tham\s*khảo|chi\s*tiết))?|phần\s*đáp\s*án|answer\s*key)[ \t]*:?[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?=\n|$)/gi;
+            const singleHeadingRegex = /(?:^|\n)[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|phần\s*đáp\s*án|answer\s*key)[ \t]*:?[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?=\n|$)/gi;
             let match;
             let lastValidMatch = null;
             while ((match = singleHeadingRegex.exec(text)) !== null) {
@@ -1898,7 +2023,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             let current = ''; let lastTableQ = null;
             bodyText = splitInlineOptions(bodyText);
             const lines = bodyText.split('\n');
-            const QUESTION_START_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i;
+            const QUESTION_START_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?(?:\s*[:\.\)\/\-–—\(\[]+|\s+(?!(?:trong|của|ở|và|là|is|in|of)(?:\s+|$))[^\s]+|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i;
             const hardMaxChars = maxChars * 1.5;
             for (const line of lines) {
                 const rawNoTag = line.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
@@ -1932,7 +2057,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         function checkTextHasAnswerHint(text) {
             if (!text || typeof text !== 'string') return false;
             text = splitInlineOptions(text);
-            const starHintRe = /^\s*(?:\*+\s*(?:\*{2,3}\s*)?(?:[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*?(?:\s+\S|$))|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*)\s*$)/im;
+            const starHintRe = /^\s*(?:(?:\*(?!\*)\s*|(?:\*{2}\s*[a-fA-F][\.\)\-\/:](?!\s*\*{2}))|\*{3,}\s*)(?:[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*?(?:\s+\S|$))|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*)\s*$)/im;
             if (starHintRe.test(text)) return true;
 
             const answerKeywords = [
@@ -2037,7 +2162,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     const lines = formatted.split('\n');
                     let count = 0;
                     for (const line of lines) {
-                        if (/^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i.test(line.trim())) count++;
+                        if (/^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?(?:\s*[:\.\)\/\-–—\(\[]+|\s+(?!(?:trong|của|ở|và|là|is|in|of)(?:\s+|$))[^\s]+|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i.test(line.trim())) count++;
                     }
                     currentIndex += count;
 
