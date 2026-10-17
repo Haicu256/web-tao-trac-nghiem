@@ -16,14 +16,16 @@ export default {
             return handleShareCreate(request, env);
         }
 
-        // Trang mở link chia sẻ: /share?s=<id> (Worker chèn tên đề vào thẻ xem trước link)
-        if ((url.pathname === '/share' || url.pathname === '/share/') && (request.method === 'GET' || request.method === 'HEAD')) {
+        // Trang mở link chia sẻ: /share?s=<id> hoặc /?s=<id> (Worker chèn tên đề vào thẻ xem trước link)
+        if ((url.pathname === '/share' || url.pathname === '/share/' || (url.pathname === '/' && url.searchParams.has('s'))) && (request.method === 'GET' || request.method === 'HEAD')) {
             return handleSharePage(request, env, url);
         }
 
         const shareMatch = url.pathname.match(/^\/api\/share\/([^/]+)$/);
         if (shareMatch && request.method === 'GET') {
-            return handleShareGet(shareMatch[1], env);
+            let id = shareMatch[1];
+            try { id = decodeURIComponent(id); } catch {}
+            return handleShareGet(id.trim(), env);
         }
 
         // Tuyệt đối không để route /api/* chưa định nghĩa bị rơi vào fallback tài nguyên tĩnh
@@ -103,7 +105,9 @@ async function handleConvert(request, env) {
             return jsonResponse({ error: 'Thiếu nội dung văn bản.' }, 400);
         }
 
-        if (rawText.length > MAX_INPUT_SIZE) {
+        const normalizedText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        if (normalizedText.length > MAX_INPUT_SIZE) {
             return jsonResponse({ error: `Văn bản quá lớn (tối đa ${MAX_INPUT_SIZE.toLocaleString('vi-VN')} ký tự mỗi lần).` }, 413);
         }
 
@@ -115,7 +119,7 @@ async function handleConvert(request, env) {
             return jsonResponse({ error: 'Server chưa cấu hình CF_AIG_TOKEN.' }, 500);
         }
 
-        const prompt = buildPrompt(rawText, startIndex);
+        const prompt = buildPrompt(normalizedText, startIndex);
         const accountId = env.CF_AIG_ACCOUNT_ID || '9cfdacf13184881724759ce98fa45d5a';
         const gateway = env.CF_AIG_GATEWAY || 'default';
         const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
@@ -138,22 +142,30 @@ async function handleConvert(request, env) {
             const errText = await geminiRes.text().catch(() => '');
             try {
                 const errBody = JSON.parse(errText);
-                const errMsg = errBody?.error?.message || errBody?.error?.[0]?.message || errBody?.errors?.[0]?.message; if (errMsg) message = `Gemini lỗi: ${errMsg}`;
+                const errMsg = (typeof errBody?.error === 'string' ? errBody.error : errBody?.error?.message)
+                    || errBody?.error?.[0]?.message
+                    || errBody?.errors?.[0]?.message
+                    || (typeof errBody?.message === 'string' ? errBody.message : null);
+                if (errMsg) message = `Gemini lỗi: ${errMsg}`;
             } catch (e) {
                 if (errText) message = `Gemini lỗi: ${geminiRes.status} (${errText.slice(0, 150).trim()})`;
             }
-            return jsonResponse({ error: message }, 502);
+            const status = (geminiRes.status >= 400 && geminiRes.status <= 599) ? geminiRes.status : 502;
+            return jsonResponse({ error: message }, status);
         }
 
-        const data = await geminiRes.json();
+        const data = await geminiRes.json().catch(() => null);
+        if (!data) {
+            return jsonResponse({ error: 'Dữ liệu phản hồi từ AI không đúng định dạng JSON.' }, 502);
+        }
         const candidate = data?.candidates?.[0];
         const blockReason = data?.promptFeedback?.blockReason || (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'RECITATION'].includes(candidate?.finishReason) ? candidate.finishReason : null);
         if (blockReason) {
             return jsonResponse({ error: `Nội dung bị bộ lọc của Google Gemini từ chối xử lý (${blockReason}).` }, 422);
         }
         let resultText = Array.isArray(candidate?.content?.parts)
-            ? candidate.content.parts.map(p => (typeof p === 'object' && p ? p.text || '' : '')).join('')
-            : (candidate?.content?.parts?.[0]?.text || '');
+            ? candidate.content.parts.filter(p => !p?.thought).map(p => (typeof p === 'object' && p ? p.text || '' : '')).join('')
+            : (candidate?.content?.parts?.[0]?.thought ? '' : (candidate?.content?.parts?.[0]?.text || ''));
         const truncated = candidate?.finishReason === 'MAX_TOKENS';
 
         if (!resultText) {
@@ -163,7 +175,7 @@ async function handleConvert(request, env) {
         // Loại bỏ markdown code block (``` hoặc ```text ... ```) nếu AI vô tình bọc lại
         resultText = resultText.trim();
         if (resultText.startsWith('```')) {
-            resultText = resultText.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+            resultText = resultText.replace(/^`{3,}[a-zA-Z]*\n?/, '').replace(/\n?`{3,}$/, '').trim();
         }
 
         // Loại bỏ hoàn toàn các ký hiệu đánh dấu định dạng tạm nếu AI quên xóa trong kết quả
@@ -207,11 +219,12 @@ async function handleShareCreate(request, env) {
         }
 
         const body = parseResult.data;
-        const text = body?.text;
+        let text = body?.text;
 
         if (typeof text !== 'string' || text.trim().length === 0) {
             return jsonResponse({ error: 'Thiếu nội dung đề.' }, 400);
         }
+        text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         if (text.length > MAX_SHARE_CHARS) {
             return jsonResponse({ error: tooLargeMessage() }, 413);
         }
@@ -298,16 +311,24 @@ async function handleSharePage(request, env, url) {
     if (!page.ok) return new Response('Not Found', { status: 404 });
 
     try {
-        const id = url.searchParams.get('s') || '';
+        const id = (url.searchParams.get('s') || '').trim();
         if (env.SHARES && SHARE_ID_REGEX.test(id)) {
             const stored = await env.SHARES.get(id);
             if (stored !== null) {
                 const { title } = parseStoredShare(stored);
-                if (title) return withShareMeta(page, title, `${url.origin}/share?s=${id}`);
+                const shareTitle = title || 'Bài tập trắc nghiệm';
+                const transformed = withShareMeta(page, shareTitle, `${url.origin}/share?s=${id}`);
+                if (request.method === 'HEAD') {
+                    return new Response(null, { status: transformed.status, headers: transformed.headers });
+                }
+                return transformed;
             }
         }
     } catch (err) {
         console.error('Share page meta error:', err);
+    }
+    if (request.method === 'HEAD') {
+        return new Response(null, { status: page.status, headers: page.headers });
     }
     return page;
 }
@@ -347,9 +368,10 @@ function tooLargeMessage() {
 
 // Nhận diện giống parseQuizData ở frontend — tránh biến endpoint này thành nơi lưu file tùy ý
 function looksLikeQuiz(text) {
-    return /^\s*(câu\s*hỏi|câu|q|bài)\s*\d+/im.test(text)
-        || /^\s*câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(text)
-        || /^\s*\d+\s*[\.\)\/:]\s/m.test(text);
+    const hasQuestion = /^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|q|bài|question)\s*\d+(?:\.\d+)?|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/im.test(text)
+        || /^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/m.test(text);
+    const hasOption = /^\s*(?:\*+\s*(?:[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*?\s+)|(?:\*{1,3}\s*)?[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$))/im.test(text);
+    return hasQuestion && hasOption;
 }
 
 // Id = 64 bit đầu của SHA-256 (tên đề + nội dung), mã hóa base62 (11 ký tự).
@@ -399,7 +421,7 @@ B. [nội dung ý B - nếu là ý sai]
 D. [nội dung ý D]
 
 B. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM LỰA CHỌN THÔNG THƯỜNG:
-- Chuẩn hóa tiền tố câu (Bài 1:, 1., 1/, Câu hỏi 1:, Q1,...) thành "Câu X:".
+- Chuẩn hóa tiền tố câu (Bài 1:, 1., 1/, Câu hỏi 1:, Question 1:, Q1,...) thành "Câu X:".
 - GIỮ NGUYÊN số thứ tự nếu có sẵn; nếu văn bản không có số thứ tự thì đánh số tăng dần bắt đầu từ ${startIndex}.
 - Không thay đổi nội dung từ ngữ của câu hỏi và đáp án.
 - Giữ nguyên số lượng lựa chọn của câu hỏi theo đề bài gốc (thông thường là 4 lựa chọn A, B, C, D).

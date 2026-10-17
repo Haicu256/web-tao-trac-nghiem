@@ -9,7 +9,7 @@
     <meta name="keywords" content="tạo đề trắc nghiệm, luyện thi trắc nghiệm, quiz online, thi trắc nghiệm, ôn thi, câu hỏi trắc nghiệm, tạo bài kiểm tra">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://web-tao-trac-nghiem.haicu25699652.workers.dev/">
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
@@ -464,7 +464,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         };
 
         // ===== Nhạc =====
-        const audio = new Audio('music/chill.mp3');
+        const audio = new Audio('/music/chill.mp3');
         audio.loop = true;
 
         let originalQuestions = [];
@@ -494,11 +494,27 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             toastTimer = setTimeout(() => UI.toast.classList.remove("show"), duration);
         }
 
+        audio.addEventListener('pause', () => {
+            if (UI.musicBtn && UI.musicBtn.classList.contains('playing')) {
+                UI.musicBtn.innerHTML = '♫';
+                UI.musicBtn.classList.remove('playing');
+            }
+        });
+
         function toggleMusic() {
             if (audio.paused) {
-                audio.play().catch(e => console.warn('Lỗi phát nhạc:', e));
-                UI.musicBtn.innerHTML = '♫ 🔊';
-                UI.musicBtn.classList.add('playing');
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        UI.musicBtn.innerHTML = '♫ 🔊';
+                        UI.musicBtn.classList.add('playing');
+                    }).catch(e => {
+                        console.warn('Lỗi phát nhạc:', e);
+                        UI.musicBtn.innerHTML = '♫';
+                        UI.musicBtn.classList.remove('playing');
+                        if (e.name !== 'AbortError') showToast('Không thể phát nhạc nền.', 3000);
+                    });
+                }
             } else {
                 audio.pause();
                 UI.musicBtn.innerHTML = '♫';
@@ -601,27 +617,44 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         }
         document.addEventListener('DOMContentLoaded', () => updateThemeUI(getStoredTheme()));
 
+        let activeModalCancel = null;
+
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && UI.modal.classList.contains('show')) closeModal();
+            if (e.key === 'Escape' && UI.modal.classList.contains('show')) closeModal(true);
+        });
+
+        UI.modal.addEventListener('click', (e) => {
+            if (e.target === UI.modal) closeModal(true);
         });
 
         function showModal({ icon, title, desc, cancelText, confirmText, onConfirm, onCancel }) {
+            activeModalCancel = onCancel || null;
             UI.modalIcon.textContent = icon;
             UI.modalTitle.textContent = title;
             UI.missingText.innerHTML = desc;
             UI.modalCancelBtn.textContent = cancelText;
             UI.modalCancelBtn.onclick = () => {
-                closeModal();
-                if (typeof onCancel === 'function') onCancel();
+                closeModal(true);
             };
             UI.modalConfirmBtn.textContent = confirmText;
             UI.modalConfirmBtn.onclick = () => {
-                closeModal();
-                if (typeof onConfirm === 'function') onConfirm();
+                const cb = onConfirm;
+                activeModalCancel = null;
+                closeModal(false);
+                if (typeof cb === 'function') cb();
             };
             UI.modal.classList.add('show');
         }
-        function closeModal() { UI.modal.classList.remove('show'); }
+        function closeModal(triggerCancel = false) {
+            UI.modal.classList.remove('show');
+            if (triggerCancel && typeof activeModalCancel === 'function') {
+                const cb = activeModalCancel;
+                activeModalCancel = null;
+                cb();
+            } else if (!triggerCancel) {
+                activeModalCancel = null;
+            }
+        }
 
         // ===== XỬ LÝ FILE TXT =====
         UI.fileInput.addEventListener('change', function(e) {
@@ -634,7 +667,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             }
             const reader = new FileReader();
             reader.onload = e => {
-                let text = e.target.result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                let text = (e.target.result || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
                 if (text.includes('\uFFFD')) {
                     showToast('File có ký tự không hợp lệ. Vui lòng lưu lại dưới dạng UTF-8!', 5000);
                     UI.fileInput.value = '';
@@ -647,15 +680,85 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             reader.readAsText(file, 'UTF-8');
         });
 
+        // Tách các lựa chọn đáp án nằm trên cùng một dòng (bảng Word, cột PDF, hoặc tab/cách ngang) thành các dòng riêng biệt
+        function splitInlineOptions(text) {
+            if (!text || typeof text !== 'string') return '';
+            const lines = text.split('\n');
+            const result = [];
+            for (let line of lines) {
+                const trimmed = line.trim();
+                const plainTrimmed = trimmed.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
+                const startOptMatch = plainTrimmed.match(/^(\*+\s*)?(\*{2,3}\s*)?([a-fA-F])([.:)\/\-–—])\s+/);
+                const startQMatch = plainTrimmed.match(/^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?|q\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3})/i);
+                const hasA = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*[aA][.:)\/\-–—]\s+/;
+                const hasB = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*[bB][.:)\/\-–—]\s+/;
+
+                if (startOptMatch || (startQMatch && hasA.test(line) && hasB.test(line))) {
+                    const parts = [];
+                    let lastIdx = 0;
+                    const inlineRe = /(?:\t+|[ ]{2,})(?:⟦[^⟧]+⟧\s*)*(\*+\s*)?(\*{2,3}\s*)?(?:⟦[^⟧]+⟧\s*)*([a-fA-F])([.:)\/\-–—])\s+/g;
+                    let m;
+                    while ((m = inlineRe.exec(line)) !== null) {
+                        parts.push(line.slice(lastIdx, m.index).trim());
+                        const sepLen = m[0].match(/^(?:\t+|[ ]{2,})/)[0].length;
+                        lastIdx = m.index + sepLen;
+                    }
+                    if (parts.length > 0) {
+                        parts.push(line.slice(lastIdx).trim());
+                        result.push(...parts.filter(p => p.length > 0));
+                        continue;
+                    }
+                }
+
+                if (startOptMatch && /^[aA][.:)\/\-–—]/.test(plainTrimmed.replace(/^\*+\s*/, ''))) {
+                    const letters = ['b', 'c', 'd'];
+                    let isSequential = true;
+                    let checkIdx = 0;
+                    for (const l of letters) {
+                        const sub = line.slice(checkIdx);
+                        const seqM = sub.match(new RegExp('(?:^|\\s+)(?:\\*+\\s*)?' + l + '[.:)\\-–—]\\s+', 'i'));
+                        if (!seqM) { isSequential = false; break; }
+                        checkIdx += seqM.index + seqM[0].length;
+                    }
+                    if (isSequential) {
+                        const allLetters = ['a', 'b', 'c', 'd'];
+                        const seqMatches = [];
+                        let currIdx = 0;
+                        for (const l of allLetters) {
+                            const sub = line.slice(currIdx);
+                            const m = sub.match(new RegExp('(?:^|\\s+)(?:\\*+\\s*)?' + l + '[.:)\\-–—]\\s+', 'i'));
+                            const mStart = currIdx + m.index + (m[0].match(/^\s+/)?.[0].length || 0);
+                            seqMatches.push(mStart);
+                            currIdx += m.index + m[0].length;
+                        }
+                        const parts = [];
+                        for (let i = 0; i < seqMatches.length; i++) {
+                            const start = seqMatches[i];
+                            const end = (i < seqMatches.length - 1) ? seqMatches[i + 1] : line.length;
+                            parts.push(line.slice(start, end).trim());
+                        }
+                        result.push(...parts.filter(p => p.length > 0));
+                        continue;
+                    }
+                }
+
+                result.push(line);
+            }
+            return result.join('\n');
+        }
+
         function parseQuizData(text, shareId = null, title = '') {
+            text = splitInlineOptions((text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
             const lines = text.split('\n');
             const parsedQuestions = [];
             let currentQ = null;
-            const QUESTION_KEYWORD_REGEX = /^(?:(Câu\s*hỏi|Câu|Bài)\s*\d+|Q\s*\d+\s*[:\.\)\/])/i;
-            const BARE_QUESTION_REGEX = /^\d+\s*[\.\)\/:]\s/;
-            const TRUE_FALSE_KEYWORD = /^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/i;
-            const OPTION_REGEX = /^([a-fA-F][\.\)]|[a-fA-F][\-\/](?=\s|$))\s*/;
-            const END_OF_QUIZ_REGEX = /^(?:[-=_*~#]{2,}\s*hết(?:\s*(?:đề(?:\s*thi)?|toàn\s*bộ\s*đề))?\s*[-=_*~#]{2,}|hết\.?$|\(?(?:thí\s*sinh\s*không\s*được\s*sử\s*dụng\s*tài\s*liệu|cán\s*bộ\s*coi\s*thi\s*không\s*giải\s*thích\s*gì\s*thêm)\)?|(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*chấm|đáp\s*án\s*tham\s*khảo)\s*[:.]?)/i;
+            const QUESTION_KEYWORD_REGEX = /^(?:(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(Câu\s*hỏi|Câu|Bài|Question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|Q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]))/i;
+            const BARE_QUESTION_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/i;
+            const TRUE_FALSE_KEYWORD = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$)/i;
+            const LOOSE_QUESTION_REGEX = /^(?:(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(Câu\s*hỏi|Câu|Bài|Question)\s*\d+(?:\.\d+)?\s+)/i;
+            const OPTION_REGEX = /^([a-fA-F]\*?[\.\):]|[a-fA-F]\*?[\-\/](?=\s|$)|[a-fA-F]\*(?=\s|$))\s*/;
+            const STAR_OPTION_REGEX = /^([a-fA-F]\*?[\.\):]|[a-fA-F]\*?[\-\/](?=\s|$)|[a-fA-F](?:\*|\*?\s+|$))\s*/;
+            const END_OF_QUIZ_REGEX = /^(?:[-=_*~#]{2,}\s*(?:hết(?:\s*(?:đề(?:\s*thi)?|toàn\s*bộ\s*đề))?|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\s*[-=_*~#]{2,}|(?:hết|the\s*end|end\s*of\s*(?:test|exam|quiz|paper))\.?$|\(?\s*(?:thí\s*sinh\s*không\s*được\s*sử\s*dụng\s*tài\s*liệu|cán\s*bộ\s*coi\s*thi\s*không\s*giải\s*thích\s*gì\s*thêm).*?\.?\)?$|(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải(?:\s*chi\s*tiết)?|đáp\s*án(?:\s*(?:tham\s*khảo|chi\s*tiết))?|phần\s*đáp\s*án|answer\s*key)\s*[:.]?$)/i;
             const DIVIDER_REGEX = /^[-=_*~#]{3,}\s*$/;
             const escapeHTML = (str) => str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
             let isEndOfQuiz = false;
@@ -665,31 +768,88 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 if (!trimmedLine) return;
                 if (DIVIDER_REGEX.test(trimmedLine)) return;
                 if (END_OF_QUIZ_REGEX.test(trimmedLine)) {
-                    isEndOfQuiz = true;
-                    if (currentQ) { parsedQuestions.push(currentQ); currentQ = null; }
+                    const hasStartedQuiz = parsedQuestions.length > 0 || (currentQ && currentQ.options.length > 0);
+                    if (hasStartedQuiz) {
+                        isEndOfQuiz = true;
+                        if (currentQ) { parsedQuestions.push(currentQ); currentQ = null; }
+                    }
                     return;
                 }
                 if (isEndOfQuiz) return;
                 const isTrueFalse = TRUE_FALSE_KEYWORD.test(trimmedLine);
-                const isBareQuestion = BARE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length > 0);
-                const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse || isBareQuestion;
+                const isBareQuestion = BARE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length >= 2);
+                const isLooseQuestion = LOOSE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length > 0);
+                const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse || isBareQuestion || isLooseQuestion;
 
                 if (isNewQuestion) {
                     if (currentQ) parsedQuestions.push(currentQ);
-                    let cleanTitle = trimmedLine.replace(/^(Câu\s*hỏi|Câu|Q|Bài)?\s*\d+\s*[:\.\)\/]?\s*/i, '');
+                    let clean = trimmedLine.replace(/^#{1,6}\s*/, '');
+                    const hadWrappingBold = /^\*{2,3}/.test(clean) && /\*{2,3}$/.test(clean);
+                    clean = clean.replace(/^\*{1,3}\s*/, '');
                     if (isTrueFalse) {
-                        cleanTitle = trimmedLine.replace(/^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+\s*[:\.\)\/]?\s*/i, '').trim();
-                        currentQ = { title: escapeHTML(cleanTitle), options: [], type: 'true_false' };
+                        clean = clean.replace(/^(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)(?:\s*\*{1,3})?\s*[:.\-–—]?(?:\s*\*{1,3})?\s*(?:(?:(?:câu\s*hỏi|câu|bài|question|q)\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*\*{1,3})?\s*[:\.\)\/\-–—\]]?(?:\s*\*{1,3})?\s*)?/i, '');
                     } else {
-                        currentQ = { title: escapeHTML(cleanTitle), options: [], type: 'multiple_choice' };
+                        clean = clean.replace(/^(?:(Câu\s*hỏi|Câu|Q|Bài|Question)\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*\*{1,3})?\s*[:\.\)\/\-–—\]]?(?:\s*\*{1,3})?\s*/i, '');
                     }
+                    clean = clean.replace(/^\*+\s*/, '');
+                    if (hadWrappingBold) {
+                        clean = clean.replace(/\*{2,3}$/, '');
+                    }
+                    currentQ = {
+                        title: escapeHTML(clean.trim()),
+                        options: [],
+                        type: isTrueFalse ? 'true_false' : 'multiple_choice'
+                    };
                 } else if (currentQ) {
-                    const isCorrect = trimmedLine.startsWith('*');
-                    const cleanLine = isCorrect ? trimmedLine.slice(1).trimStart() : trimmedLine;
-                    const hasOptionPrefix = OPTION_REGEX.test(cleanLine);
+                    let workingLine = trimmedLine;
+                    let isCorrect = false;
 
-                    if (hasOptionPrefix || isCorrect) {
-                        const optionText = escapeHTML(cleanLine.replace(OPTION_REGEX, '').trim());
+                    if (/^\*(?!\*)/.test(workingLine)) {
+                        isCorrect = true;
+                        workingLine = workingLine.replace(/^\*\s*/, '');
+                    } else if (/^\*{3,}\s*[a-fA-F]/i.test(workingLine)) {
+                        isCorrect = true;
+                        workingLine = workingLine.replace(/^\*/, '');
+                    }
+
+                    const mdBoldMatch = workingLine.match(/^(\*{2,3})\s*([a-fA-F])(?:\s*\*{2,3}\s*([.:)\/\-–—])?|([.:)\/\-–—])\s*\*{2,3})\s*/i);
+                    let isBoldPrefix = false;
+                    if (mdBoldMatch) {
+                        isBoldPrefix = true;
+                        const letter = mdBoldMatch[2];
+                        const delim = mdBoldMatch[3] || mdBoldMatch[4] || '.';
+                        workingLine = letter + delim + ' ' + workingLine.slice(mdBoldMatch[0].length);
+                    } else {
+                        const wholeLineBold = workingLine.match(/^(\*{2,3})\s*([a-fA-F])\s*([.:)\/\-–—])\s*([\s\S]*?)\*+\s*$/i);
+                        if (wholeLineBold) {
+                            isBoldPrefix = true;
+                            const letter = wholeLineBold[2];
+                            const delim = wholeLineBold[3];
+                            const content = wholeLineBold[4].trim();
+                            workingLine = letter + delim + ' ' + content;
+                        }
+                    }
+
+                    const activeOptionRegex = isCorrect ? STAR_OPTION_REGEX : OPTION_REGEX;
+                    const prefixMatch = workingLine.match(activeOptionRegex);
+
+                    if (prefixMatch) {
+                        if (prefixMatch[0].includes('*')) isCorrect = true;
+                        let rawText = workingLine.replace(activeOptionRegex, '').trim();
+
+                        if (/^(\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))\s*\S/.test(rawText)) {
+                            isCorrect = true;
+                            rawText = rawText.replace(/^(\(\*\)|\*)\s*/, '');
+                        } else if (/\S\s+(\(\*\)|\*)$/.test(rawText) || (rawText.endsWith('(*)') && rawText.length > 3)) {
+                            isCorrect = true;
+                            rawText = rawText.replace(/\s*(\(\*\)|\*)$/, '').trim();
+                        }
+
+                        if (isBoldPrefix && rawText.endsWith('**')) {
+                            rawText = rawText.replace(/\*\*\s*$/, '').trim();
+                        }
+
+                        const optionText = escapeHTML(rawText);
                         currentQ.options.push({ text: optionText, isCorrect });
                     } else {
                         if (currentQ.options.length === 0) {
@@ -735,8 +895,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 badge.id = 'questionCountBadge';
                 badge.style.cssText = 'text-align:center; color: var(--correct-text); font-weight: 600; margin-bottom: 0;';
                 const tfCount = originalQuestions.filter(q => q.type === 'true_false').length;
-                badge.textContent = `✅ Đã tải ${originalQuestions.length} câu hỏi (${tfCount} câu đúng/sai)`;
-                UI.configSection.querySelector('hr').insertAdjacentElement('afterend', badge);
+                badge.textContent = `✅ Đã tải ${originalQuestions.length} câu hỏi${tfCount > 0 ? ` (${tfCount} câu đúng/sai)` : ''}`;
+                const hr = UI.configSection.querySelector('hr');
+                if (hr) hr.insertAdjacentElement('afterend', badge);
+                else UI.configSection.prepend(badge);
                 sourceTitle = title;
                 renderQuizTitle();
                 return true;
@@ -1026,15 +1188,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
         // ===== BẮT ĐẦU QUIZ =====
         function startQuiz() {
+            if (!originalQuestions || originalQuestions.length === 0) return;
             clearTimeout(immediateResultTimer);
             UI.footer.style.display = 'none';
             UI.freeMessage.style.display = 'none';
             UI.usageGuide.style.display = 'none';
             showMusicButton();
 
-            const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
-            const isShuffleQ = document.getElementById('shuffleQuestions').checked;
-            const isShuffleO = document.getElementById('shuffleOptions').checked;
+            const viewMode = document.querySelector('input[name="viewMode"]:checked')?.value || 'immediate';
+            const isShuffleQ = document.getElementById('shuffleQuestions')?.checked ?? true;
+            const isShuffleO = document.getElementById('shuffleOptions')?.checked ?? true;
 
             try {
                 finalQuestions = structuredClone(originalQuestions);
@@ -1046,9 +1209,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             if (isShuffleO) {
                 finalQuestions.forEach(q => {
                     if (q.type === 'true_false') return; // Không bao giờ trộn thứ tự các ý a, b, c, d của câu Đúng/Sai
-                    const hasLetterRef = q.options.some(o => /\b[A-D]\s*(và|,|\s+hoặc\s+|\s+đều\s+)\s*[A-D]\b/i.test(o.text));
+                    const hasLetterRef = q.options.some(o => /(?:cả|both|either|neither|ý|phương\s*án|đáp\s*án|lựa\s*chọn|câu|chỉ|only)\s*(?:có\s*|của\s*|ở\s*|tại\s*|(?:các\s*)?(?:phương\s*án|đáp\s*án|lựa\s*chọn|câu|ý|options?|statements?)\s*)?[A-F]\b|\b[A-F]\s*(?:và|and|,|\s*(?:hoặc|or|nor)\s*|\s+đều\s+)\s*(?:câu\s*|ý\s*|phương\s*án\s*|đáp\s*án\s*|lựa\s*chọn\s*|options?\s*|statements?\s*)?[A-F]\b/i.test(o.text));
                     if (hasLetterRef) return;
-                    const isAll = o => /^(cả\s*(\d+|hai|ba|bốn|[a-d]\b)|tất\s*cả(\s|$)|các\s*(đáp\s*án|phương\s*án|lựa\s*chọn|ý)\s*trên|không\s*có\s*(đáp\s*án|phương\s*án|lựa\s*chọn)|không\s*(có\s*)?(đáp\s*án|phương\s*án)\s*(nào|đúng)?)/i.test(o.text.trim());
+                    const isAll = o => /^(?:cả\s*(?:\d+|hai|ba|bốn)(?:\s|$)|tất\s*cả\s*(?:đều|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)|đúng|sai|$)|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:trên|đều)|không\s*(?:có\s*)?(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:nào|trên|đúng|sai)|all\s+(?:of\s+)?the\s+above|none\s+(?:of\s+)?the\s+above|all\s+(?:are\s+)?correct|none\s+(?:is|are)\s+correct)/i.test(o.text.trim());
                     if (q.options.some(isAll)) {
                         q.options = [...shuffle(q.options.filter(o => !isAll(o))), ...q.options.filter(isAll)];
                     } else {
@@ -1066,6 +1229,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
         // ===== NỘP BÀI =====
         function submitQuiz() {
+            if (!finalQuestions || finalQuestions.length === 0) return;
             let missing = [];
             for (let i = 0; i < finalQuestions.length; i++) {
                 if (finalQuestions[i].type === 'true_false') {
@@ -1220,23 +1384,26 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             return true;
         }
 
-        // Bọc ký hiệu định dạng ⟦TAG⟧...⟦/TAG⟧ theo từng dòng và đẩy khoảng trắng/tab ở 2 đầu ra ngoài
+        // Bọc ký hiệu định dạng ⟦TAG⟧...⟦/TAG⟧ theo từng dòng/ô bảng và đẩy khoảng trắng ở 2 đầu ra ngoài
         function wrapInlineTag(text, tag) {
             const openRe = new RegExp(`⟦${tag}⟧`, 'gi');
             const closeRe = new RegExp(`⟦\\/${tag}⟧`, 'gi');
             return text.split('\n').map(line => {
                 if (!line.trim()) return line;
-                const clean = line.replace(openRe, '').replace(closeRe, '');
-                const m = clean.match(/^([ \t]*)([\s\S]*?)([ \t]*)$/);
-                if (!m || !m[2]) return clean;
-                return `${m[1]}⟦${tag}⟧${m[2]}⟦/${tag}⟧${m[3]}`;
+                return line.split('\t').map(cell => {
+                    if (!cell.trim()) return cell;
+                    const clean = cell.replace(openRe, '').replace(closeRe, '');
+                    const m = clean.match(/^([ ]*)([\s\S]*?)([ ]*)$/);
+                    if (!m || !m[2]) return clean;
+                    return `${m[1]}⟦${tag}⟧${m[2]}⟦/${tag}⟧${m[3]}`;
+                }).join('\t');
             }).join('\n');
         }
 
-        // Gộp tất cả các ký hiệu đóng-mở cùng tên đứng liền kề nhau (hỗ trợ cả khi lồng nhau)
+        // Gộp tất cả các ký hiệu đóng-mở cùng tên đứng liền kề nhau (không gộp qua ký tự \t ngăn cách ô bảng)
         function mergeAdjacentFormattingTags(str) {
             let prev;
-            const tagRe = /⟦\/(B|U|HL|CLR)⟧([ \t]*)⟦\1⟧/g;
+            const tagRe = /⟦\/(B|U|HL|CLR)⟧( *)⟦\1⟧/g;
             do {
                 prev = str;
                 str = str.replace(tagRe, '$2');
@@ -1411,8 +1578,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 }
                 const hexMatch = val.match(/^#([0-9a-f]{6})$/i);
                 if (hexMatch) return !!normalizeDistinctColorHex(hexMatch[1]);
-                const rgbMatch = val.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+                const rgbMatch = val.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/i);
                 if (rgbMatch) {
+                    const a = rgbMatch[4] !== undefined ? parseFloat(rgbMatch[4]) : 1;
+                    if (a < 0.1) return false;
                     const hex = [rgbMatch[1], rgbMatch[2], rgbMatch[3]]
                         .map(n => Math.min(255, Math.max(0, parseInt(n, 10))).toString(16).padStart(2, '0'))
                         .join('');
@@ -1425,7 +1594,21 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 const m = styleStr.match(/(?:background(?:-color)?|mso-highlight)\s*:\s*([^;]+)/i);
                 if (!m) return false;
                 const val = m[1].trim().toLowerCase();
-                return !['transparent', 'none', 'white', '#fff', '#ffffff', 'rgb(255,255,255)', 'rgb(255, 255, 255)', 'inherit', 'initial', 'unset', 'window'].includes(val);
+                if (['transparent', 'none', 'white', '#fff', '#ffffff', 'rgb(255,255,255)', 'rgb(255, 255, 255)', 'inherit', 'initial', 'unset', 'window'].includes(val)) {
+                    return false;
+                }
+                const rgbaMatch = val.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/i);
+                if (rgbaMatch) {
+                    const a = rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) : 1;
+                    if (a < 0.05) return false;
+                    const r = parseInt(rgbaMatch[1], 10);
+                    const g = parseInt(rgbaMatch[2], 10);
+                    const b = parseInt(rgbaMatch[3], 10);
+                    if (r > 240 && g > 240 && b > 240) return false;
+                    if (r === 0 && g === 0 && b === 0) return false;
+                    return true;
+                }
+                return true;
             }
 
             function walk(node, listItemIndex = null) {
@@ -1442,20 +1625,26 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     let listOut = '';
                     let idx = 0;
                     const liChildren = Array.from(node.children).filter(c => c.tagName && c.tagName.toLowerCase() === 'li');
-                    const hasQuestionMarkers = liChildren.some(li => {
+                    const hasQuestionKeywords = liChildren.some(li => {
                         const t = (li.textContent || '').trim();
-                        return /^(câu\s*hỏi|câu|bài|q)\s*\d+/i.test(t) || /\?\s*$/m.test(t);
+                        return /^(câu\s*hỏi|câu|bài|question|q)\s*\d+/i.test(t);
                     });
-                    const isOptionList = liChildren.length >= 2 && liChildren.length <= 6 && !hasQuestionMarkers && !liChildren.some(li => li.querySelector('ol, ul'));
+                    const isOptionList = liChildren.length >= 2 && liChildren.length <= 6 && !hasQuestionKeywords && !liChildren.some(li => li.querySelector('ol, ul'));
                     for (const child of node.children) {
                         if (child.tagName && child.tagName.toLowerCase() === 'li') {
-                            listOut += walk(child, isOptionList ? idx : -(idx + 1));
+                            if (isOptionList) {
+                                listOut += walk(child, idx);
+                            } else if (tag === 'ol') {
+                                listOut += walk(child, -(idx + 1));
+                            } else {
+                                listOut += walk(child, null);
+                            }
                             idx++;
                         } else {
                             listOut += walk(child);
                         }
                     }
-                    return listOut + '\n';
+                    return '\n' + listOut.trim() + '\n';
                 }
 
                 let inner = '';
@@ -1468,14 +1657,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
                 if (tag === 'li' && listItemIndex !== null) {
                     const plainInner = inner.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '').trim();
+                    const checkText = plainInner.replace(/^\*+\s*/, '');
                     if (listItemIndex >= 0 && listItemIndex < 6) {
-                        if (!/^([a-zA-Z][\.\)\-\/]|(câu|bài|q)\s*\d+|\d+[\.\)\/:])/i.test(plainInner)) {
+                        if (!/^([a-fA-F][\.\)\-\/:]|(câu|bài|question|q)\s*\d+|\d+[\.\)\/:])/i.test(checkText)) {
                             const letter = String.fromCharCode(65 + listItemIndex);
-                            inner = `${letter}. ${inner.trim()}`;
+                            const hasStar = /^\*+/.test(inner.trim());
+                            inner = hasStar ? `*${letter}. ${inner.trim().replace(/^\*+\s*/, '')}` : `${letter}. ${inner.trim()}`;
                         }
                     } else if (listItemIndex < 0) {
                         const qNum = -listItemIndex;
-                        if (!/^((câu|bài|q)\s*\d+|\d+[\.\)\/:])/i.test(plainInner)) {
+                        if (!/^((câu|bài|question|q)\s*\d+|\d+[\.\)\/:])/i.test(checkText)) {
                             inner = `Câu ${qNum}: ${inner.trim()}`;
                         }
                     }
@@ -1488,7 +1679,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
                 if (tag === 'font') {
                     const fontColor = node.getAttribute('color') || '';
-                    if (fontColor && !['black', '#000', '#000000'].includes(fontColor.trim().toLowerCase())) {
+                    if (fontColor && !['black', 'windowtext', 'auto', 'inherit', 'initial', 'unset', '#000', '#000000', 'rgb(0,0,0)', 'rgb(0, 0, 0)'].includes(fontColor.trim().toLowerCase())) {
                         isColor = true;
                     }
                 }
@@ -1513,7 +1704,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 if (tag === 'td' || tag === 'th') {
                     return res.replace(/\n+/g, ' ').trim() + '\t';
                 }
-                if (['p', 'div', 'li', 'tr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+                if (tag === 'tr') return res.replace(/\t+$/, '') + '\n';
+                if (['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
                     return res + '\n';
                 }
                 return res;
@@ -1525,7 +1717,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             let prevRaw;
             do {
                 prevRaw = raw;
-                raw = raw.replace(/⟦\/(HL|CLR)⟧([ \t]*)⟦\1⟧/g, '$2');
+                raw = raw.replace(/⟦\/(HL|CLR)⟧( *)⟦\1⟧/g, '$2');
             } while (raw !== prevRaw);
 
             raw = raw.replace(/⟦HL⟧([\s\S]*?)⟦\/HL⟧/g, (_, content) => wrapInlineTag(content, 'HL'));
@@ -1545,7 +1737,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 case 'md':
                     return new Promise((resolve, reject) => {
                         const reader = new FileReader();
-                        reader.onload = e => resolve(e.target.result);
+                        reader.onload = e => {
+                            const res = (e.target.result || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                            if (res.includes('\uFFFD')) {
+                                reject(new Error('File có ký tự không hợp lệ (lỗi font/bảng mã). Vui lòng lưu lại file dưới dạng UTF-8 trước khi tải lên.'));
+                            } else {
+                                resolve(res);
+                            }
+                        };
                         reader.onerror = reject;
                         reader.readAsText(file, 'UTF-8');
                     });
@@ -1575,37 +1774,59 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     if (typeof pdfjsLib === 'undefined') {
                         throw new Error('Thư viện đọc PDF chưa tải xong, vui lòng kiểm tra kết nối mạng và thử lại.');
                     }
-                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-                    let fullText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        let pageText = '';
-                        for (let j = 0; j < content.items.length; j++) {
-                            const item = content.items[j];
-                            pageText += item.str;
-                            if (item.hasEOL) {
-                                pageText += '\n';
-                            } else if (j < content.items.length - 1) {
-                                const next = content.items[j + 1];
-                                const currY = (item.transform && item.transform[5] !== undefined) ? item.transform[5] : null;
-                                const nextY = (next.transform && next.transform[5] !== undefined) ? next.transform[5] : null;
-                                const lineH = item.height || (item.transform ? Math.abs(item.transform[3]) : 10) || 10;
-                                if (currY !== null && nextY !== null && Math.abs(nextY - currY) > lineH * 0.5) {
+                    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    }
+                    let pdf;
+                    try {
+                        try {
+                            pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                        } catch (pdfErr) {
+                            if (pdfErr && (pdfErr.name === 'PasswordException' || /password/i.test(pdfErr.message || ''))) {
+                                throw new Error('File PDF có mật khẩu bảo vệ. Vui lòng mở khóa file trước khi tải lên.');
+                            }
+                            throw pdfErr;
+                        }
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            let pageText = '';
+                            for (let j = 0; j < content.items.length; j++) {
+                                const item = content.items[j];
+                                pageText += item.str;
+                                if (item.hasEOL) {
                                     pageText += '\n';
-                                } else if (item.str && next.str && !/[\s\t]$/.test(item.str) && !/^[\s\t]/.test(next.str)) {
-                                    const currentEndX = (item.transform && item.transform[4] !== undefined && item.width !== undefined)
-                                        ? (item.transform[4] + item.width) : null;
-                                    const nextStartX = (next.transform && next.transform[4] !== undefined) ? next.transform[4] : null;
-                                    if (currentEndX !== null && nextStartX !== null && (nextStartX - currentEndX) > 1.5) {
-                                        pageText += ' ';
+                                } else if (j < content.items.length - 1) {
+                                    const next = content.items[j + 1];
+                                    const currY = (item.transform && item.transform[5] !== undefined) ? item.transform[5] : null;
+                                    const nextY = (next.transform && next.transform[5] !== undefined) ? next.transform[5] : null;
+                                    const lineH = item.height || (item.transform ? Math.abs(item.transform[3]) : 10) || 10;
+                                    if (currY !== null && nextY !== null && Math.abs(nextY - currY) > lineH * 0.5) {
+                                        pageText += '\n';
+                                    } else if (item.str && next.str && !/[\s\t]$/.test(item.str) && !/^[\s\t]/.test(next.str)) {
+                                        const currentEndX = (item.transform && item.transform[4] !== undefined && item.width !== undefined)
+                                            ? (item.transform[4] + item.width) : null;
+                                        const nextStartX = (next.transform && next.transform[4] !== undefined) ? next.transform[4] : null;
+                                        if (currentEndX !== null && nextStartX !== null) {
+                                            const gap = nextStartX - currentEndX;
+                                            if (gap >= 15) {
+                                                pageText += '\t';
+                                            } else if (gap > 1.5) {
+                                                pageText += ' ';
+                                            }
+                                        }
                                     }
                                 }
                             }
+                            fullText += pageText + '\n';
                         }
-                        fullText += pageText + '\n';
+                        return fullText;
+                    } finally {
+                        if (pdf && typeof pdf.destroy === 'function') {
+                            pdf.destroy().catch(() => {});
+                        }
                     }
-                    return fullText;
 
                 default:
                     throw new Error(`Định dạng .${ext} chưa được hỗ trợ. Vui lòng chuyển sang .docx, .pdf, .txt, .md hoặc .html.`);
@@ -1613,40 +1834,71 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         }
 
         async function formatWithGemini(rawText, startIndex = 1) {
-            const response = await fetch('/api/convert', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: rawText, startIndex })
-            });
+            let attempt = 0;
+            const maxAttempts = 2;
+            while (attempt < maxAttempts) {
+                attempt++;
+                let response;
+                try {
+                    response = await fetch('/api/convert', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: rawText, startIndex })
+                    });
+                } catch (networkErr) {
+                    if (attempt < maxAttempts) {
+                        await sleep(2500);
+                        continue;
+                    }
+                    throw networkErr;
+                }
 
-            const data = await response.json().catch(() => ({}));
+                const data = await response.json().catch(() => ({}));
 
-            if (!response.ok) {
-                throw new Error(data.error || `Lỗi server: ${response.status}`);
+                if (!response.ok) {
+                    const isRetryable = response.status === 429 || response.status >= 500;
+                    if (isRetryable && attempt < maxAttempts) {
+                        await sleep(2500);
+                        continue;
+                    }
+                    throw new Error(data.error || `Lỗi server: ${response.status}`);
+                }
+                return { text: data.text || '', truncated: !!data.truncated };
             }
-            return { text: data.text || '', truncated: !!data.truncated };
         }
 
         function splitIntoChunks(text, maxChars = 6000) {
+            text = (text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             // Tách riêng bảng đáp án ở cuối văn bản trước khi chia nhỏ thành các phần
             let bodyText = text;
             let answerKeyBlock = '';
 
-            const keyHeadingMatch = text.match(/(?:^|\n)[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*chấm|đáp\s*án\s*tham\s*khảo)[ \t]*:?[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*\n[\s\S]*$/i);
-            if (keyHeadingMatch) {
-                const matchedKey = keyHeadingMatch[0].trim();
-                const contentBeforeKey = text.slice(0, keyHeadingMatch.index).trim();
-                // Tách nếu bảng đáp án dưới 8.000 ký tự và có nội dung câu hỏi phía trước
-                if (matchedKey.length < 8000 && contentBeforeKey.length > 0) {
-                    bodyText = contentBeforeKey;
-                    answerKeyBlock = '\n\n[BẢNG ĐÁP ÁN CHUNG CỦA ĐỀ ĐỂ TRA CỨU]:\n' + matchedKey;
+            const singleHeadingRegex = /(?:^|\n)[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải(?:\s*chi\s*tiết)?|đáp\s*án(?:\s*(?:tham\s*khảo|chi\s*tiết))?|phần\s*đáp\s*án|answer\s*key)[ \t]*:?[ \t]*(?:⟦\/?(?:B|U|HL|CLR)⟧)*[ \t]*(?=\n|$)/gi;
+            let match;
+            let lastValidMatch = null;
+            while ((match = singleHeadingRegex.exec(text)) !== null) {
+                const startIndex = match.index;
+                const candidateKey = text.slice(startIndex).trim();
+                const contentBefore = text.slice(0, startIndex).trim();
+                const plainCandidate = candidateKey.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
+                const hasFullQuestion = /(?:^|\n)[ \t]*\*?[A-F][\.\)\-\/][ \t]+\S[^\n]*(?:\n[ \t]*|[ \t]{2,}|\t)\*?[A-F][\.\)\-\/][ \t]+\S/i.test(plainCandidate)
+                    || /(?:^|\n)[ \t]*(?:câu\s*hỏi|câu|bài|question)\s*\d+\s*[:\.\)\/\-–—][ \t]*\S+[ \t]+\S+[ \t]+\S+/i.test(plainCandidate)
+                    || /(?:^|\n)[ \t]*\d+\t[^\n]+\t(?:đúng|sai)\b/i.test(plainCandidate);
+                if (candidateKey.length < 8000 && contentBefore.length > 0 && !hasFullQuestion) {
+                    lastValidMatch = { candidateKey, contentBefore };
+                    break;
                 }
+            }
+            if (lastValidMatch) {
+                bodyText = lastValidMatch.contentBefore;
+                answerKeyBlock = '\n\n[BẢNG ĐÁP ÁN CHUNG CỦA ĐỀ ĐỂ TRA CỨU]:\n' + lastValidMatch.candidateKey;
             }
 
             const chunks = [];
             let current = ''; let lastTableQ = null;
+            bodyText = splitInlineOptions(bodyText);
             const lines = bodyText.split('\n');
-            const QUESTION_START_REGEX = /^((câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu|(câu\s*hỏi|câu|bài|q))\s*\d+|\d+\s*[\.\)\/:]\s)/i;
+            const QUESTION_START_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i;
             const hardMaxChars = maxChars * 1.5;
             for (const line of lines) {
                 const rawNoTag = line.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
@@ -1679,14 +1931,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         // Nhận diện xem văn bản thô có chứa dấu hiệu đáp án hay không
         function checkTextHasAnswerHint(text) {
             if (!text || typeof text !== 'string') return false;
-            if (/^\s*\*([a-zA-Z0-9][\.\)\-\/\s]|\s|\S)/m.test(text)) return true;
+            text = splitInlineOptions(text);
+            const starHintRe = /^\s*(?:\*+\s*(?:\*{2,3}\s*)?(?:[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*?(?:\s+\S|$))|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*)\s*$)/im;
+            if (starHintRe.test(text)) return true;
 
             const answerKeywords = [
-                /(?:đáp\s*án|bảng\s*đáp\s*án|\bkey\b|lời\s*giải|hướng\s*dẫn\s*chấm|chọn\s*đáp\s*án)\b/i,
-                /(?:[\t|(\[–—\-]\s*đúng\b|đúng\s*:\s*[a-d]|sai\s*:\s*[a-d])\b/i,
+                /(?:đáp\s*án|bảng\s*đáp\s*án|\bkey\b|\banswers?\b|lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|chọn\s*đáp\s*án)\b/i,
+                /(?:[\t|(\[–—\-]\s*(?:đúng|true)\b|true[\s\/\-–—]*false|(?:đúng|true)\s*[:.\-–—]\s*(?:[a-d]|\d+)|(?:sai|false)\s*[:.\-–—]\s*(?:[a-d]|\d+)|\b\d+\s*[:.\-–—]\s*(?:đúng|sai|true|false)\b)/i,
                 /\b\d+\s*[\.\:\-]\s*[A-D]\b/i
             ];
-            const plainForHint = text.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, ''); if (/^\s*\*([a-zA-Z0-9][\.\)\-\/\s]|\s|\S)/m.test(plainForHint)) return true; if (answerKeywords.some(regex => regex.test(plainForHint))) return true;
+            const plainForHint = text.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '');
+            if (starHintRe.test(plainForHint)) return true;
+            if (answerKeywords.some(regex => regex.test(plainForHint))) return true;
 
             // Xét độc lập từng ký hiệu U (gạch chân), HL (highlight), CLR (màu chữ)
             for (const tag of ['U', 'HL', 'CLR']) {
@@ -1781,7 +2037,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     const lines = formatted.split('\n');
                     let count = 0;
                     for (const line of lines) {
-                        if (/^(?:(câu\s*hỏi|câu|bài)\s*\d+|q\s*\d+|câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+|\d+\s*[\.\)\/:]\s)/i.test(line.trim())) count++;
+                        if (/^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(((?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))|(câu\s*hỏi|câu|bài|question)\s*\d+(?:\.\d+)?\s*(?:[:\.\)\/\-–—\(\[]+|\*+\s*[:\.\)\/\-–—]?|$)|q\s*\d+(?:\.\d+)?\s*[:\.\)\/\-–—]|\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s)/i.test(line.trim())) count++;
                     }
                     currentIndex += count;
 
@@ -1826,14 +2082,15 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         }
 
         function useConvertedTextImmediately() {
-            const content = UI.convertedText.value.trim();
-            if (!content) {
+            const rawContent = UI.convertedText.value.trim();
+            if (!rawContent) {
                 showToast('Không có nội dung để xử lý!', 3000);
                 return;
             }
 
             // Kiểm tra xem nội dung đã được đánh dấu đáp án bằng dấu * hay chưa
-            const hasMarkedAnswers = /^\s*\*([a-zA-Z0-9][\.\)\-\/\s]|\s|\S)/m.test(content);
+            const content = splitInlineOptions(rawContent);
+            const hasMarkedAnswers = /^\s*(?:\*+\s*(?:\*{2,3}\s*)?(?:[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*?(?:\s+\S|$))|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*)\s*$)/im.test(content);
             if (!hasMarkedAnswers) {
                 showModal({
                     icon: '🚫',
@@ -1860,12 +2117,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 showToast('Không có nội dung để tải!', 3000);
                 return;
             }
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const cleanContent = content.replace(/^\uFEFF/, '');
+            const blob = new Blob(['\uFEFF' + cleanContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const safeTitle = convertedTitle ? convertedTitle.replace(/[\/\\?%*:|"<>]/g, '_') : 'de_trac_nghiem';
-            a.download = safeTitle + '.txt';
+            const safeTitle = convertedTitle ? convertedTitle.replace(/[\x00-\x1f\x7f\/\\?%*:|"<>]/g, '_').trim() : 'de_trac_nghiem';
+            a.download = (safeTitle || 'de_trac_nghiem') + '.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1876,7 +2134,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         // Tên đề = tên file bỏ đuôi (.txt, .pdf...), gọn khoảng trắng, tối đa SHARE_TITLE_MAX ký tự
         function titleFromFileName(name) {
             if (typeof name !== 'string') return '';
-            const base = name.replace(/\.(txt|md|html?|pdf|docx)$/i, '').replace(/\s+/g, ' ').trim();
+            const base = name
+                .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ')
+                .replace(/\.(txt|md|html?|pdf|docx)$/i, '')
+                .replace(/\s+/g, ' ')
+                .trim();
             return Array.from(base).slice(0, SHARE_TITLE_MAX).join('').trim();
         }
 
@@ -1890,7 +2152,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 line.id = 'quizTitleLine';
                 line.className = 'quiz-title-line';
                 line.textContent = '📄 ' + sourceTitle;
-                UI.configSection.querySelector('hr').insertAdjacentElement('afterend', line);
+                const hr = UI.configSection.querySelector('hr');
+                if (hr) hr.insertAdjacentElement('afterend', line);
+                else UI.configSection.prepend(line);
             }
             UI.shareTitleText.textContent = sourceTitle;
             UI.shareTitleRow.style.display = sourceTitle ? '' : 'none';
@@ -1974,7 +2238,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
         // Mở đề từ link dạng /share?s=<id> (link cũ dạng /?s=<id> vẫn mở được)
         async function loadSharedQuiz() {
-            const id = new URLSearchParams(location.search).get('s');
+            const id = (new URLSearchParams(location.search).get('s') || '').trim();
             if (!id) return;
             if (!SHARE_ID_REGEX.test(id)) {
                 showToast('Link chia sẻ không hợp lệ.', 4000);
