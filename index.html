@@ -131,9 +131,9 @@
         .quiz-title-line { text-align: center; font-weight: 700; margin: 12px 0 4px; overflow-wrap: anywhere; }
 
         .question-box { background: var(--card-bg); padding: 25px; margin-bottom: 20px; border-radius: 12px; box-shadow: var(--qbox-shadow); }
-        .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; line-height: 1.5; }
+        .question-title { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; line-height: 1.5; overflow-wrap: break-word; word-break: break-word; }
         .options { display: flex; flex-direction: column; gap: 10px; }
-        .option-btn { padding: 12px 15px; border: 1px solid var(--border-color); background: var(--card-bg); border-radius: 8px; cursor: pointer; text-align: left; font-size: 16px; transition: all 0.15s ease; color: var(--btn-text); line-height: 1.4; }
+        .option-btn { padding: 12px 15px; border: 1px solid var(--border-color); background: var(--card-bg); border-radius: 8px; cursor: pointer; text-align: left; font-size: 16px; transition: all 0.15s ease; color: var(--btn-text); line-height: 1.4; overflow-wrap: break-word; word-break: break-word; }
         .option-btn:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--hover-border); }
         .selected { background: var(--selected-bg) !important; border-color: var(--selected-border) !important; color: var(--selected-text) !important; font-weight: 500; }
         .correct { background: var(--correct-bg) !important; color: var(--correct-text) !important; border-color: var(--correct-border) !important; font-weight: bold; }
@@ -231,7 +231,7 @@
         }
         .tf-statement:hover { background: var(--hover-bg); }
         .tf-prefix { font-weight: bold; color: var(--title-color); min-width: 24px; }
-        .tf-text { flex: 1; }
+        .tf-text { flex: 1; overflow-wrap: break-word; word-break: break-word; }
         .tf-checkbox-group {
             display: flex;
             gap: 12px;
@@ -640,7 +640,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     UI.fileInput.value = '';
                     return;
                 }
-                parseQuizData(text, null, titleFromFileName(file.name));
+                if (parseQuizData(text, null, titleFromFileName(file.name))) closeConvertResult();
                 UI.fileInput.value = '';
             };
             reader.onerror = () => { showToast("Lỗi đọc file!"); UI.fileInput.value = ''; };
@@ -652,6 +652,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             const parsedQuestions = [];
             let currentQ = null;
             const QUESTION_KEYWORD_REGEX = /^(?:(Câu\s*hỏi|Câu|Bài)\s*\d+|Q\s*\d+\s*[:\.\)\/])/i;
+            const BARE_QUESTION_REGEX = /^\d+\s*[\.\)\/:]\s/;
             const TRUE_FALSE_KEYWORD = /^câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/i;
             const OPTION_REGEX = /^([a-fA-F][\.\)]|[a-fA-F][\-\/](?=\s|$))\s*/;
             const END_OF_QUIZ_REGEX = /^(?:[-=_*~#]{2,}\s*hết(?:\s*(?:đề(?:\s*thi)?|toàn\s*bộ\s*đề))?\s*[-=_*~#]{2,}|hết\.?$|\(?(?:thí\s*sinh\s*không\s*được\s*sử\s*dụng\s*tài\s*liệu|cán\s*bộ\s*coi\s*thi\s*không\s*giải\s*thích\s*gì\s*thêm)\)?|(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|hướng\s*dẫn\s*chấm|đáp\s*án\s*tham\s*khảo)\s*[:.]?)/i;
@@ -670,7 +671,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 }
                 if (isEndOfQuiz) return;
                 const isTrueFalse = TRUE_FALSE_KEYWORD.test(trimmedLine);
-                const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse;
+                const isBareQuestion = BARE_QUESTION_REGEX.test(trimmedLine) && (!currentQ || currentQ.options.length > 0);
+                const isNewQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse || isBareQuestion;
 
                 if (isNewQuestion) {
                     if (currentQ) parsedQuestions.push(currentQ);
@@ -725,6 +727,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 sourceText = text;
                 resetShareUI(shareId);
                 UI.uploadCard.style.display = 'none';
+                UI.usageGuide.style.display = 'none';
                 UI.configSection.style.display = 'block';
                 const existingBadge = document.getElementById('questionCountBadge');
                 if (existingBadge) existingBadge.remove();
@@ -1017,7 +1020,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     if (choice !== undefined && q.options[choice].isCorrect) earnedPoints += 1;
                 }
             });
-            const percentage = Math.round((earnedPoints / total) * 100);
+            const percentage = total > 0 ? Math.round((earnedPoints / total) * 100) : 0;
             return { points: Math.round(earnedPoints * 100) / 100, total, percentage };
         }
 
@@ -1043,7 +1046,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             if (isShuffleO) {
                 finalQuestions.forEach(q => {
                     if (q.type === 'true_false') return; // Không bao giờ trộn thứ tự các ý a, b, c, d của câu Đúng/Sai
-                    const isAll = o => /^(cả\s*(\d+|hai|ba|bốn|[a-d]\b)|tất\s*cả(\s|$)|không\s*(có\s*)?(đáp\s*án|phương\s*án)\s*(nào|đúng)?)/i.test(o.text.trim());
+                    const hasLetterRef = q.options.some(o => /\b[A-D]\s*(và|,|\s+hoặc\s+|\s+đều\s+)\s*[A-D]\b/i.test(o.text));
+                    if (hasLetterRef) return;
+                    const isAll = o => /^(cả\s*(\d+|hai|ba|bốn|[a-d]\b)|tất\s*cả(\s|$)|các\s*(đáp\s*án|phương\s*án|lựa\s*chọn|ý)\s*trên|không\s*có\s*(đáp\s*án|phương\s*án|lựa\s*chọn)|không\s*(có\s*)?(đáp\s*án|phương\s*án)\s*(nào|đúng)?)/i.test(o.text.trim());
                     if (q.options.some(isAll)) {
                         q.options = [...shuffle(q.options.filter(o => !isAll(o))), ...q.options.filter(isAll)];
                     } else {
@@ -1158,7 +1163,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 }
             });
 
-            const percentage = Math.round((earnedPoints / total) * 100);
+            const percentage = total > 0 ? Math.round((earnedPoints / total) * 100) : 0;
             const displayPoints = Math.round(earnedPoints * 100) / 100;
             UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${displayPoints}/${total}</span> điểm (Đạt ${percentage}%)`;
             UI.resultBox.style.display = 'block';
@@ -1176,10 +1181,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             UI.configSection.style.display = 'block';
             UI.quizContainer.innerHTML = '';
             UI.actionSection.style.display = 'none';
+            finalQuestions = [];
             selectedAnswers = {};
             answeredCount = {};
             UI.freeMessage.style.display = 'block';
-            UI.usageGuide.style.display = 'block';
             UI.footer.style.display = 'flex';
             scrollToTop();
         }
@@ -1329,7 +1334,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
                 let dominantBodyColor = null;
                 const colorKeys = Object.keys(colorCharCounts);
-                if (colorKeys.length >= 2) {
+                if (colorKeys.length >= 1) {
                     colorKeys.sort((a, b) => colorCharCounts[b] - colorCharCounts[a]);
                     const totalColored = colorKeys.reduce((acc, k) => acc + colorCharCounts[k], 0);
                     if (colorCharCounts[colorKeys[0]] / (totalColored + totalPlainChars) > 0.6) {
@@ -1436,9 +1441,15 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 if (tag === 'ol' || tag === 'ul') {
                     let listOut = '';
                     let idx = 0;
+                    const liChildren = Array.from(node.children).filter(c => c.tagName && c.tagName.toLowerCase() === 'li');
+                    const hasQuestionMarkers = liChildren.some(li => {
+                        const t = (li.textContent || '').trim();
+                        return /^(câu\s*hỏi|câu|bài|q)\s*\d+/i.test(t) || /\?\s*$/m.test(t);
+                    });
+                    const isOptionList = liChildren.length >= 2 && liChildren.length <= 6 && !hasQuestionMarkers && !liChildren.some(li => li.querySelector('ol, ul'));
                     for (const child of node.children) {
                         if (child.tagName && child.tagName.toLowerCase() === 'li') {
-                            listOut += walk(child, idx);
+                            listOut += walk(child, isOptionList ? idx : -(idx + 1));
                             idx++;
                         } else {
                             listOut += walk(child);
@@ -1455,11 +1466,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     return tag === 'br' ? '\n' : ((tag === 'td' || tag === 'th') ? '\t' : '');
                 }
 
-                if (tag === 'li' && listItemIndex !== null && listItemIndex < 6) {
+                if (tag === 'li' && listItemIndex !== null) {
                     const plainInner = inner.replace(/⟦\/?(?:B|U|HL|CLR)⟧/g, '').trim();
-                    if (!/^([a-zA-Z][\.\)\-\/]|(câu|bài|q)\s*\d+)/i.test(plainInner)) {
-                        const letter = String.fromCharCode(65 + listItemIndex);
-                        inner = `${letter}. ${inner.trim()}`;
+                    if (listItemIndex >= 0 && listItemIndex < 6) {
+                        if (!/^([a-zA-Z][\.\)\-\/]|(câu|bài|q)\s*\d+|\d+[\.\)\/:])/i.test(plainInner)) {
+                            const letter = String.fromCharCode(65 + listItemIndex);
+                            inner = `${letter}. ${inner.trim()}`;
+                        }
+                    } else if (listItemIndex < 0) {
+                        const qNum = -listItemIndex;
+                        if (!/^((câu|bài|q)\s*\d+|\d+[\.\)\/:])/i.test(plainInner)) {
+                            inner = `Câu ${qNum}: ${inner.trim()}`;
+                        }
                     }
                 }
 
@@ -1570,9 +1588,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                                 pageText += '\n';
                             } else if (j < content.items.length - 1) {
                                 const next = content.items[j + 1];
-                                const currentY = item.transform ? item.transform[5] : null;
-                                const nextY = next.transform ? next.transform[5] : null;
-                                if (currentY !== null && nextY !== null && Math.abs(currentY - nextY) > 3) {
+                                const currY = (item.transform && item.transform[5] !== undefined) ? item.transform[5] : null;
+                                const nextY = (next.transform && next.transform[5] !== undefined) ? next.transform[5] : null;
+                                const lineH = item.height || (item.transform ? Math.abs(item.transform[3]) : 10) || 10;
+                                if (currY !== null && nextY !== null && Math.abs(nextY - currY) > lineH * 0.5) {
                                     pageText += '\n';
                                 } else if (item.str && next.str && !/[\s\t]$/.test(item.str) && !/^[\s\t]/.test(next.str)) {
                                     const currentEndX = (item.transform && item.transform[4] !== undefined && item.width !== undefined)
@@ -1762,7 +1781,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     const lines = formatted.split('\n');
                     let count = 0;
                     for (const line of lines) {
-                        if (/^(?:(câu\s*hỏi|câu|bài)\s*\d+|q\s*\d+|câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+)/i.test(line.trim())) count++;
+                        if (/^(?:(câu\s*hỏi|câu|bài)\s*\d+|q\s*\d+|câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+|\d+\s*[\.\)\/:]\s)/i.test(line.trim())) count++;
                     }
                     currentIndex += count;
 

@@ -147,8 +147,9 @@ async function handleConvert(request, env) {
 
         const data = await geminiRes.json();
         const candidate = data?.candidates?.[0];
-        if (candidate?.finishReason === 'SAFETY') {
-            return jsonResponse({ error: 'Nội dung bị bộ lọc an toàn của Google Gemini từ chối xử lý.' }, 422);
+        const blockReason = data?.promptFeedback?.blockReason || (['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'RECITATION'].includes(candidate?.finishReason) ? candidate.finishReason : null);
+        if (blockReason) {
+            return jsonResponse({ error: `Nội dung bị bộ lọc của Google Gemini từ chối xử lý (${blockReason}).` }, 422);
         }
         let resultText = Array.isArray(candidate?.content?.parts)
             ? candidate.content.parts.map(p => (typeof p === 'object' && p ? p.text || '' : '')).join('')
@@ -347,7 +348,8 @@ function tooLargeMessage() {
 // Nhận diện giống parseQuizData ở frontend — tránh biến endpoint này thành nơi lưu file tùy ý
 function looksLikeQuiz(text) {
     return /^\s*(câu\s*hỏi|câu|q|bài)\s*\d+/im.test(text)
-        || /^\s*câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(text);
+        || /^\s*câu\s*hỏi\s*đúng\s*sai\s*[:.]?\s*câu\s*\d+/im.test(text)
+        || /^\s*\d+\s*[\.\)\/:]\s/m.test(text);
 }
 
 // Id = 64 bit đầu của SHA-256 (tên đề + nội dung), mã hóa base62 (11 ký tự).
@@ -385,7 +387,7 @@ QUY TẮC BẮT BUỘC:
    - KHÔNG thêm bất kỳ lời chào, giải thích, ghi chú hay kết luận nào ngoài các câu hỏi đã chuẩn hóa.
 
 A. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM ĐÚNG/SAI:
-- Nhận diện: Các câu hỏi yêu cầu xác định Đúng hay Sai cho từng phát biểu/nhận định (True/False).
+- Nhận diện: Các câu hỏi yêu cầu xác định Đúng hay Sai cho từng phát biểu/nhận định (True/False). LƯU Ý: Nếu văn bản gốc là bảng ngân hàng câu hỏi có cột phụ ghi ĐÚNG/SAI để đánh dấu phương án đúng cho câu hỏi trắc nghiệm 4 lựa chọn thông thường (chỉ 1 ý ĐÚNG và 3 ý SAI), thì đó là câu trắc nghiệm thông thường ở mục B (đặt dấu * vào phương án ĐÚNG), KHÔNG phải câu hỏi đúng/sai mục A.
 - Tiền tố bắt buộc: Thêm "câu hỏi đúng sai: Câu X:" ngay trước nội dung câu hỏi.
 - Đánh số bắt đầu từ ${startIndex} nếu văn bản gốc không có số thứ tự câu.
 - Đặt dấu * trước ý nào là ý Đúng (nếu phát hiện được từ văn bản gốc).
@@ -433,8 +435,13 @@ export class USProxy {
         this.env = env;
     }
     async fetch(request) {
-        const { url, options } = await request.json();
-        let res; try { res = await fetch(url, options); } catch (e) { return jsonResponse({ error: { message: e.message || "Lỗi kết nối USProxy" } }, 502); }
+        let url, options, res;
+        try {
+            ({ url, options } = await request.json());
+            res = await fetch(url, options);
+        } catch (e) {
+            return jsonResponse({ error: { message: e.message || "Lỗi kết nối USProxy" } }, 502);
+        }
         return new Response(res.body, {
             status: res.status,
             headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' }
