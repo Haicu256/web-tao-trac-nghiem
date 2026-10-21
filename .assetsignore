@@ -1,6 +1,7 @@
 .git
 .github
 .wrangler
+.wrangler_config
 worker.js
 wrangler.jsonc
 .assetsignore
@@ -8,3 +9,8 @@ wrangler.jsonc
 .dev.vars.example
 node_modules
 *.md
+package.json
+package-lock.json
+playwright.config.js
+tests/
+test_exams/

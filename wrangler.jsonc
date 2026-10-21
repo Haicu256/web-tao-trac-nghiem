@@ -17,7 +17,7 @@
   "secrets": {
     "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN"]
   },
-  // Lưu ý: Cần bổ sung "id" cho KV namespace trước khi deploy production (tạo bằng: npx wrangler kv namespace create SHARES)
+
   "kv_namespaces": [
     { "binding": "SHARES" }
   ],

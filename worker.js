@@ -1,12 +1,24 @@
-// ===== Cấu hình chia sẻ link =====
-const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90; // link tự hết hạn sau 90 ngày (KV tự xóa)
-const MAX_SHARE_CHARS = 300_000;             // giới hạn độ dài nội dung đề được chia sẻ (khớp SHARE_MAX_CHARS ở index.html)
-const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;  // khớp SHARE_ID_REGEX ở index.html
-const MAX_TITLE_CHARS = 100;                 // độ dài tối đa của tên đề (khớp SHARE_TITLE_MAX ở index.html)
+
+const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90;
+const MAX_SHARE_CHARS = 300_000;
+const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
+const MAX_TITLE_CHARS = 100;
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+
+        if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
+            return new Response(null, {
+                status: 204,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+                    'Access-Control-Max-Age': '86400',
+                }
+            });
+        }
 
         if (url.pathname === '/api/convert' && request.method === 'POST') {
             return handleConvert(request, env);
@@ -16,7 +28,6 @@ export default {
             return handleShareCreate(request, env);
         }
 
-        // Trang mở link chia sẻ: /share?s=<id> hoặc /?s=<id> (Worker chèn tên đề vào thẻ xem trước link)
         if ((url.pathname === '/share' || url.pathname === '/share/' || (url.pathname === '/' && url.searchParams.has('s'))) && (request.method === 'GET' || request.method === 'HEAD')) {
             return handleSharePage(request, env, url);
         }
@@ -25,43 +36,52 @@ export default {
         if (shareMatch && request.method === 'GET') {
             let id = shareMatch[1];
             try { id = decodeURIComponent(id); } catch {}
-            return handleShareGet(id.trim(), env);
+            return handleShareGet(id.trim(), env, request);
         }
 
-        // Tuyệt đối không để route /api/* chưa định nghĩa bị rơi vào fallback tài nguyên tĩnh
         if (url.pathname.startsWith('/api/')) {
             return jsonResponse({ error: 'Endpoint API không tồn tại.' }, 404);
         }
 
-        // Không khớp route API nào: nếu có env.ASSETS (Cloudflare Workers Assets), chuyển tiếp để phân phối tài nguyên tĩnh
         if (env.ASSETS) {
             return env.ASSETS.fetch(request);
         }
 
-        // Không khớp route nào và không có binding tài nguyên tĩnh -> trả 404
         return new Response('Not Found', { status: 404 });
     }
 };
 
-// Đọc an toàn body JSON với giới hạn byte thực tế (bảo vệ cả khi thiếu header Content-Length hoặc dùng chunked transfer)
 async function readJsonWithLimit(request, maxBytes) {
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType || !contentType.toLowerCase().includes('application/json')) {
+        return { errorStatus: 415 };
+    }
     const declaredLength = request.headers.get('content-length');
-    if (declaredLength && Number(declaredLength) > maxBytes) {
-        return { errorStatus: 413 };
+    if (declaredLength) {
+        const parsedLen = parseInt(declaredLength, 10);
+        if (Number.isFinite(parsedLen) && (parsedLen < 0 || parsedLen > maxBytes)) {
+            return { errorStatus: 413 };
+        }
     }
     if (!request.body) return { data: null };
     const reader = request.body.getReader();
     let bytesCount = 0;
     const chunks = [];
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytesCount += value.length;
-        if (bytesCount > maxBytes) {
-            reader.cancel();
-            return { errorStatus: 413 };
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            bytesCount += value.length;
+            if (bytesCount > maxBytes) {
+                await reader.cancel().catch(() => {});
+                return { errorStatus: 413 };
+            }
+            chunks.push(value);
         }
-        chunks.push(value);
+    } catch (readErr) {
+        return { errorStatus: 400 };
+    } finally {
+        reader.releaseLock();
     }
     const merged = new Uint8Array(bytesCount);
     let offset = 0;
@@ -77,21 +97,59 @@ async function readJsonWithLimit(request, maxBytes) {
     }
 }
 
+function getClientRateLimitKey(request) {
+    const rawHeader = request.headers.get('cf-connecting-ip') || '';
+    if (!rawHeader) return 'unknown-client';
+
+    let ip = rawHeader.trim();
+
+    if (ip.startsWith('[') && ip.includes(']')) {
+        ip = ip.slice(1, ip.indexOf(']'));
+    } else if (ip.includes('.') && ip.includes(':') && ip.indexOf(':') === ip.lastIndexOf(':')) {
+        ip = ip.split(':')[0];
+    }
+
+    if (ip.toLowerCase().startsWith('::ffff:')) {
+        ip = ip.slice(7);
+    }
+
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+        return ip;
+    }
+
+    if (ip.includes(':')) {
+        let parts = ip.split(':');
+        if (ip.includes('::')) {
+            const [left, right] = ip.split('::');
+            const leftParts = left ? left.split(':') : [];
+            const rightParts = right ? right.split(':') : [];
+            const missing = 8 - (leftParts.length + rightParts.length);
+            const zeroes = Array(Math.max(0, missing)).fill('0');
+            parts = [...leftParts, ...zeroes, ...rightParts];
+        }
+        return parts.slice(0, 4).map(p => p.toLowerCase().padStart(4, '0')).join(':') || 'unknown-ipv6';
+    }
+
+    return ip || 'unknown-client';
+}
+
 async function handleConvert(request, env) {
     try {
-        // Chặn spam: giới hạn số request theo IP (nếu binding rate limiter đã được cấu hình)
+
         if (env.CONVERT_LIMITER) {
-            const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-            const { success } = await env.CONVERT_LIMITER.limit({ key: ip });
+            const rateKey = getClientRateLimitKey(request);
+            const { success } = await env.CONVERT_LIMITER.limit({ key: rateKey });
             if (!success) {
                 return jsonResponse({ error: 'Bạn đang gửi quá nhiều yêu cầu, vui lòng thử lại sau ít phút.' }, 429);
             }
         }
 
-        // Chặn sớm payload quá lớn trước và trong khi đọc body (UTF-8 tối đa 4 byte/ký tự)
-        const MAX_INPUT_SIZE = 50_000; // ~8x lớn hơn 1 chunk hợp lệ lớn nhất từ frontend
+        const MAX_INPUT_SIZE = 50_000;
         const maxInputBytes = MAX_INPUT_SIZE * 4 + 1024;
         const parseResult = await readJsonWithLimit(request, maxInputBytes);
+        if (parseResult.errorStatus === 415) {
+            return jsonResponse({ error: 'Chỉ chấp nhận Content-Type: application/json.' }, 415);
+        }
         if (parseResult.errorStatus === 413) {
             return jsonResponse({ error: `Văn bản quá lớn (tối đa ${MAX_INPUT_SIZE.toLocaleString('vi-VN')} ký tự mỗi lần).` }, 413);
         }
@@ -105,7 +163,7 @@ async function handleConvert(request, env) {
             return jsonResponse({ error: 'Thiếu nội dung văn bản.' }, 400);
         }
 
-        const normalizedText = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const normalizedText = (rawText || '').normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
         if (normalizedText.length > MAX_INPUT_SIZE) {
             return jsonResponse({ error: `Văn bản quá lớn (tối đa ${MAX_INPUT_SIZE.toLocaleString('vi-VN')} ký tự mỗi lần).` }, 413);
@@ -115,14 +173,18 @@ async function handleConvert(request, env) {
         if (!apiKey) {
             return jsonResponse({ error: 'Server chưa cấu hình GEMINI_API_KEY.' }, 500);
         }
+
         if (!env.CF_AIG_TOKEN) {
             return jsonResponse({ error: 'Server chưa cấu hình CF_AIG_TOKEN.' }, 500);
         }
 
-        const prompt = buildPrompt(normalizedText, startIndex);
-        const accountId = (env.CF_AIG_ACCOUNT_ID && typeof env.CF_AIG_ACCOUNT_ID === 'string' ? env.CF_AIG_ACCOUNT_ID.trim() : '') || '9cfdacf13184881724759ce98fa45d5a';
-        const gateway = (env.CF_AIG_GATEWAY && typeof env.CF_AIG_GATEWAY === 'string' ? env.CF_AIG_GATEWAY.trim() : '') || 'default';
-        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent`;
+        const sanitizedText = normalizedText.replace(/[<＜]\s*\/?\s*tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]');
+        const prompt = buildPrompt(sanitizedText, startIndex);
+        const accountId = env.CF_AIG_ACCOUNT_ID?.trim() || '9cfdacf13184881724759ce98fa45d5a';
+        const gateway = env.CF_AIG_GATEWAY?.trim() || 'default';
+        const model = env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
+        const isGemini3 = model.startsWith('gemini-3');
+        const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/${model}:generateContent`;
 
         const geminiRes = await callViaUS(env, geminiUrl, {
             method: 'POST',
@@ -133,8 +195,12 @@ async function handleConvert(request, env) {
             },
             body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-            })
+                generationConfig: {
+                    temperature: isGemini3 ? 1.0 : 0.1,
+                    maxOutputTokens: 8192
+                }
+            }),
+            signal: AbortSignal.timeout(45000)
         });
 
         if (!geminiRes.ok) {
@@ -172,13 +238,21 @@ async function handleConvert(request, env) {
             return jsonResponse({ error: 'AI không trả về kết quả.' }, 502);
         }
 
-        // Loại bỏ markdown code block (``` hoặc ```text ... ```) nếu AI vô tình bọc lại
         resultText = resultText.trim();
         if (resultText.startsWith('```')) {
             resultText = resultText.replace(/^`{3,}[a-zA-Z]*\n?/, '').replace(/\n?`{3,}$/, '').trim();
+        } else {
+            const fencedMatch = resultText.match(/^([^`]{0,200}?)\n?`{3,}[a-zA-Z]*\n([\s\S]*)\n`{3,}([^`]{0,200})$/);
+            if (fencedMatch) {
+                const pre = fencedMatch[1].trim();
+                const post = fencedMatch[3].trim();
+                const hasExamOutside = /(?:câu\s*hỏi|câu|bài|question|exercise|problem)\s*(?:\d+|[ivxlcdm]+)|\b\d+[\.\)\/:]\s|(?:\*+\s*)?[a-fA-F][\.\)\-\/:]/i.test(pre + '\n' + post);
+                if (!hasExamOutside && fencedMatch[2].trim()) {
+                    resultText = fencedMatch[2].trim();
+                }
+            }
         }
 
-        // Loại bỏ hoàn toàn các ký hiệu đánh dấu định dạng tạm nếu AI quên xóa trong kết quả
         resultText = resultText.replace(/⟦\/?(?:B|U|HL|CLR)⟧/gi, '');
 
         return jsonResponse({ text: resultText, truncated });
@@ -191,29 +265,34 @@ async function handleConvert(request, env) {
 function jsonResponse(obj, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(obj), {
         status,
-        headers: { 'Content-Type': 'application/json', ...extraHeaders }
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'X-Content-Type-Options': 'nosniff',
+            ...extraHeaders
+        }
     });
 }
 
-// ===== CHIA SẺ LINK =====
 async function handleShareCreate(request, env) {
     try {
         if (!env.SHARES) {
             return jsonResponse({ error: 'Server chưa cấu hình tính năng chia sẻ (thiếu KV binding SHARES).' }, 500);
         }
 
-        // Chặn spam: giới hạn số lần tạo link theo IP (nếu binding rate limiter đã được cấu hình)
         if (env.SHARE_LIMITER) {
-            const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-            const { success } = await env.SHARE_LIMITER.limit({ key: ip });
+            const rateKey = getClientRateLimitKey(request);
+            const { success } = await env.SHARE_LIMITER.limit({ key: rateKey });
             if (!success) {
                 return jsonResponse({ error: 'Bạn tạo link quá nhanh, vui lòng thử lại sau ít phút.' }, 429);
             }
         }
 
-        // Chặn sớm payload quá lớn trước và trong khi đọc body (UTF-8 tối đa 4 byte/ký tự)
         const maxShareBytes = MAX_SHARE_CHARS * 4 + 1024;
         const parseResult = await readJsonWithLimit(request, maxShareBytes);
+        if (parseResult.errorStatus === 415) {
+            return jsonResponse({ error: 'Chỉ chấp nhận Content-Type: application/json.' }, 415);
+        }
         if (parseResult.errorStatus === 413) {
             return jsonResponse({ error: tooLargeMessage() }, 413);
         }
@@ -224,7 +303,7 @@ async function handleShareCreate(request, env) {
         if (typeof text !== 'string' || text.trim().length === 0) {
             return jsonResponse({ error: 'Thiếu nội dung đề.' }, 400);
         }
-        text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        text = text.normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         if (text.length > MAX_SHARE_CHARS) {
             return jsonResponse({ error: tooLargeMessage() }, 413);
         }
@@ -236,7 +315,7 @@ async function handleShareCreate(request, env) {
         const id = await makeShareId(title, text);
 
         try {
-            // Cùng tên đề + cùng nội dung -> cùng link, không ghi lại KV (gói free chỉ có 1.000 lượt ghi/ngày)
+
             const existing = await env.SHARES.get(id);
             if (existing === null) {
                 await env.SHARES.put(id, JSON.stringify({ v: 1, title, text }), { expirationTtl: SHARE_TTL_SECONDS });
@@ -253,7 +332,7 @@ async function handleShareCreate(request, env) {
     }
 }
 
-async function handleShareGet(id, env) {
+async function handleShareGet(id, env, request = null) {
     try {
         if (!env.SHARES) {
             return jsonResponse({ error: 'Server chưa cấu hình tính năng chia sẻ (thiếu KV binding SHARES).' }, 500);
@@ -262,15 +341,37 @@ async function handleShareGet(id, env) {
             return jsonResponse({ error: 'Link chia sẻ không hợp lệ.' }, 400);
         }
 
+        const clientEtag = request?.headers?.get('if-none-match');
+        if (clientEtag && (clientEtag.trim() === `"${id}"` || clientEtag.trim() === id)) {
+            return new Response(null, {
+                status: 304,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=86400, s-maxage=604800, immutable',
+                    'ETag': `"${id}"`
+                }
+            });
+        }
+
         const stored = await env.SHARES.get(id);
         if (stored === null) {
-            return jsonResponse({ error: 'Không tìm thấy đề này. Link có thể đã hết hạn hoặc bị sai.' }, 404);
+            return jsonResponse(
+                { error: 'Không tìm thấy đề này. Link có thể đã hết hạn hoặc bị sai.' },
+                404,
+                { 'Cache-Control': 'public, max-age=60' }
+            );
         }
 
         const { text, title } = parseStoredShare(stored);
 
-        // Nội dung theo id không bao giờ đổi -> cho phép trình duyệt cache ngắn hạn
-        return jsonResponse({ text, title }, 200, { 'Cache-Control': 'public, max-age=300' });
+        return jsonResponse(
+            { text, title },
+            200,
+            {
+                'Cache-Control': 'public, max-age=86400, s-maxage=604800, immutable',
+                'ETag': `"${id}"`
+            }
+        );
 
     } catch (err) {
         console.error('KV share read error:', err);
@@ -278,33 +379,27 @@ async function handleShareGet(id, env) {
     }
 }
 
-// Làm sạch tên đề: bỏ ký tự điều khiển/ký tự ẩn, gộp khoảng trắng, cắt tối đa MAX_TITLE_CHARS ký tự (theo ký tự, không cắt đôi emoji)
 function cleanTitle(raw) {
     if (typeof raw !== 'string') return '';
     const cleaned = raw
         .slice(0, 1000)
+        .replace(/https?:\/\/\S+/gi, '')
         .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     return Array.from(cleaned).slice(0, MAX_TITLE_CHARS).join('').trim();
 }
 
-// Giá trị lưu trong KV: {"v":1,"title":...,"text":...}.
-// Link tạo trước khi có tên đề lưu thẳng nội dung đề (không phải JSON) -> vẫn đọc được, title rỗng.
 function parseStoredShare(stored) {
     try {
         const obj = JSON.parse(stored);
         if (obj && obj.v === 1 && typeof obj.text === 'string') {
             return { text: obj.text, title: cleanTitle(obj.title) };
         }
-    } catch (e) { /* không phải JSON -> link cũ */ }
+    } catch (e) {  }
     return { text: stored, title: '' };
 }
 
-// ===== TRANG CHIA SẺ: /share?s=<id> =====
-// Trả lại chính trang index.html. Nếu đề có tên thì thay các thẻ tiêu đề / xem trước link (og:title...)
-// bằng tên đề, vì Zalo/Messenger đọc các thẻ này từ HTML gốc (họ không chạy JavaScript).
-// Không có tên đề / link sai / KV lỗi -> vẫn trả trang gốc để trang tự báo lỗi cho người dùng.
 async function handleSharePage(request, env, url) {
     if (!env.ASSETS) return new Response('Not Found', { status: 404 });
     const page = await env.ASSETS.fetch(new Request(`${url.origin}/`, { headers: { Accept: 'text/html' } }));
@@ -337,28 +432,31 @@ function withShareMeta(page, title, shareUrl) {
     const pageTitle = `Đề trắc nghiệm: ${title}`;
     const description = 'Bấm vào để mở đề và làm bài trắc nghiệm ngay, không cần tải file.';
 
-    // Tự escape khi ghi giá trị vào thuộc tính: HTMLRewriter.setAttribute không escape ký tự "&"
-    // (đã thử trên runtime thật: tên đề "AT&amp;T" bị đọc thành "AT&T"), nên thay nguyên cả thẻ.
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const esc = (s) => String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     const metaTag = (attr, key, value) => ({
         element(el) { el.replace(`<meta ${attr}="${key}" content="${esc(value)}">`, { html: true }); }
     });
 
     const rewritten = new HTMLRewriter()
-        .on('title', { element(el) { el.setInnerContent(pageTitle); } })   // nội dung văn bản: runtime escape đúng
+        .on('title', { element(el) { el.setInnerContent(pageTitle); } })
         .on('meta[name="description"]', metaTag('name', 'description', description))
         .on('meta[property="og:title"]', metaTag('property', 'og:title', pageTitle))
         .on('meta[property="og:description"]', metaTag('property', 'og:description', description))
-        .on('meta[property="og:url"]', metaTag('property', 'og:url', shareUrl))   // mỗi link một địa chỉ riêng, nếu không Facebook sẽ gộp chung xem trước
+        .on('meta[property="og:url"]', metaTag('property', 'og:url', shareUrl))
         .on('meta[name="twitter:title"]', metaTag('name', 'twitter:title', pageTitle))
         .on('meta[name="twitter:description"]', metaTag('name', 'twitter:description', description))
         .on('link[rel="canonical"]', { element(el) { el.replace(`<link rel="canonical" href="${esc(shareUrl)}">`, { html: true }); } })
         .transform(page);
 
     const headers = new Headers(rewritten.headers);
-    headers.delete('ETag');            // nội dung đã bị thay -> không dùng validator của file gốc
+    headers.delete('ETag');
     headers.delete('Content-Length');
-    headers.set('Cache-Control', 'public, max-age=300');
+    headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
     return new Response(rewritten.body, { status: rewritten.status, headers });
 }
 
@@ -366,16 +464,21 @@ function tooLargeMessage() {
     return `Đề quá lớn để chia sẻ (tối đa ${MAX_SHARE_CHARS.toLocaleString('vi-VN')} ký tự).`;
 }
 
-// Nhận diện giống parseQuizData ở frontend — tránh biến endpoint này thành nơi lưu file tùy ý
 function looksLikeQuiz(text) {
-    const hasQuestion = /^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|q|bài|question)\s*\d+(?:\.\d+)?|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/im.test(text)
-        || /^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/m.test(text);
-    const hasOption = /^\s*(?:\*+\s*(?:[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*?\s+)|(?:\*{1,3}\s*)?[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$))/im.test(text);
-    return hasQuestion && hasOption;
+    if (typeof text !== 'string') return false;
+    const normalized = text.normalize('NFC');
+    const qMatches = (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|q|bài|question|exercise|problem)\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+\b)|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/gim) || []).length
+        + (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
+    const optMatches = (normalized.match(/^\s*(?:\*+\s*)?(?:\*{1,3}\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length;
+
+    if (qMatches === 0 || optMatches === 0) return false;
+
+    if (normalized.length > 10000 && (qMatches < 2 || optMatches < 4)) {
+        return false;
+    }
+    return true;
 }
 
-// Id = 64 bit đầu của SHA-256 (tên đề + nội dung), mã hóa base62 (11 ký tự).
-// Cùng tên đề + cùng nội dung luôn ra cùng một link; không đoán được link nếu không biết nội dung.
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 async function makeShareId(title, text) {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([title, text])));
@@ -443,10 +546,12 @@ async function callViaUS(env, url, options) {
     if (env.US_PROXY) {
         const id = env.US_PROXY.idFromName('us-west');
         const stub = env.US_PROXY.get(id, { locationHint: 'wnam' });
+        const { signal, ...serializableOptions } = options;
         return stub.fetch('https://us-proxy/call', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, options })
+            body: JSON.stringify({ url, options: serializableOptions }),
+            signal: signal || AbortSignal.timeout(45000)
         });
     }
     return fetch(url, options);
@@ -458,16 +563,49 @@ export class USProxy {
         this.env = env;
     }
     async fetch(request) {
-        let url, options, res;
-        try {
-            ({ url, options } = await request.json());
-            res = await fetch(url, options);
-        } catch (e) {
-            return jsonResponse({ error: { message: e.message || "Lỗi kết nối USProxy" } }, 502);
+        if (request.method !== 'POST') {
+            return jsonResponse({ error: { message: "Chỉ hỗ trợ POST method." } }, 405);
         }
-        return new Response(res.body, {
-            status: res.status,
-            headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' }
-        });
+        let url, options;
+        try {
+            const body = await request.json();
+            url = body?.url;
+            options = body?.options || {};
+        } catch {
+            return jsonResponse({ error: { message: "Body không đúng định dạng JSON." } }, 400);
+        }
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(url);
+        } catch {
+            return jsonResponse({ error: { message: "URL không hợp lệ." } }, 400);
+        }
+        const ALLOWED_HOSTS = ['gateway.ai.cloudflare.com', 'generativelanguage.googleapis.com'];
+        if (parsedUrl.protocol !== 'https:' || !ALLOWED_HOSTS.includes(parsedUrl.hostname.toLowerCase())) {
+            return jsonResponse({ error: { message: "URL đích bị từ chối bởi chính sách bảo mật." } }, 403);
+        }
+        try {
+            const { signal: _ignoredSignal, ...safeOptions } = options;
+            const res = await fetch(parsedUrl.toString(), {
+                ...safeOptions,
+                method: 'POST',
+                redirect: 'manual',
+                signal: AbortSignal.timeout(45000)
+            });
+            if (res.status >= 300 && res.status < 400) {
+                return jsonResponse({ error: { message: "Chuyển hướng không được phép qua proxy." } }, 502);
+            }
+            return new Response(res.body, {
+                status: res.status,
+                headers: {
+                    'Content-Type': res.headers.get('Content-Type') || 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            });
+        } catch (e) {
+            console.error('USProxy upstream error:', e);
+            return jsonResponse({ error: { message: "Không thể kết nối đến AI Gateway upstream." } }, 502);
+        }
     }
 }
+
