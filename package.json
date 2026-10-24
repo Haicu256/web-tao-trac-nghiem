@@ -1,0 +1,15 @@
+{
+  "name": "wtn-quiz",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --inspector-port 0 --ip 127.0.0.1 --show-interactive-dev-session false",
+    "test": "playwright test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "wrangler": "^4.151.1"
+  }
+}
