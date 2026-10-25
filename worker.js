@@ -3,22 +3,11 @@ const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90;
 const MAX_SHARE_CHARS = 300_000;
 const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
 const MAX_TITLE_CHARS = 100;
+const CSP_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; media-src 'self'; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; img-src 'self' data:; frame-ancestors 'none';";
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
-
-        if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
-            return new Response(null, {
-                status: 204,
-                headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-                    'Access-Control-Max-Age': '86400',
-                }
-            });
-        }
 
         if (url.pathname === '/api/convert' && request.method === 'POST') {
             return handleConvert(request, env);
@@ -28,7 +17,13 @@ export default {
             return handleShareCreate(request, env);
         }
 
-        if ((url.pathname === '/share' || url.pathname === '/share/' || (url.pathname === '/' && url.searchParams.has('s'))) && (request.method === 'GET' || request.method === 'HEAD')) {
+        if (url.pathname === '/' && url.searchParams.has('s') && (request.method === 'GET' || request.method === 'HEAD')) {
+            const redirectUrl = new URL('/share', request.url);
+            redirectUrl.search = url.search;
+            return Response.redirect(redirectUrl.toString(), 301);
+        }
+
+        if ((url.pathname === '/share' || url.pathname === '/share/') && (request.method === 'GET' || request.method === 'HEAD')) {
             return handleSharePage(request, env, url);
         }
 
@@ -44,7 +39,21 @@ export default {
         }
 
         if (env.ASSETS) {
-            return env.ASSETS.fetch(request);
+            const isAllowedAsset = url.pathname === '/' || url.pathname === '/favicon.png' || url.pathname === '/robots.txt' || (url.pathname.startsWith('/music/') && !url.pathname.includes('..'));
+            if (!isAllowedAsset) {
+                return new Response('Not Found', { status: 404 });
+            }
+            const res = await env.ASSETS.fetch(request);
+            const headers = new Headers(res.headers);
+            headers.set('X-Frame-Options', 'DENY');
+            headers.set('X-Content-Type-Options', 'nosniff');
+            headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+            headers.set('Content-Security-Policy', CSP_POLICY);
+            return new Response(res.body, {
+                status: res.status,
+                statusText: res.statusText,
+                headers
+            });
         }
 
         return new Response('Not Found', { status: 404 });
@@ -177,10 +186,13 @@ async function handleConvert(request, env) {
         if (!env.CF_AIG_TOKEN) {
             return jsonResponse({ error: 'Server chưa cấu hình CF_AIG_TOKEN.' }, 500);
         }
+        if (!env.CF_AIG_ACCOUNT_ID) {
+            return jsonResponse({ error: 'Server chưa cấu hình CF_AIG_ACCOUNT_ID.' }, 500);
+        }
 
         const sanitizedText = normalizedText.replace(/[<＜]\s*\/?\s*tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]');
         const prompt = buildPrompt(sanitizedText, startIndex);
-        const accountId = env.CF_AIG_ACCOUNT_ID?.trim() || '9cfdacf13184881724759ce98fa45d5a';
+        const accountId = env.CF_AIG_ACCOUNT_ID.trim();
         const gateway = env.CF_AIG_GATEWAY?.trim() || 'default';
         const model = env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
         const isGemini3 = model.startsWith('gemini-3');
@@ -204,17 +216,13 @@ async function handleConvert(request, env) {
         });
 
         if (!geminiRes.ok) {
-            let message = `Gemini lỗi: ${geminiRes.status}`;
             const errText = await geminiRes.text().catch(() => '');
-            try {
-                const errBody = JSON.parse(errText);
-                const errMsg = (typeof errBody?.error === 'string' ? errBody.error : errBody?.error?.message)
-                    || errBody?.error?.[0]?.message
-                    || errBody?.errors?.[0]?.message
-                    || (typeof errBody?.message === 'string' ? errBody.message : null);
-                if (errMsg) message = `Gemini lỗi: ${errMsg}`;
-            } catch (e) {
-                if (errText) message = `Gemini lỗi: ${geminiRes.status} (${errText.slice(0, 150).trim()})`;
+            console.error('Gemini upstream error:', geminiRes.status, errText);
+            let message = `Dịch vụ AI tạm thời không khả dụng (${geminiRes.status}). Vui lòng thử lại sau.`;
+            if (geminiRes.status === 429) {
+                message = 'Hệ thống AI đang quá tải hoặc hết hạn ngạch, vui lòng thử lại sau ít phút.';
+            } else if (geminiRes.status === 401 || geminiRes.status === 403) {
+                message = 'Lỗi cấu hình xác thực dịch vụ AI.';
             }
             const status = (geminiRes.status >= 400 && geminiRes.status <= 599) ? geminiRes.status : 502;
             return jsonResponse({ error: message }, status);
@@ -258,7 +266,8 @@ async function handleConvert(request, env) {
         return jsonResponse({ text: resultText, truncated });
 
     } catch (err) {
-        return jsonResponse({ error: err.message || 'Lỗi không xác định.' }, 500);
+        console.error('Convert error:', err);
+        return jsonResponse({ error: 'Đã xảy ra lỗi khi xử lý định dạng đề thi. Vui lòng thử lại sau.' }, 500);
     }
 }
 
@@ -267,7 +276,6 @@ function jsonResponse(obj, status = 200, extraHeaders = {}) {
         status,
         headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
             'X-Content-Type-Options': 'nosniff',
             ...extraHeaders
         }
@@ -328,7 +336,8 @@ async function handleShareCreate(request, env) {
         return jsonResponse({ id, title });
 
     } catch (err) {
-        return jsonResponse({ error: err.message || 'Lỗi không xác định.' }, 500);
+        console.error('Share create error:', err);
+        return jsonResponse({ error: 'Không thể tạo liên kết chia sẻ lúc này. Vui lòng thử lại sau.' }, 500);
     }
 }
 
@@ -341,18 +350,6 @@ async function handleShareGet(id, env, request = null) {
             return jsonResponse({ error: 'Link chia sẻ không hợp lệ.' }, 400);
         }
 
-        const clientEtag = request?.headers?.get('if-none-match');
-        if (clientEtag && (clientEtag.trim() === `"${id}"` || clientEtag.trim() === id)) {
-            return new Response(null, {
-                status: 304,
-                headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Cache-Control': 'public, max-age=86400, s-maxage=604800, immutable',
-                    'ETag': `"${id}"`
-                }
-            });
-        }
-
         const stored = await env.SHARES.get(id);
         if (stored === null) {
             return jsonResponse(
@@ -360,6 +357,17 @@ async function handleShareGet(id, env, request = null) {
                 404,
                 { 'Cache-Control': 'public, max-age=60' }
             );
+        }
+
+        const clientEtag = request?.headers?.get('if-none-match');
+        if (clientEtag && (clientEtag.trim() === `"${id}"` || clientEtag.trim() === id)) {
+            return new Response(null, {
+                status: 304,
+                headers: {
+                    'Cache-Control': 'public, max-age=86400, s-maxage=604800, immutable',
+                    'ETag': `"${id}"`
+                }
+            });
         }
 
         const { text, title } = parseStoredShare(stored);
@@ -422,10 +430,15 @@ async function handleSharePage(request, env, url) {
     } catch (err) {
         console.error('Share page meta error:', err);
     }
+    const pageHeaders = new Headers(page.headers);
+    pageHeaders.set('X-Frame-Options', 'DENY');
+    pageHeaders.set('X-Content-Type-Options', 'nosniff');
+    pageHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    pageHeaders.set('Content-Security-Policy', CSP_POLICY);
     if (request.method === 'HEAD') {
-        return new Response(null, { status: page.status, headers: page.headers });
+        return new Response(null, { status: page.status, headers: pageHeaders });
     }
-    return page;
+    return new Response(page.body, { status: page.status, headers: pageHeaders });
 }
 
 function withShareMeta(page, title, shareUrl) {
@@ -457,6 +470,10 @@ function withShareMeta(page, title, shareUrl) {
     headers.delete('ETag');
     headers.delete('Content-Length');
     headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+    headers.set('X-Frame-Options', 'DENY');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    headers.set('Content-Security-Policy', CSP_POLICY);
     return new Response(rewritten.body, { status: rewritten.status, headers });
 }
 
@@ -471,7 +488,7 @@ function looksLikeQuiz(text) {
         + (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
     const optMatches = (normalized.match(/^\s*(?:\*+\s*)?(?:\*{1,3}\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length;
 
-    if (qMatches === 0 || optMatches === 0) return false;
+    if (qMatches < 1 || optMatches < 2) return false;
 
     if (normalized.length > 10000 && (qMatches < 2 || optMatches < 4)) {
         return false;
@@ -598,8 +615,7 @@ export class USProxy {
             return new Response(res.body, {
                 status: res.status,
                 headers: {
-                    'Content-Type': res.headers.get('Content-Type') || 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                    'Content-Type': res.headers.get('Content-Type') || 'application/json'
                 }
             });
         } catch (e) {

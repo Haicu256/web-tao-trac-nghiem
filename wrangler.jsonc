@@ -15,11 +15,11 @@
     "nodejs_compat"
   ],
   "secrets": {
-    "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN"]
+    "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN", "CF_AIG_ACCOUNT_ID"]
   },
 
   "kv_namespaces": [
-    { "binding": "SHARES" }
+    { "binding": "SHARES", "id": "placeholder_set_via_wrangler_or_dashboard" }
   ],
   "durable_objects": {
     "bindings": [
