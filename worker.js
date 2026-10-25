@@ -267,6 +267,9 @@ async function handleConvert(request, env) {
 
     } catch (err) {
         console.error('Convert error:', err);
+        if (err?.name === 'TimeoutError' || (err?.name === 'AbortError' && String(err?.message || '').toLowerCase().includes('timeout'))) {
+            return jsonResponse({ error: 'Quá thời gian xử lý yêu cầu (timeout 45s). Vui lòng thử lại với đoạn văn bản ngắn hơn.' }, 504);
+        }
         return jsonResponse({ error: 'Đã xảy ra lỗi khi xử lý định dạng đề thi. Vui lòng thử lại sau.' }, 500);
     }
 }
@@ -469,7 +472,7 @@ function withShareMeta(page, title, shareUrl) {
     const headers = new Headers(rewritten.headers);
     headers.delete('ETag');
     headers.delete('Content-Length');
-    headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+    headers.set('Cache-Control', 'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400');
     headers.set('X-Frame-Options', 'DENY');
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -607,7 +610,7 @@ export class USProxy {
                 ...safeOptions,
                 method: 'POST',
                 redirect: 'manual',
-                signal: AbortSignal.timeout(45000)
+                signal: AbortSignal.timeout(40000)
             });
             if (res.status >= 300 && res.status < 400) {
                 return jsonResponse({ error: { message: "Chuyển hướng không được phép qua proxy." } }, 502);
@@ -620,6 +623,9 @@ export class USProxy {
             });
         } catch (e) {
             console.error('USProxy upstream error:', e);
+            if (e?.name === 'TimeoutError' || (e?.name === 'AbortError' && String(e?.message || '').toLowerCase().includes('timeout'))) {
+                return jsonResponse({ error: { message: "Quá thời gian kết nối tới AI Gateway upstream (timeout 40s)." } }, 504);
+            }
             return jsonResponse({ error: { message: "Không thể kết nối đến AI Gateway upstream." } }, 502);
         }
     }
