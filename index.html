@@ -25,9 +25,9 @@
     <meta name="twitter:image" content="https://web-tao-trac-nghiem.haicu25699652.workers.dev/favicon.png">
 
     
-    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" referrerpolicy="no-referrer"></script>
+    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha512-sG5Q7boJL+ft/weuz6Mmi9XBD+bEzE9AI2FMP4YMFxp3FpTFUQSQQm5K5cSgJCyed6bWs3W8f8h0lp36lHXhQA==" referrerpolicy="no-referrer"></script>
+    <script defer crossorigin="anonymous" src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ==" referrerpolicy="no-referrer"></script>
 
     <style>
         :root {
@@ -205,11 +205,11 @@
         #toast { visibility: hidden; min-width: 250px; background-color: #323232; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; transform: translateX(-50%); box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, bottom 0.3s; font-weight: 500; }
         #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
 
-        #site-footer { position: fixed; bottom: 14px; right: 18px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 98; }
+        #site-footer { position: fixed; bottom: 14px; left: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; z-index: 98; }
         #bmc-btn { font-size: 12px; font-weight: 600; color: #5a3e00; background: #f7c948; border-radius: 20px; padding: 5px 12px; border: none; cursor: pointer; font-family: inherit; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transition: transform 0.15s, opacity 0.15s; white-space: nowrap; }
         #bmc-btn:hover { transform: translateY(-2px); opacity: 0.9; }
-        .footer-line { font-size: 11px; color: var(--btn-text); opacity: 0.55; text-align: right; }
-        .footer-email { font-size: 10px; color: var(--btn-text); opacity: 0.5; text-align: right; margin-top: 2px; }
+        .footer-line { font-size: 11px; color: var(--btn-text); opacity: 0.55; text-align: left; }
+        .footer-email { font-size: 10px; color: var(--btn-text); opacity: 0.5; text-align: left; margin-top: 2px; }
         .free-message-outside { text-align: center; margin-top: 0px; margin-bottom: 25px; font-size: 14px; padding: 8px 15px; background-color: transparent; color: var(--title-color); font-weight: 500; letter-spacing: 0.3px; display: block; }
 
         .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-radius: 50%; border-top-color: var(--title-color); animation: spin 0.8s linear infinite; }
@@ -380,7 +380,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
             <div id="share-box" class="share-box">
                 <h3>🔗 Chia sẻ đề này</h3>
-                <p class="share-desc">Tạo link để bạn bè bấm vào là có sẵn đề, không cần tải file. Bất kỳ ai có link đều mở được đề.</p>
+                <p class="share-desc">Tạo link để bạn bè bấm vào là có sẵn đề, không cần tải file. Bất kỳ ai có link đều mở được đề. Link sẽ hết hạn nếu không ai mở trong 60 ngày.</p>
                 <p id="shareTitleRow" class="share-title" style="display:none;">Tên đề: <strong id="shareTitleText"></strong></p>
                 <button type="button" id="shareCreateBtn" class="btn-share-create" onclick="createShareLink()">🔗 Tạo link chia sẻ</button>
                 <div id="shareResult" style="display:none;">
@@ -501,7 +501,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 .normalize('NFC')
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 .replace(/\r\n/g, '\n')
-                .replace(/\r/g, '\n');
+                .replace(/\r/g, '\n')
+                .replace(/^([ \t]*đáp\s*án\s*[:.\-–—])[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$)/gimu, '$1\n');
         }
 
         function escapeHTML(str) {
@@ -626,7 +627,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
         function scrollToGuide() { UI.usageGuide.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
         function goHome() {
-            const isInProgress = finalQuestions.length > 0 && Object.keys(selectedAnswers).length > 0 && UI.resultBox.style.display !== 'block';
+            const hasActualAnswer = Object.values(selectedAnswers).some(v => typeof v === 'number' || (v && typeof v === 'object' && Object.values(v).some(s => s && (s.dung || s.sai))));
+            const isInProgress = finalQuestions.length > 0 && hasActualAnswer && UI.resultBox.style.display !== 'block';
             if (isInProgress) {
                 showModal({
                     icon: '🏠',
@@ -923,7 +925,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             const EXPLANATION_LINE_REGEX = /^(?:lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:giải|chấm)(?:\s*chi\s*tiết)?|giải\s*thích(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*:|đáp\s*án\s*chi\s*tiết)\s*[:.\-–—]?/i;
             const ANSWER_LINE_REGEX = /^(?:(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|answer|key)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)|(?:(?:chọn|suy\s*ra\s*chọn|do\s*đó\s*chọn|ta\s*chọn|vậy\s*chọn|suy\s*ra|do\s*đó|vậy)\s*(?:chọn)?(?:\s*(?:đáp\s*án|phương\s*án))?(?:\s*là)?))\s*[:.\-–—]?\s*([a-fA-F])(?!\p{L})/iu;
             const INLINE_ANSWER_REGEX = /(?:(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|answer|key)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)|(?:(?:chọn|suy\s*ra\s*chọn|do\s*đó\s*chọn|ta\s*chọn|vậy\s*chọn|suy\s*ra|do\s*đó|vậy)\s*(?:chọn)?(?:\s*(?:đáp\s*án|phương\s*án))?(?:\s*là)?))\s*[:.\-–—]?\s*([a-fA-F])(?!\p{L})/iu;
-            const escapeHTML = (str) => str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;').replace(/`/g,'&#96;');
             const EXAM_CODE_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\[?\s*(?:mã\s*đề(?:\s*thi)?|đề\s*(?:thi\s*)?số|exam\s*code|test\s*code|paper\s*code)\s*[:.\-–—]?\s*([a-zA-Z0-9_\-]+)\b/iu;
             let isEndOfQuiz = false;
             let inExplanationSection = false;
@@ -937,7 +938,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 const map = new Map();
                 if (!tableText) return map;
 
-                const mcRegex = /(?:(?:câu|bài|question|q|exercise|problem)[^\S\r\n]*)?(\d+(?:\.\d+)?)[^\S\r\n]*(?:[:.\)\-–—\/|\]]|[^\S\r\n]+)[^\S\r\n]*\(?([a-fA-F])\)?(?!\p{L}|\d)/giu;
+                const mcRegex = /(?:(?:câu|bài|question|q|exercise|problem)[^\S\r\n]*)?(\d+(?:\.\d+)?)[^\S\r\n]*(?:[:.\)\-–—\/|\]]|[^\S\r\n]+)[^\S\r\n]*\(?([a-fA-F])\)?(?!\p{L}|\d|\s*(?:đúng|sai|true|false|đ\b|s\b))/giu;
 
                 const compactRegex = /(?:^|[\s,;|\-–—])(\d+(?:\.\d+)?)\.?([a-fA-F])\.?(?=[\s,;|\-–—]|$)(?!\p{L})/giu;
                 let m;
@@ -991,6 +992,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 if (!text) return null;
                 let clean = text.replace(/^(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|answer|key|hướng\s*dẫn\s*(?:chấm|giải)|lời\s*giải)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)\s*[:.\-–—]?\s*/i, '').trim();
                 if (!clean) return null;
+                const numberedCompact = clean.match(/^\d+\s*[.:)\-–—]\s*([ĐSDFTF]{2,6})$/i);
+                if (numberedCompact) clean = numberedCompact[1];
 
                 const clauseRegex = /(?:(?:các\s*ý|các\s*câu|ý|câu)?\s*([a-dA-D1-4](?:\s*[,;\s+vàand]+\s*[a-dA-D1-4])*)\s*[:.\)\-–—\s\]]+\s*(đúng|sai|đ|s|true|false|t|f)(?![a-zA-Z\p{L}]))/giu;
                 const matches = [...clean.matchAll(clauseRegex)];
@@ -1125,7 +1128,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             lines.forEach((line, lineIndex) => {
                 if (stopAllParsing) return;
                 const trimmedLine = line.trim();
-                if (!trimmedLine) return;
+                if (!trimmedLine) {
+                    if (currentQ && currentQ.options.length >= 2) currentQ.blankAfterOptions = true;
+                    return;
+                }
                 if (DIVIDER_REGEX.test(trimmedLine)) return;
 
                 const examCodeMatch = trimmedLine.match(EXAM_CODE_REGEX);
@@ -1270,7 +1276,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     if (hasStartedQuiz) {
                         isEndOfQuiz = true;
                         if (currentQ) { parsedQuestions.push(currentQ); currentQ = null; }
-                        answerTableLines.push(trimmedLine);
+                        const rem = trimmedLine.replace(/^(?:[-=_*~#]{2,}\s*)?(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|đáp\s*án\s*và\s*hướng\s*dẫn\s*chấm|phần\s*đáp\s*án|answer\s*key|đáp\s*án)(?:\s*(?:trắc\s*nghiệm|(?:mã\s*)?đề\s*[\p{L}\p{N}_\-]+|chi\s*tiết|tham\s*khảo|\([^)]*\)|\[[^\]]*\]))*\s*[:.\-–—]?\s*/iu, '').trim();
+                        if (rem && !/^(?:[-=_*~#]{2,}\s*)?(?:hết|the\s*end|end\s*of|\(?\s*(?:thí\s*sinh|cán\s*bộ))/iu.test(rem)) {
+                            answerTableLines.push(rem);
+                        }
                     }
                     return;
                 }
@@ -1336,7 +1345,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 if (isNewQuestion) {
                     inExplanationSection = false;
                     lastExplanationQ = null;
-                    if (currentQ) parsedQuestions.push(currentQ);
+                    const carriedStem = currentQ?.pendingTail || [];
+                    if (currentQ) {
+                        currentQ.pendingTail = [];
+                        parsedQuestions.push(currentQ);
+                    }
                     let clean = trimmedLine.replace(/^#{1,6}\s*/, '');
                     const hadWrappingBold = /^\*{2,3}/.test(clean) && /\*{2,3}$/.test(clean);
                     clean = clean.replace(/^\*{1,3}\s*/, '');
@@ -1366,7 +1379,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     }
                     currentQ = {
                         qNum,
-                        title: escapeHTML(clean.trim()),
+                        title: [...carriedStem, escapeHTML(clean.trim())].filter(Boolean).join('<br>'),
                         options: [],
                         type: isTrueFalse ? 'true_false' : 'multiple_choice'
                     };
@@ -1429,6 +1442,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                             isStarCorrect = true;
                         }
                         let rawText = workingLine.replace(activeOptionRegex, '').trim();
+                        const isPrefixStar = isStarCorrect;
+                        const textWithStar = rawText;
 
                         const isItalics = /^\*([^*\s]|[^*\s][^*]*[^*\s])\*(?:\s|$)/.test(rawText);
                         const isMathOrCodeStar = /(?:^|[^\p{L}\d])(?:[A-Z]|int|char|void|float|double|size_t|bool)\*$/i.test(rawText) || /^[A-Za-z0-9]\*$/.test(rawText);
@@ -1449,11 +1464,20 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                             }
                         }
 
+                        if (currentQ.pendingTail?.length) {
+                            const lastOpt = currentQ.options[currentQ.options.length - 1];
+                            lastOpt.text = [lastOpt.text, ...currentQ.pendingTail].filter(Boolean).join('<br>');
+                            currentQ.pendingTail = [];
+                        }
+                        currentQ.blankAfterOptions = false;
                         const optionText = escapeHTML(rawText);
-                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar });
+                        const isTextStar = isStarCorrect && !isPrefixStar;
+                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar, isPrefixStar, isTextStar, textWithStar: isTextStar ? escapeHTML(textWithStar) : undefined });
                     } else {
                         if (currentQ.options.length === 0) {
                             currentQ.title = currentQ.title ? (currentQ.title + '<br>' + escapeHTML(trimmedLine)) : escapeHTML(trimmedLine);
+                        } else if (currentQ.blankAfterOptions) {
+                            (currentQ.pendingTail ||= []).push(escapeHTML(trimmedLine));
                         } else {
                             const lastOpt = currentQ.options[currentQ.options.length - 1];
                             lastOpt.text = lastOpt.text ? (lastOpt.text + '<br>' + escapeHTML(trimmedLine)) : escapeHTML(trimmedLine);
@@ -1464,7 +1488,24 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             if (currentQ) parsedQuestions.push(currentQ);
 
             parsedQuestions.forEach(q => {
+                if (q?.pendingTail?.length && q.options.length > 0) {
+                    const lastOpt = q.options[q.options.length - 1];
+                    lastOpt.text = [lastOpt.text, ...q.pendingTail].filter(Boolean).join('<br>');
+                }
+                if (q) {
+                    delete q.pendingTail;
+                    delete q.blankAfterOptions;
+                }
                 if (!q || !q.options || q.options.length < 2) return;
+                if (q.options.some(o => o.isPrefixStar)) {
+                    q.options.forEach(o => {
+                        if (o.isTextStar) {
+                            o.isStarCorrect = false;
+                            o.isCorrect = false;
+                            o.text = o.textWithStar;
+                        }
+                    });
+                }
                 q.hasLetterRef = q.options.some(o => /(?:[Cc]ả|[Bb]oth|[Ee]ither|[Nn]either|[Ýý]|[Pp]hương\s*[áa]n|[Đđ][áa]p\s*[áa]n|[Ll]ựa\s*chọn|[Cc]âu|[Cc]hỉ|[Oo]nly)\s*(?:có\s*|của\s*|ở\s*|tại\s*|(?:các\s*)?(?:[Pp]hương\s*[áa]n|[Đđ][áa]p\s*[áa]n|[Ll]ựa\s*chọn|[Cc]âu|[Ýý]|options?|statements?)\s*)?[A-F](?!\p{L})|(?:^|[^\p{L}])[A-F]\s*(?:và|and|&amp;|&|,|\s*(?:hoặc|or|nor)\s*|\s+đều\s+)\s*(?:[Cc]âu\s*|[Ýý]\s*|[Pp]hương\s*[áa]n\s*|[Đđ][áa]p\s*[áa]n\s*|[Ll]ựa\s*chọn\s*|options?\s*|statements?\s*)?[A-F](?!\p{L})/u.test(o.text));
                 if (q.hasExplicitTFAnswer) return;
                 const hasStar = q.options.some(o => o.isStarCorrect);
@@ -1539,17 +1580,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
             const validQuestions = parsedQuestions.filter(q => q.options.length >= 2);
             const droppedNoOptionCount = parsedQuestions.length - validQuestions.length;
-            const hasAnyStar = validQuestions.some(q => q.hasExplicitTFAnswer || q.options.some(o => o.isCorrect));
-            const withCorrectAnswer = validQuestions.filter(q => (q.type === 'true_false' && (hasAnyStar || q.hasExplicitTFAnswer)) || q.options.some(o => o.isCorrect));
-            const droppedTFCount = hasAnyStar ? 0 : validQuestions.filter(q => q.type === 'true_false').length;
+            const withCorrectAnswer = validQuestions.filter(q => q.type === 'true_false' || q.options.some(o => o.isCorrect));
             const droppedMCCount = validQuestions.filter(q => q.type !== 'true_false' && !q.options.some(o => o.isCorrect)).length;
-            const unstarredTFCount = hasAnyStar ? validQuestions.filter(q => q.type === 'true_false' && !q.hasExplicitTFAnswer && !q.options.some(o => o.isCorrect)).length : 0;
+            const unstarredTFCount = validQuestions.filter(q => q.type === 'true_false' && !q.hasExplicitTFAnswer && !q.options.some(o => o.isCorrect)).length;
             if (withCorrectAnswer.length > 0) originalQuestions = withCorrectAnswer;
 
             const dropMsgs = [];
             const nonStandardTFCount = withCorrectAnswer.filter(q => q.type === 'true_false' && q.options.length !== 4).length;
             if (droppedMCCount > 0) dropMsgs.push(`${droppedMCCount} câu trắc nghiệm thiếu đáp án *`);
-            if (droppedTFCount > 0) dropMsgs.push(`${droppedTFCount} câu Đúng/Sai thiếu đáp án *`);
             if (droppedNoOptionCount > 0) dropMsgs.push(`${droppedNoOptionCount} câu không có phương án`);
             if (unstarredTFCount > 0) dropMsgs.push(`${unstarredTFCount} câu Đúng/Sai không có dấu * (mặc định các ý đều là Sai)`);
             if (nonStandardTFCount > 0) dropMsgs.push(`${nonStandardTFCount} câu Đúng/Sai không có 4 ý (chấm theo tỷ lệ)`);
@@ -1861,7 +1899,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     earnedPoints += getTFPoints(countTFCorrect(q, qIndex), q.options.length);
                 } else {
                     const choice = selectedAnswers[qIndex];
-                    if (choice !== undefined && q.options[choice].isCorrect) earnedPoints += 1;
+                    if (choice !== undefined && q.options?.[choice]?.isCorrect) earnedPoints += 1;
                 }
             });
             const percentage = total > 0 ? Math.round((earnedPoints / total) * 100) : 0;
@@ -2621,6 +2659,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 return htmlToFormattedText(raw);
             }
 
+            if (ext === 'doc') {
+                throw new Error('Định dạng .doc cũ không được hỗ trợ. Vui lòng mở file bằng Word và lưu lại thành .docx trước khi tải lên.');
+            }
+
             let arrayBuffer = await readFileAsArrayBuffer(file);
 
             switch (ext) {
@@ -2652,7 +2694,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     let pdf;
                     try {
                         try {
-                            pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                            pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer), isEvalSupported: false }).promise;
                             arrayBuffer = null;
                         } catch (pdfErr) {
                             if (pdfErr && (pdfErr.name === 'PasswordException' || /password/i.test(pdfErr.message || ''))) {
@@ -2768,11 +2810,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                     || /(?:^|\n)[ \t]*\d+\t[^\n]+\t(?:đúng|sai)(?!\p{L})/iu.test(plainCandidate);
                 const headingMatched = match[0].trim();
                 const isExplicitTableHeading = /(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu|hướng\s*dẫn\s*chấm|đáp\s*án\s*tham\s*khảo|phần\s*đáp\s*án|answer\s*key)/i.test(headingMatched);
-                const hasMultipleAnswers = ((plainCandidate.match(/(?:^|[\s,;|\/–—\-])\d+[.:\-)–—]?[A-F](?![\p{L}\d])/gi) || []).length >= 2)
+                const hasMultipleAnswers = ((plainCandidate.match(/(?:^|[\s,;|\/–—\-])\d+[^\S\r\n]*(?:[:.\-)–—\/|\]][^\S\r\n]*|[^\S\r\n]+)?[A-F](?![\p{L}\d])/gi) || []).length >= 2)
                     || ((plainCandidate.match(/(?:đúng|sai|true|false)/gi) || []).length >= 2);
                 if (candidateKey.length < 8000 && contentBefore.length > 0 && !hasFullQuestion && (isExplicitTableHeading || hasMultipleAnswers)) {
                     lastValidMatch = { candidateKey, contentBefore };
-                    break;
                 }
             }
             if (lastValidMatch) {
@@ -2849,7 +2890,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 /(?:^|\n)\s*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|phần\s*đáp\s*án|answer\s*key|(?:đáp\s*án\s*và\s*)?hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải\s*chi\s*tiết)(?!\p{L})/iu,
                 /(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp|phương)\s*án)?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?)\s*[:.\-–—]\s*(?:[a-fA-F]|\d+[.:\-)–—]?[a-fA-F])|(?:^|\n)\s*(?:đáp\s*án|answer|key)\s*[:.\-–—]?\s*(?:[a-fA-F]|\d+[.:\-)–—]?[a-fA-F]))(?!\p{L})/iu,
                 /(?:[\t|(\[–—\-]\s*(?:đúng|true)(?!\p{L})|(?:đúng|true)\s*[:.\-–—]\s*(?:[a-d](?!\p{L})|\d+)|(?:sai|false)\s*[:.\-–—]\s*(?:[a-d](?!\p{L})|\d+)|(?:^|[^\p{L}\d])\d+\s*[:.\-–—]\s*(?:đúng|sai|true|false)(?!\p{L}))/iu,
-                /(?:(?:^|[^\p{L}\d])\d+[^\S\r\n]*[:.\-)–—][^\S\r\n]*[A-D](?!\p{L})[\s,;|\/–—\-]+\d+[^\S\r\n]*[:.\-)–—][^\S\r\n]*[A-D](?!\p{L})|(?:^|[^\p{L}\d])(?!(?:nhóm|group|lớp|khối|phòng)\s*)\d+[A-D](?!\p{L})[\s,;|\/–—\-]+\d+[A-D](?!\p{L})[\s,;|\/–—\-]+\d+[A-D](?!\p{L}))/iu
+                /(?:(?:^|[^\p{L}\d])(?!(?:nhóm|group|lớp|khối|phòng)\s*)\d+[^\S\r\n]*(?:[:.\-)–—\/|\]][^\S\r\n]*|[ \t]+)[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[^\S\r\n]*(?:[:.\-)–—\/|\]][^\S\r\n]*|[ \t]+)[A-F](?![\p{L}\d])|(?:^|[^\p{L}\d])(?!(?:nhóm|group|lớp|khối|phòng)\s*)\d+[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[A-F](?![\p{L}\d]))/iu
             ];
             const plainForHint = stripFormattingTags(text);
             if (starHintRe.test(plainForHint)) return true;
@@ -3076,7 +3117,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             const base = name
                 .replace(/https?:\/\/\S+/gi, '')
                 .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202F\u2060-\u206F\uFEFF]/g, ' ')
-                .replace(/\.(txt|md|html?|pdf|docx)$/i, '')
+                .replace(/\.(txt|md|html?|pdf|docx?)$/i, '')
                 .replace(/\s+/g, ' ')
                 .trim();
             return Array.from(base).slice(0, SHARE_TITLE_MAX).join('').trim();

@@ -20,3 +20,6 @@ tools/
 docs/
 test_exams/
 wtn_crew/
+test-results/
+playwright-report/
+.claude

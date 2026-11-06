@@ -16,11 +16,15 @@
     "nodejs_compat"
   ],
   "secrets": {
-    "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN", "CF_AIG_ACCOUNT_ID"]
+    "required": ["GEMINI_API_KEY", "CF_AIG_TOKEN"]
+  },
+  "vars": {
+    "CF_AIG_ACCOUNT_ID": "9cfdacf13184881724759ce98fa45d5a",
+    "GEMINI_MODEL": "gemini-3.1-flash-lite"
   },
 
   "kv_namespaces": [
-    { "binding": "SHARES", "id": "placeholder_set_via_wrangler_or_dashboard" }
+    { "binding": "SHARES", "id": "4eba8ce34e9b4c8992e8fb7cf7d247e5" }
   ],
   "durable_objects": {
     "bindings": [

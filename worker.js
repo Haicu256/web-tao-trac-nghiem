@@ -1,5 +1,6 @@
 
 const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90;
+const SHARE_RENEW_AFTER_SECONDS = 60 * 60 * 24 * 30;
 const MAX_SHARE_CHARS = 300_000;
 const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
 const MAX_TITLE_CHARS = 100;
@@ -39,7 +40,7 @@ export default {
         }
 
         if (env.ASSETS) {
-            const isAllowedAsset = url.pathname === '/' || url.pathname === '/favicon.png' || url.pathname === '/robots.txt' || (url.pathname.startsWith('/music/') && !url.pathname.includes('..'));
+            const isAllowedAsset = url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/favicon.png' || url.pathname === '/robots.txt' || /^\/music\/[a-zA-Z0-9_\-.]+\.mp3$/.test(url.pathname);
             if (!isAllowedAsset) {
                 return new Response('Not Found', { status: 404 });
             }
@@ -49,6 +50,10 @@ export default {
             headers.set('X-Content-Type-Options', 'nosniff');
             headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
             headers.set('Content-Security-Policy', CSP_POLICY);
+            if (request.method === 'HEAD') {
+                await res.body?.cancel();
+                return new Response(null, { status: res.status, headers });
+            }
             return new Response(res.body, {
                 status: res.status,
                 statusText: res.statusText,
@@ -172,7 +177,10 @@ async function handleConvert(request, env) {
             return jsonResponse({ error: 'Thiếu nội dung văn bản.' }, 400);
         }
 
-        const normalizedText = (rawText || '').normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const normalizedText = (rawText || '').normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\r\n/g, '\n').replace(/[\r\u2028\u2029]/g, '\n');
+        if (normalizedText.trim().length === 0) {
+            return jsonResponse({ error: 'Thiếu nội dung văn bản.' }, 400);
+        }
 
         if (normalizedText.length > MAX_INPUT_SIZE) {
             return jsonResponse({ error: `Văn bản quá lớn (tối đa ${MAX_INPUT_SIZE.toLocaleString('vi-VN')} ký tự mỗi lần).` }, 413);
@@ -196,6 +204,7 @@ async function handleConvert(request, env) {
         const gateway = env.CF_AIG_GATEWAY?.trim() || 'default';
         const model = env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
         const isGemini3 = model.startsWith('gemini-3');
+        const supportsThinking = model.startsWith('gemini-2.5');
         const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/${model}:generateContent`;
 
         const geminiRes = await callViaUS(env, geminiUrl, {
@@ -209,7 +218,8 @@ async function handleConvert(request, env) {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: {
                     temperature: isGemini3 ? 1.0 : 0.1,
-                    maxOutputTokens: 8192
+                    maxOutputTokens: 16384,
+                    ...(supportsThinking ? { thinkingConfig: { thinkingBudget: 1024 } } : {})
                 }
             }),
             signal: AbortSignal.timeout(45000)
@@ -223,6 +233,8 @@ async function handleConvert(request, env) {
                 message = 'Hệ thống AI đang quá tải hoặc hết hạn ngạch, vui lòng thử lại sau ít phút.';
             } else if (geminiRes.status === 401 || geminiRes.status === 403) {
                 message = 'Lỗi cấu hình xác thực dịch vụ AI.';
+            } else if (geminiRes.status === 504) {
+                message = 'Quá thời gian xử lý yêu cầu (timeout). Vui lòng thử lại với đoạn văn bản ngắn hơn.';
             }
             const status = (geminiRes.status >= 400 && geminiRes.status <= 599) ? geminiRes.status : 502;
             return jsonResponse({ error: message }, status);
@@ -314,7 +326,10 @@ async function handleShareCreate(request, env) {
         if (typeof text !== 'string' || text.trim().length === 0) {
             return jsonResponse({ error: 'Thiếu nội dung đề.' }, 400);
         }
-        text = text.normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        text = text.normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\r\n/g, '\n').replace(/[\r\u2028\u2029]/g, '\n');
+        if (text.trim().length === 0) {
+            return jsonResponse({ error: 'Thiếu nội dung đề.' }, 400);
+        }
         if (text.length > MAX_SHARE_CHARS) {
             return jsonResponse({ error: tooLargeMessage() }, 413);
         }
@@ -326,10 +341,24 @@ async function handleShareCreate(request, env) {
         const id = await makeShareId(title, text);
 
         try {
-
+            let shouldPut = false;
             const existing = await env.SHARES.get(id);
             if (existing === null) {
-                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text }), { expirationTtl: SHARE_TTL_SECONDS });
+                shouldPut = true;
+            } else {
+                try {
+                    const parsed = JSON.parse(existing);
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    if (!parsed || typeof parsed.c !== 'number' || (nowSec - parsed.c) > 7 * 86400) {
+                        shouldPut = true;
+                    }
+                } catch {
+                    shouldPut = true;
+                }
+            }
+            if (shouldPut) {
+                const nowSec = Math.floor(Date.now() / 1000);
+                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text, c: nowSec }), { expirationTtl: SHARE_TTL_SECONDS });
             }
         } catch (kvErr) {
             console.error('KV share error:', kvErr);
@@ -373,7 +402,16 @@ async function handleShareGet(id, env, request = null) {
             });
         }
 
-        const { text, title } = parseStoredShare(stored);
+        const { text, title, c } = parseStoredShare(stored);
+
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (c === null || nowSec - c > SHARE_RENEW_AFTER_SECONDS) {
+            try {
+                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text, c: nowSec }), { expirationTtl: SHARE_TTL_SECONDS });
+            } catch (renewErr) {
+                console.error('KV share renew error:', renewErr);
+            }
+        }
 
         return jsonResponse(
             { text, title },
@@ -405,16 +443,19 @@ function parseStoredShare(stored) {
     try {
         const obj = JSON.parse(stored);
         if (obj && obj.v === 1 && typeof obj.text === 'string') {
-            return { text: obj.text, title: cleanTitle(obj.title) };
+            return { text: obj.text, title: cleanTitle(obj.title), c: typeof obj.c === 'number' ? obj.c : null };
         }
     } catch (e) {  }
-    return { text: stored, title: '' };
+    return { text: stored, title: '', c: null };
 }
 
 async function handleSharePage(request, env, url) {
     if (!env.ASSETS) return new Response('Not Found', { status: 404 });
     const page = await env.ASSETS.fetch(new Request(`${url.origin}/`, { headers: { Accept: 'text/html' } }));
-    if (!page.ok) return new Response('Not Found', { status: 404 });
+    if (!page.ok) {
+        await page.body?.cancel();
+        return new Response('Not Found', { status: 404 });
+    }
 
     try {
         const id = (url.searchParams.get('s') || '').trim();
@@ -425,6 +466,7 @@ async function handleSharePage(request, env, url) {
                 const shareTitle = title || 'Bài tập trắc nghiệm';
                 const transformed = withShareMeta(page, shareTitle, `${url.origin}/share?s=${id}`);
                 if (request.method === 'HEAD') {
+                    await transformed.body?.cancel();
                     return new Response(null, { status: transformed.status, headers: transformed.headers });
                 }
                 return transformed;
@@ -439,6 +481,7 @@ async function handleSharePage(request, env, url) {
     pageHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     pageHeaders.set('Content-Security-Policy', CSP_POLICY);
     if (request.method === 'HEAD') {
+        await page.body?.cancel();
         return new Response(null, { status: page.status, headers: pageHeaders });
     }
     return new Response(page.body, { status: page.status, headers: pageHeaders });
@@ -489,7 +532,8 @@ function looksLikeQuiz(text) {
     const normalized = text.normalize('NFC');
     const qMatches = (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|q|bài|question|exercise|problem)\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+\b)|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/gim) || []).length
         + (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
-    const optMatches = (normalized.match(/^\s*(?:\*+\s*)?(?:\*{1,3}\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length;
+    const optMatches = (normalized.match(/^\s*(?:\*+\s*)?(?:\*{1,3}\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length
+        + (normalized.match(/(?:\t+|[ ]{2,})(?:\*+\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:])\s+/gi) || []).length;
 
     if (qMatches < 1 || optMatches < 2) return false;
 
