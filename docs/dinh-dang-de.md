@@ -259,6 +259,19 @@ câu 1: B
 câu 1 phương án D: 1
 ```
 
+### Lời giải có biến toán học: đáp án lấy theo "Chọn D", không theo chữ "a" trong lời giải
+```de
+Câu 1: Tìm a biết 2a = 4?
+A. 1
+B. 3
+C. 4
+D. 2
+Lời giải: Suy ra a = 2. Chọn D.
+```
+```ket-qua
+câu 1: D
+```
+
 ## 6. Bảng đáp án ở cuối đề
 
 ### Tiêu đề "Đáp án:" đứng riêng một dòng
@@ -676,6 +689,19 @@ D. Đồ thị đi qua điểm $(1; 2)$
 ```ket-qua
 câu 1: ĐSĐS
 câu 1 phương án C: $\lim_{x \to +\infty} y = +\infty$
+```
+
+### Công thức có (a + b) + (b + c) không bị tách thành nhiều phương án
+```de
+Câu 1: Rút gọn P
+A. P = (a + b) + (b + c) + (c + d) với a > 0
+*B. P = 0
+C. P = 1
+```
+```ket-qua
+câu 1 số phương án: 3
+câu 1: B
+câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
 ```
 
 ## 11. Giới hạn đã biết

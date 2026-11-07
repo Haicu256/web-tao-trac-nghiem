@@ -82,7 +82,7 @@ async function labelWithAI(plainLines) {
 
 async function runThroughAI(raw) {
     const strip = app.fn('stripFormattingTags');
-    const lines = app.fn('prepareLines')(raw);
+    const lines = app.fn('keepFirstExamCode')(app.fn('prepareLines')(raw)).lines;
     const chunks = app.fn('chunkLines')(lines, 8000);
     const labels = new Array(lines.length);
     const models = new Set();
@@ -96,7 +96,7 @@ async function runThroughAI(raw) {
         } else {
             try {
                 const out = await labelWithAI(chunk.lines.map(l => strip(l).trim()));
-                chunkLabels = out.labels;
+                chunkLabels = app.fn('reconcileLabels')(chunk.lines, out.labels);
                 cachedAll &&= out.cached;
                 if (out.model) models.add(out.model);
             } catch (err) {

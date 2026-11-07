@@ -247,10 +247,14 @@ function missingAiConfig(env) {
 
 // Gemini thỉnh thoảng báo "high demand" (503) hoặc chậm quá mức; mỗi model có sức chứa riêng,
 // nên khi model chính quá tải thì thử ngay model dự phòng (GEMINI_FALLBACK_MODEL) một lần.
-async function callGeminiWithFallback(env, prompt, extraGenerationConfig = {}) {
+function geminiModels(env) {
     const primaryModel = env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
     const fallbackModel = env.GEMINI_FALLBACK_MODEL?.trim();
-    const models = fallbackModel && fallbackModel !== primaryModel ? [primaryModel, fallbackModel] : [primaryModel];
+    return fallbackModel && fallbackModel !== primaryModel ? [primaryModel, fallbackModel] : [primaryModel];
+}
+
+async function callGeminiWithFallback(env, prompt, extraGenerationConfig = {}) {
+    const models = geminiModels(env);
     const attemptTimeoutMs = models.length > 1 ? GEMINI_ATTEMPT_TIMEOUT_MS : 45000;
 
     let geminiRes = null;
@@ -364,22 +368,42 @@ async function handleLabelLines(rawLines, env) {
     const missing = missingAiConfig(env);
     if (missing) return missing;
 
-    const { geminiRes, usedModel } = await callGeminiWithFallback(env, buildLabelPrompt(lines), {
-        responseMimeType: 'application/json',
-        responseSchema: LABEL_SCHEMA,
-    });
-    if (!geminiRes.ok) return geminiErrorResponse(geminiRes);
-    const reply = await readGeminiReply(geminiRes);
-    if (reply.error) return reply.error;
-
-    let parsed = null;
-    try { parsed = JSON.parse(reply.text); } catch { parsed = null; }
-    const doan = validateLabelRanges(parsed?.doan, lines.length);
-    if (!doan) {
-        console.warn('AI gắn nhãn sai khuôn:', usedModel, reply.truncated ? '(bị cắt)' : '', reply.text.slice(0, 300));
-        return jsonResponse({ error: 'AI gắn nhãn thiếu, trùng dòng hoặc sai định dạng. Vui lòng thử lại.' }, 502);
+    // Thử model chính rồi model dự phòng: chuyển model khi quá tải (429/5xx), quá thời gian, hoặc khi AI trả nhãn
+    // sai khuôn / bị cắt (HTTP 200 nhưng không dùng được).
+    const prompt = buildLabelPrompt(lines);
+    const config = { responseMimeType: 'application/json', responseSchema: LABEL_SCHEMA };
+    const models = geminiModels(env);
+    const attemptTimeoutMs = models.length > 1 ? GEMINI_ATTEMPT_TIMEOUT_MS : 45000;
+    for (let i = 0; i < models.length; i++) {
+        const isLast = i === models.length - 1;
+        let geminiRes;
+        try {
+            geminiRes = await requestGemini(env, models[i], prompt, attemptTimeoutMs, config);
+        } catch (attemptErr) {
+            if (!isTimeoutError(attemptErr) || isLast) throw attemptErr;
+            console.warn('Gắn nhãn: model quá thời gian, thử model dự phòng:', models[i]);
+            continue;
+        }
+        if (!geminiRes.ok) {
+            if (!isLast && FALLBACK_STATUSES.has(geminiRes.status)) {
+                await geminiRes.body?.cancel();
+                console.warn('Gắn nhãn: model lỗi', geminiRes.status, ', thử model dự phòng:', models[i]);
+                continue;
+            }
+            return geminiErrorResponse(geminiRes);
+        }
+        const reply = await readGeminiReply(geminiRes);
+        if (reply.error) {
+            if (!isLast) continue;
+            return reply.error;
+        }
+        let parsed = null;
+        try { parsed = JSON.parse(reply.text); } catch { parsed = null; }
+        const doan = validateLabelRanges(parsed?.doan, lines.length);
+        if (doan) return jsonResponse({ doan, model: models[i] });
+        console.warn('AI gắn nhãn sai khuôn:', models[i], reply.truncated ? '(bị cắt)' : '', reply.text.slice(0, 300));
     }
-    return jsonResponse({ doan, model: usedModel });
+    return jsonResponse({ error: 'AI gắn nhãn thiếu, trùng dòng hoặc sai định dạng. Vui lòng thử lại.' }, 502);
 }
 
 function buildLabelPrompt(lines) {

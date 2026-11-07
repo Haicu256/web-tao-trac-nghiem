@@ -221,3 +221,118 @@ test('chunkLines chỉ cắt ở đầu câu hỏi và giữ vị trí dòng g�
     }
     assert.equal(expectedStart, lines.length);
 });
+
+// ===== Lỗi do Gemini 4 Argon rà soát ngày 7/11/2026 tìm ra (và lỗi AI gắn nhầm "Câu N:") =====
+const stars = text => text.split('\n').filter(l => l.startsWith('*')).length;
+
+test('Argon #2: câu đúng/sai có cả 4 ý gạch chân thì cả 4 ý là Đúng', () => {
+    const r = parseAssembled(['Câu 1: Xét:', '⟦U⟧a) 1+1=2⟦/U⟧', '⟦U⟧b) 2+2=4⟦/U⟧', '⟦U⟧c) 3+3=6⟦/U⟧', '⟦U⟧d) 4+4=8⟦/U⟧'], 'TOOOO');
+    assert.equal(answerOf(r.questions[0]), 'ĐĐĐĐ');
+});
+
+test('Argon #2: câu đúng/sai có 2 ý in đậm cả nội dung thì 2 ý đó là Đúng', () => {
+    const r = parseAssembled(['Câu 1: Xét:', '⟦B⟧a) Ý một đúng⟦/B⟧', 'b) Ý hai', '⟦B⟧c) Ý ba đúng⟦/B⟧', 'd) Ý bốn'], 'TOOOO');
+    assert.equal(answerOf(r.questions[0]), 'ĐSĐS');
+});
+
+test('Argon #3: câu trắc nghiệm có 3 phương án tô màu không đoán đáp án', () => {
+    assert.equal(stars(build(['Câu 1: a?', '⟦CLR⟧A.⟦/CLR⟧ x', '⟦CLR⟧B.⟦/CLR⟧ y', '⟦CLR⟧C.⟦/CLR⟧ z', 'D. t'], 'QOOOO').text), 0);
+});
+
+test('Argon #3: câu trắc nghiệm có hai loại đánh dấu chỉ vào hai phương án khác nhau thì không đoán', () => {
+    assert.equal(stars(build(['Câu 1: a?', '⟦U⟧A. x⟦/U⟧', 'B. y', '⟦HL⟧C. z⟦/HL⟧', 'D. t'], 'QOOOO').text), 0);
+});
+
+test('Argon #3: chữ cái in đậm kiểu Markdown **A.** ở mọi phương án không phải đáp án', () => {
+    assert.equal(stars(build([...fn('prepareLines')('Câu 1: a?\n**A.** Huế\n**B.** Hà Nội\n**C.** Vinh')], 'QOOO').text), 0);
+});
+
+test('Argon #3: chỉ một phương án in đậm cả dòng kiểu Markdown thì đó là đáp án', () => {
+    const r = parseAssembled([...fn('prepareLines')('Câu 1: Thủ đô?\nA. Huế\n**B. Hà Nội**\nC. Vinh')], 'QOOO');
+    assert.equal(answerOf(r.questions[0]), 'B');
+});
+
+test('Argon #3: dấu nhân ở cuối dòng rồi xuống dòng không bị hiểu là đáp án', () => {
+    const r = build(['Câu 1: Phép tính nào đúng?', 'A. 2 *', '3 = 5', 'B. 2 * 3 = 6'], 'QOCO');
+    assert.equal(stars(r.text), 0);
+    assert.deepEqual([...r.unanswered], [1]);
+});
+
+test('Argon #3: dấu (*) ở dòng nối tiếp của phương án vẫn được tính', () => {
+    const r = parseAssembled(['Câu 1: Chọn câu đúng', 'A. Dòng một', 'của phương án A (*)', 'B. Phương án B'], 'QOCO');
+    assert.equal(answerOf(r.questions[0]), 'A');
+});
+
+test('Argon #4: lời giải nhiều dòng không lọt vào đề bài, đáp án lấy theo "Chọn D"', () => {
+    const lines = ['Câu 1: Tìm a biết 2a = 4?', 'A. 1', 'B. 3', 'C. 4', 'D. 2', 'Lời giải:', 'Suy ra a = 2. Chọn D.'];
+    assert.deepEqual([...fn('labelLinesLocally')(lines)], labels('QOOOODD'));
+    const r = parseAssembled(lines, 'QOOOODD');
+    assert.equal(answerOf(r.questions[0]), 'D');
+    assert.ok(!plainText(r.questions[0].title).includes('Suy ra'));
+});
+
+test('Argon #4: dòng đáp án không có từ khoá vẫn được hiểu là lời giải, không nối vào phương án D', () => {
+    const r = parseAssembled(['Câu 1: 2+2?', 'A. 3', 'B. 4', 'C. 5', 'D. 6', 'Ta có 2 + 2 = 4 nên chọn B.'], 'QOOOOD');
+    assert.equal(answerOf(r.questions[0]), 'B');
+    assert.equal(plainText(r.questions[0].options[3].text), '6');
+});
+
+test('Argon #5: dòng bắt đầu bằng "Phần lớn", "Phần mềm" không phải tiêu đề phần', () => {
+    assert.deepEqual([...fn('labelLinesLocally')(['Câu 1: Đặc điểm địa hình?', 'Phần lớn diện tích là đồi núi.', 'A. Đúng', '*B. Sai'])], labels('QSOO'));
+    assert.deepEqual([...fn('labelLinesLocally')(['Câu 1: Phần mềm nào?', 'A. Word', '*B. Excel', 'Phần mềm diệt virus'])], labels('QOOC'));
+});
+
+test('Argon #6: đề có hai mã đề chỉ giữ mã đề đầu', () => {
+    const lines = ['Mã đề 101', 'Câu 1: a?', 'A. x', '*B. y', 'Mã đề 102', 'Câu 1: a?', '*A. y', 'B. x'];
+    const r = fn('keepFirstExamCode')(lines);
+    assert.deepEqual([...r.lines], lines.slice(0, 4));
+    assert.equal(r.cut, true);
+    assert.equal(fn('keepFirstExamCode')(lines.slice(0, 4)).cut, false);
+});
+
+test('Argon #8: đoạn văn đọc hiểu được AI gắn là đầu câu vẫn đi vào câu kế tiếp', () => {
+    const r = build(['Câu 4: 1+1?', 'A. 1', '*B. 2', 'Đọc đoạn văn sau và trả lời câu 5:', 'Nước sôi ở 100 độ C.', 'Câu 5: Nước sôi ở mấy độ?', '*A. 100', 'B. 50'], 'QOOQSQOO');
+    assert.equal(r.withoutOptions, 0);
+    assert.match(r.text, /Câu 5: Đọc đoạn văn sau và trả lời câu 5:\nNước sôi ở 100 độ C\.\nNước sôi ở mấy độ\?/);
+});
+
+test('Argon #9: giữ số câu thập phân và số La Mã', () => {
+    assert.deepEqual(build(['Câu 1.1: a?', 'A. 1', '*B. 2', 'Câu 1.2: b?', '*A. 3', 'B. 4'], 'QOOQOO').text.match(/^Câu [^:]+:/gm), ['Câu 1.1:', 'Câu 1.2:']);
+    assert.equal(build(['Câu II: a?', 'A. 1', '*B. 2'], 'QOO').text.split('\n')[0], 'Câu II: a?');
+});
+
+test('Argon #10: chunkLines không cắt ở dòng phát biểu "1. ..." hay dòng bảng đáp án "15. B"', () => {
+    const lines = ['Câu 1: ' + 'x'.repeat(60), 'A. a', 'B. b', 'Câu 2: Cho các phát biểu:', '1. Phát biểu thứ nhất khá dài', '2. Phát biểu hai', 'A. 1', 'B. 2', 'ĐÁP ÁN', '1. A', '2. B'];
+    for (const c of fn('chunkLines')(lines, 100)) assert.match(c.lines[0], /^(Câu \d+:|ĐÁP ÁN)/, c.lines[0]);
+});
+
+test('Argon #11: phương án không có chữ cái, chỉ gạch chân một từ đầu dòng thì không phải đáp án', () => {
+    assert.equal(stars(build(['Câu 1: Câu nào sai?', '- ⟦U⟧Anh⟦/U⟧ trai tôi đang học ở trường đại học quốc gia', '- Chị gái tôi đang làm việc tại ngân hàng', '- Mẹ tôi là giáo viên trường trung học'], 'QOOO').text), 0);
+});
+
+test('AI gắn nhầm "Câu N:" là nội dung câu hỏi thì code sửa lại thành câu mới (đề THPT 2022)', () => {
+    const lines = ['Câu 83: a?', 'A. 1', 'B. 2', 'Câu 84: b?', 'A. 3', 'B. 4', 'Câu 9 trong sách: không phải câu mới'];
+    const fixed = fn('reconcileLabels')(lines, labels('QOOSOOS'));
+    assert.deepEqual([...fixed], labels('QOOQOOS'));
+});
+
+test('AI gắn "phuong_an" cho dòng không có chữ cái giữa các phương án có chữ cái thì coi là dòng nối tiếp', () => {
+    const lines = ['Câu 1: a?', 'A. Cây hoa đỏ : 3 cây', 'hoa đỏ : 5 cây hoa trắng.', 'B. Khác'];
+    assert.deepEqual([...fn('reconcileLabels')(lines, labels('QOOO'))], labels('QOCO'));
+});
+
+test('Argon #1: bảng đáp án có tiêu đề "ĐÁP ÁN TRẮC NGHIỆM" vẫn được áp', () => {
+    const r = parseAssembled(['Câu 1: Pháp?', 'A. Berlin', 'B. Paris', 'Câu 2: Ý?', 'A. Rome', 'B. Paris', 'ĐÁP ÁN TRẮC NGHIỆM', '1.B 2.A'], 'QOOQOOKK');
+    assert.deepEqual([...r.questions].map(answerOf), ['B', 'A']);
+});
+
+test('Argon #1: bảng đáp án câu đúng/sai "Câu 1: ĐSĐS" vẫn được áp', () => {
+    const r = parseAssembled(['Câu 1: Xét các phát biểu', 'a) Phát biểu một', 'b) Phát biểu hai', 'c) Phát biểu ba', 'd) Phát biểu bốn', 'BẢNG ĐÁP ÁN PHẦN II', 'Câu 1: ĐSĐS'], 'TOOOOKK');
+    assert.equal(answerOf(r.questions[0]), 'ĐSĐS');
+});
+
+test('"Đáp án:" rồi xuống dòng chữ cái đáp án vẫn được đọc (không thêm tiền tố vào dòng chữ cái)', () => {
+    const r = parseAssembled(['Câu 1: Thủ đô?', 'A. Huế', 'B. Hà Nội', 'Đáp án:', 'B'], 'QOODD');
+    assert.equal(answerOf(r.questions[0]), 'B');
+    assert.deepEqual([...r.unanswered], []);
+});

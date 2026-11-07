@@ -348,3 +348,12 @@ test('API không tồn tại trả 404 dạng JSON', async () => {
     assert.equal(res.status, 404);
     assert.ok((await res.json()).error);
 });
+
+test('Argon #12: model chính trả nhãn sai khuôn thì worker thử model dự phòng', async () => {
+    const bad = labelReply([{ tu: 1, den: 2, loai: 'bo_qua' }]);
+    const calls = fakeGeminiSequence([{ status: 200, body: bad }, { status: 200, body: labelReply(GOOD_LABELS) }]);
+    const res = await worker.fetch(post('/api/convert', { lines: LINES }), FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+    assert.equal((await res.json()).model, 'gemini-3.5-flash-lite');
+});
