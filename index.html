@@ -1583,16 +1583,19 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
             const validQuestions = parsedQuestions.filter(q => q.options.length >= 2);
             const droppedNoOptionCount = parsedQuestions.length - validQuestions.length;
-            const withCorrectAnswer = validQuestions.filter(q => q.type === 'true_false' || q.options.some(o => o.isCorrect));
-            const droppedMCCount = validQuestions.filter(q => q.type !== 'true_false' && !q.options.some(o => o.isCorrect)).length;
-            const unstarredTFCount = validQuestions.filter(q => q.type === 'true_false' && !q.hasExplicitTFAnswer && !q.options.some(o => o.isCorrect)).length;
+            // Câu đúng/sai phải có bằng chứng (dấu * hoặc dòng/bảng đáp án như "Đáp án: SSSS"); không có thì bỏ như câu
+            // trắc nghiệm thiếu đáp án, không tự coi mọi ý là Sai (quyết định ngày 7/11/2026).
+            const hasAnswer = q => q.options.some(o => o.isCorrect) || (q.type === 'true_false' && q.hasExplicitTFAnswer);
+            const withCorrectAnswer = validQuestions.filter(hasAnswer);
+            const droppedMCCount = validQuestions.filter(q => q.type !== 'true_false' && !hasAnswer(q)).length;
+            const unstarredTFCount = validQuestions.filter(q => q.type === 'true_false' && !hasAnswer(q)).length;
             if (withCorrectAnswer.length > 0) originalQuestions = withCorrectAnswer;
 
             const dropMsgs = [];
             const nonStandardTFCount = withCorrectAnswer.filter(q => q.type === 'true_false' && q.options.length !== 4).length;
             if (droppedMCCount > 0) dropMsgs.push(`${droppedMCCount} câu trắc nghiệm thiếu đáp án *`);
             if (droppedNoOptionCount > 0) dropMsgs.push(`${droppedNoOptionCount} câu không có phương án`);
-            if (unstarredTFCount > 0) dropMsgs.push(`${unstarredTFCount} câu Đúng/Sai không có dấu * (mặc định các ý đều là Sai)`);
+            if (unstarredTFCount > 0) dropMsgs.push(`${unstarredTFCount} câu Đúng/Sai chưa có đáp án`);
             if (nonStandardTFCount > 0) dropMsgs.push(`${nonStandardTFCount} câu Đúng/Sai không có 4 ý (chấm theo tỷ lệ)`);
 
             if (withCorrectAnswer.length > 0) {

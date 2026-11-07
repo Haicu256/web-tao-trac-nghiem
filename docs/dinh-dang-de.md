@@ -458,13 +458,44 @@ câu 1: ĐSĐS
 câu 1 phương án D: Hàm số đồng biến trên R
 ```
 
-### Câu đúng/sai không có dấu * vẫn giữ, mọi ý coi là Sai
+### Câu đúng/sai không có đáp án bị bỏ, giống câu trắc nghiệm thiếu đáp án
+Web không tự coi mọi ý là Sai, vì như vậy là chấm theo đáp án không có trong đề (quyết định ngày 7/11/2026).
 ```de
 câu hỏi đúng sai: Câu 1: Xét các mệnh đề
 A. Mệnh đề p
 B. Mệnh đề q
 C. Mệnh đề r
 D. Mệnh đề s
+```
+```ket-qua
+không đọc được
+```
+
+### Câu đúng/sai không đáp án bị bỏ, câu khác trong đề vẫn giữ
+```de
+câu hỏi đúng sai: Câu 1: Xét các mệnh đề
+A. Mệnh đề p
+B. Mệnh đề q
+C. Mệnh đề r
+D. Mệnh đề s
+Câu 2: Thủ đô?
+A. Huế
+*B. Hà Nội
+```
+```ket-qua
+số câu: 1
+câu 1 loại: trắc nghiệm
+câu 1: B
+```
+
+### Câu đúng/sai mà cả 4 ý đều Sai thì ghi "Đáp án: SSSS"
+```de
+câu hỏi đúng sai: Câu 1: Xét các mệnh đề
+A. Mệnh đề p
+B. Mệnh đề q
+C. Mệnh đề r
+D. Mệnh đề s
+Đáp án: SSSS
 ```
 ```ket-qua
 số câu: 1
