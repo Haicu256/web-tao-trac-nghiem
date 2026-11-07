@@ -84,10 +84,10 @@ function makeBrowser() {
     return browser;
 }
 
-export function loadApp() {
+export function loadApp(extraGlobals = {}) {
     const html = fs.readFileSync(indexPath, 'utf8');
     const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)(?![^>]*ld\+json)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
-    const context = vm.createContext(makeBrowser());
+    const context = vm.createContext(Object.assign(makeBrowser(), extraGlobals));
     for (const code of scripts) vm.runInContext(code, context);
     const run = code => vm.runInContext(code, context);
     return {

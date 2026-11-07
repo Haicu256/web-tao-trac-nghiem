@@ -1,0 +1,14 @@
+Câu 1: Nội dung câu 1
+A. một
+*B. hai
+C. ba
+D. bốn
+
+Câu 2: Nội dung câu 2
+A. một
+B. hai
+*C. ba
+D. bốn
+
+---HẾT---
+Giáo viên ra đề: Nguyễn Văn A

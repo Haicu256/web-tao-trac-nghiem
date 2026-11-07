@@ -10,3 +10,7 @@ node_modules/
 
 # Cấu hình Claude Code riêng của máy này (có đường dẫn tuyệt đối)
 .claude/
+
+# Đề thật của người dùng và cache khi đo độ chính xác
+test_exams/private/
+test_exams/.cache/

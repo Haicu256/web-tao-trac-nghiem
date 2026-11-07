@@ -47,6 +47,8 @@ const CASES = [
     ['độ', r('30°'), '30^{\\circ}'],
     ['chữ tiếng Việt trong công thức', `${r('x')}${textRun(' với ')}${r('x>0')}`, 'x\\text{ với }x>0'],
     ['ký tự đặc biệt của LaTeX', r('{a}%'), '\\{a\\}\\%'],
+    ['công thức gõ dạng tuyến tính x^2 (Word chưa dựng lại)', r('x^2+1'), 'x^2+1'],
+    ['chỉ số gõ dạng tuyến tính a_n', r('a_n'), 'a_n'],
     ['phần tử lạ thì lấy nội dung bên trong', `<m:box>${e(r('y'))}</m:box>`, 'y'],
 ];
 
