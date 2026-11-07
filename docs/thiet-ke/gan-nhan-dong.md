@@ -50,6 +50,19 @@ dòng "Đáp án: B", lời giải "Chọn B", bảng đáp án) vẫn dùng đ�
 - Gạch chân / tô sáng / chữ màu: thẻ nào chỉ có ở một số phương án (không phải tất cả) của câu thì các phương án đó
   là đáp án. In đậm chỉ xét khi không có ba loại trên, và phải bọc nội dung chứ không chỉ chữ cái.
 - Câu không có bằng chứng thì không có đáp án; trình duyệt liệt kê các câu đó để người dùng tự thêm `*`.
+- Câu đúng/sai chỉ có đáp án khi **mọi ý** đều được nói Đ hay S (có thể trên nhiều dòng); ý không được nhắc tới không
+  tự coi là Sai, trừ kiểu liệt kê các ý Đúng ("Đáp án: a, c").
+- Lời giải chỉ cho đáp án khi mọi lời khẳng định ("Chọn C", "Đáp án đúng là C") chỉ cùng một chữ cái; chữ cái đứng trước
+  "sai", sau "không/loại", trong danh sách "A, B" hay là biến ("Vậy a = 2") không tính.
+- Bảng đáp án của đề nhiều phần đánh số lại (Phần I câu 1-18, Phần II câu 1-4) được chia theo phần; không chia khớp được
+  thì câu trùng số không nhận đáp án từ bảng.
+
+## Sửa nhãn AI sai bằng quy tắc (`reconcileLabels`)
+
+Prompt không bảo đảm được, nên các lỗi nhãn thấy rõ được sửa bằng code: dòng "Câu N:" đúng số kế tiếp (kể cả ở đầu phần
+gửi AI sau) là câu mới; dòng trông như phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi
+hay phương án; tiêu đề/chân trang trang PDF ("Trang 2/4 - Mã đề 101") luôn bỏ qua. `npm run fuzz -- labels` thử hàng
+nghìn dãy nhãn ngẫu nhiên trên đề không có đáp án để xem còn đường nào nhãn tạo ra được đáp án.
 
 ## Không đổi
 

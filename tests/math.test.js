@@ -162,3 +162,20 @@ test('ensureKatex tải KaTeX từ cdnjs có SRI, đúng phiên bản đã test'
     await loading;
     app.setGlobal('katex', undefined);
 });
+
+test('replaceOfficeMath giữ định dạng chung của công thức (tô sáng, màu, gạch chân, in đậm dùng để đánh dấu đáp án)', () => {
+    const doc = wordDoc('<w:p><w:r><w:t xml:space="preserve">B. </w:t></w:r><m:oMath><m:r><w:rPr><w:highlight w:val="yellow"/><w:b/></w:rPr><m:t>x=</m:t></m:r><m:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><m:t>2</m:t></m:r></m:oMath></w:p>');
+    app.fn('replaceOfficeMath')(doc);
+    const xml = new XMLSerializer().serializeToString(doc);
+    assert.match(xml, /<w:r><w:rPr><w:highlight w:val="yellow"\/><\/w:rPr><w:t xml:space="preserve">\$x=2\$<\/w:t><\/w:r>/);
+});
+
+test('renderMathInHtml không coi giá tiền viết sau số ("5$, 6$") là công thức', () => {
+    for (const s of ['Giá 5$, 6$ và 8$', 'Mua 2 cái giá 10$ và 20$']) assert.equal(render(s), s);
+});
+
+test('replaceOfficeMath chỉ giữ định dạng khi mọi phần của công thức cùng một giá trị (đỏ một chữ không phải cả công thức)', () => {
+    const doc = wordDoc('<w:p><m:oMath><m:r><w:rPr><w:color w:val="FF0000"/></w:rPr><m:t>x</m:t></m:r><m:r><w:rPr><w:color w:val="000000"/></w:rPr><m:t>+y+z=0</m:t></m:r></m:oMath></w:p>');
+    app.fn('replaceOfficeMath')(doc);
+    assert.doesNotMatch(new XMLSerializer().serializeToString(doc), /FF0000/);
+});

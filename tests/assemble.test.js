@@ -336,3 +336,159 @@ test('"Đáp án:" rồi xuống dòng chữ cái đáp án vẫn được đọ
     assert.equal(answerOf(r.questions[0]), 'B');
     assert.deepEqual([...r.unanswered], []);
 });
+
+// Đường chuyển file đầy đủ với bộ gắn nhãn dự phòng, như convertRawFile khi không gọi được AI.
+function convertLocally(raw) {
+    const exam = fn('keepFirstExamCode')(fn('prepareLines')(raw));
+    const out = fn('assembleQuizText')(exam.lines, fn('labelLinesLocally')(exam.lines));
+    const parsed = app.parse(out.text);
+    // Mảng tạo trong node:vm khác "realm" nên chép ra mảng thường để so sánh chặt được.
+    return { ...out, cut: exam.cut, ok: parsed.ok, questions: [...parsed.questions] };
+}
+
+test('Tiêu đề trang lặp lại cùng mã đề (chép từ PDF) không cắt đề và không dính vào phương án', () => {
+    const r = convertLocally('Mã đề thi 101\nCâu 1: Một?\nA. x\n*B. y\nC. z\nD. t\nTrang 1/3 - Mã đề 101\nCâu 2: Hai?\n*A. x\nB. y\nMã đề thi 101 - Trang 2/3\nC. z\nD. t\nMã đề thi 101                Trang 3/3\nCâu 3: Ba?\nA. x\nB. y\n*C. z\nD. t');
+    assert.equal(r.cut, false);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A', 'C']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4, 4]);
+    assert.equal(plainText(r.questions[0].options[3].text), 't');
+    assert.equal(plainText(r.questions[1].options[1].text), 'y');
+});
+
+test('Mã đề xuất hiện sau khi đề đã bắt đầu (chỉ có ở chân trang 1) mà số câu chạy tiếp thì không cắt', () => {
+    const r = convertLocally('Câu 1: Một?\nA. x\n*B. y\nMã đề 101\nCâu 2: Hai?\n*A. x\nB. y');
+    assert.equal(r.cut, false);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+});
+
+test('Không có mã đề đầu, gặp mã đề rồi số câu bắt đầu lại từ 1 thì là đề thứ hai', () => {
+    const r = convertLocally('Câu 1: Một?\nA. x\n*B. y\nCâu 2: Hai?\n*A. x\nB. y\nMã đề 102\nCâu 1: Hai?\nA. y\n*B. x');
+    assert.equal(r.cut, true);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+});
+
+test('Danh sách (a)/(b)/(c) và a)/b)/c) trong đề bài không thành phương án (đường chuyển file)', () => {
+    const r = convertLocally('Câu 1: Cho các thí nghiệm sau:\n(a) Cho Na vào nước.\n(b) Cho Fe vào dung dịch HCl.\n(c) Cho Cu vào dung dịch HCl.\nSố thí nghiệm có khí thoát ra là\nA. 1\n*B. 2\nC. 3\nD. 0\nCâu 2: Cho các chất sau:\na) NaCl\nb) HCl\nc) NaOH\nCó bao nhiêu chất là axit?\n*A. 1\nB. 2\nC. 3\nD. 0');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4]);
+    const title = plainText(r.questions[0].title);
+    for (const part of ['Cho Na vào nước.', 'Cho Cu vào dung dịch HCl.', 'Số thí nghiệm có khí thoát ra là']) assert.ok(title.includes(part), title);
+});
+
+test('Đáp án đúng/sai hai dòng và lời giải từng ý vẫn đọc đúng sau khi dựng đề (đường chuyển file)', () => {
+    const stmts = 'a) Hàm số chẵn\nb) Đồ thị đi qua điểm (1; 2)\nc) Hàm số có cực tiểu\nd) Hàm số đồng biến trên R';
+    const r = convertLocally(`câu hỏi đúng sai: Câu 1: Cho hàm số y = x².\n${stmts}\nĐáp án: a) Đúng, b) Sai\nc) Đúng, d) Sai\ncâu hỏi đúng sai: Câu 2: Cho hàm số y = x².\n${stmts}\nLời giải:\na) Đúng. Vì f(-x) = f(x).\nb) Sai. Vì f(1) = 1.\nc) Đúng. Vì hàm số đạt cực tiểu tại x = 0.\nd) Sai. Vì hàm số nghịch biến trên (-∞; 0).`);
+    assert.deepEqual(r.questions.map(answerOf), ['ĐSĐS', 'ĐSĐS']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4]);
+});
+
+test('Ý đúng/sai có f(x) hay "1 s" không bị cắt (đường chuyển file)', () => {
+    const r = convertLocally('câu hỏi đúng sai: Câu 1: Cho hàm số y = f(x).\n*a) Hàm số liên tục trên R\nb) Hàm số có 2 cực trị\n*c) Trên khoảng (1; 2) f(x) > 0\nd) Đồ thị đi qua gốc tọa độ');
+    assert.deepEqual(r.questions.map(answerOf), ['ĐSĐS']);
+});
+
+test('"**" trong biểu thức (x**2, 2**3) không phải in đậm Markdown, không thành đáp án', () => {
+    const r = convertLocally('Câu 1: Biểu thức nào bằng x bình phương?\nA. x**2\nB. x**2 + y**2\nC. 2**x\nD. x*2');
+    assert.deepEqual([...r.unanswered], [1]);
+    assert.ok(!/^\*/m.test(r.text), r.text);
+    assert.ok(r.text.includes('B. x**2 + y**2'), r.text);
+});
+
+test('Các bước "1. … 2. …" trong lời giải không thành câu hỏi mới, đáp án "Vậy chọn B" vẫn được đọc', () => {
+    const r = convertLocally('Câu 1: a?\nA. a\nB. b\nC. c\nD. d\nLời giải\nTa thực hiện:\n1. Đặt t = x\n2. Giải phương trình\nVậy chọn B.\nCâu 2: b?\nA. a\nB. b\nChọn A');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+    assert.deepEqual([...r.unanswered], []);
+});
+
+test('Đề đánh số trần: câu mới ngay sau dòng đáp án vẫn là câu mới', () => {
+    const r = convertLocally('1. Một?\nA. x\nB. y\nĐáp án: B\n2. Hai?\nA. x\nB. y\nĐáp án: A');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+});
+
+test('reconcileLabels biết số câu của phần trước nên sửa được dòng đầu của phần sau', () => {
+    const out = fn('reconcileLabels')(['Câu 66: Hỏi?', 'A. a', 'B. b'], ['noi_dung_cau_hoi', 'phuong_an', 'phuong_an'], 65);
+    assert.equal(out[0], 'cau_hoi');
+});
+
+test('chunkLines không cắt ở dòng bảng đáp án "Câu 35: D"', () => {
+    const lines = [];
+    for (let n = 1; n <= 40; n++) lines.push(`Câu ${n}: Nội dung câu hỏi số ${n} khá dài để chia phần?`, 'A. một', 'B. hai', 'C. ba', 'D. bốn');
+    lines.push('ĐÁP ÁN');
+    for (let n = 1; n <= 40; n++) lines.push(`Câu ${n}: ${'ABCD'[n % 4]}`);
+    // Ngưỡng 3500 làm điểm cắt thường rơi vào giữa bảng đáp án (nhưng chưa tới giới hạn cứng 1,5 lần).
+    const chunks = fn('chunkLines')(lines, 3500);
+    for (const c of chunks.slice(1)) assert.ok(!/^Câu \d+: [A-D]$/.test(c.lines[0]), c.lines[0]);
+});
+
+test('Phương án cách nhau bằng tab rồi dấu cách vẫn được tách', () => {
+    const lines = fn('prepareLines')('Câu 1: 2+2?\nA. 3\t B. 4\t C. 5\t D. 6');
+    assert.deepEqual([...lines], ['Câu 1: 2+2?', 'A. 3', 'B. 4', 'C. 5', 'D. 6']);
+});
+
+test('Phương án viết liền số sau chữ cái ("A.2", "D.50") vẫn là phương án', () => {
+    const r = convertLocally('Câu 1: Giá trị của x?\nA.2\nB.3\nC.4\n*D.50\nCâu 2: Tổng?\nA.2    B.3    C.4    *D.50');
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4]);
+    assert.deepEqual(r.questions.map(answerOf), ['D', 'D']);
+});
+
+test('Dấu * sát chữ cái ("B*.", "(*B)") và "(*)" ngay sau chữ cái vẫn là đáp án (đường chuyển file)', () => {
+    for (const line of ['B*. Hà Nội', '(*B) Hà Nội', 'B. (*) Hà Nội']) {
+        const r = convertLocally(`Câu 1: Thủ đô?\nA. Huế\n${line}\nC. Vinh\nD. Đà Nẵng`);
+        assert.deepEqual(r.questions.map(answerOf), ['B'], line);
+        assert.deepEqual([...r.unanswered], [], line);
+    }
+});
+
+test('Bảng đáp án theo phần "Phần 1: 1.A 2.B" vẫn được đọc (đường chuyển file)', () => {
+    const r = convertLocally('Câu 1: Một?\nA. x\nB. y\nCâu 2: Hai?\nA. x\nB. y\nĐÁP ÁN\nPhần 1: 1.A 2.B');
+    assert.deepEqual(r.questions.map(answerOf), ['A', 'B']);
+});
+
+test('Phương án "Cả a, b, c đều đúng" (chữ thường) không bị xáo trộn chỗ', () => {
+    app.parse('Câu 1: Chọn?\nA. x\nB. y\nC. z\n*D. Cả a, b, c đều đúng');
+    assert.equal(app.run('originalQuestions[0].hasLetterRef'), true);
+});
+
+test('AI gắn câu hỏi chính sau bảng số liệu ("Vẽ biểu đồ…") là đầu câu mới thì code nối lại vào câu (đề Địa thật)', () => {
+    const lines = ['Câu 2. Cho bảng số liệu sau đây:', 'Năm 1990 1995 2000', 'GDP 41,9 228,9 441,7', 'Vẽ biểu đồ thích hợp nhất thể hiện sự thay đổi GDP là?', 'A. Biểu đồ Miền', '*B. Biểu đồ Cột', 'C. Biểu đồ Tròn', 'D. Biểu đồ Đường'];
+    const fixed = fn('reconcileLabels')(lines, labels('QSSQOOOO'));
+    const out = fn('assembleQuizText')(lines, fixed);
+    const parsed = app.parse(out.text);
+    assert.equal(parsed.questions.length, 1);
+    assert.equal(answerOf(parsed.questions[0]), 'B');
+    assert.ok(plainText(parsed.questions[0].title).includes('GDP 41,9'), out.text);
+    assert.equal(out.withoutOptions, 0);
+});
+
+test('"***B. Hà Nội***" (đậm nghiêng Markdown) vẫn là đáp án B ở đường chuyển file', () => {
+    const r = convertLocally('Câu 1: Thủ đô của Việt Nam là gì?\nA. Huế\n***B. Hà Nội***\nC. Đà Nẵng\nD. Cần Thơ');
+    assert.deepEqual(r.questions.map(answerOf), ['B']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4]);
+});
+
+test('Câu đánh số trần ngay sau dòng đáp án, có danh sách "1) 2)" trong đề bài, giữ đủ đề bài', () => {
+    const r = convertLocally('1. Câu một?\nA. x\nB. y\nĐáp án: B\n2. Cho các phát biểu sau:\n1) Phát biểu một.\n2) Phát biểu hai.\nSố phát biểu đúng là:\nA. 1\n*B. 2');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'B']);
+    const title = plainText(r.questions[1].title);
+    for (const part of ['Cho các phát biểu sau:', 'Phát biểu một.', 'Số phát biểu đúng là:']) assert.ok(title.includes(part), title);
+});
+
+test('reconcileLabels không đổi câu hỏi "C. Mác và Ph. Ăng-ghen…" (AI gắn đúng là câu) thành phương án', () => {
+    const lines = ['Thủ đô của Việt Nam là gì?', 'A. Huế', '*B. Hà Nội', 'C. Đà Nẵng', 'D. Cần Thơ', 'C. Mác và Ph. Ăng-ghen đã sáng lập học thuyết nào?', '*A. Chủ nghĩa xã hội khoa học', 'B. Thuyết tương đối', 'C. Thuyết tiến hóa', 'D. Định luật vạn vật hấp dẫn'];
+    const out = fn('reconcileLabels')(lines, labels('QOOOOQOOOO'));
+    assert.equal(out[5], 'cau_hoi');
+    // AI gắn nhầm "B. 2" (phương án tiếp theo của dãy) là đầu câu thì vẫn sửa thành phương án.
+    assert.equal(fn('reconcileLabels')(['Câu 1: x?', 'A. 1', 'B. 2', 'C. 3'], labels('QOQO'))[2], 'phuong_an');
+});
+
+test('Cả câu một dòng kèm "Đáp án đúng: B" cuối dòng: có đáp án và không bị báo "chưa có đáp án"', () => {
+    const r = convertLocally('Câu 1: 2 + 2 = ?\tA. 3\tB. 4\tC. 5\tD. 6\tĐáp án đúng: B');
+    assert.deepEqual(r.questions.map(answerOf), ['B']);
+    assert.deepEqual([...r.unanswered], []);
+});
+
+test('Chân trang "Trang 1/2 - Mã đề 101" rồi Phần II đánh số lại: không cắt đề (đường chuyển file)', () => {
+    const r = convertLocally('PHẦN I. TRẮC NGHIỆM\nCâu 1: Một?\nA. x\n*B. y\nCâu 2: Hai?\n*A. x\nB. y\nTrang 1/2 - Mã đề 101\nPHẦN II. ĐÚNG SAI\nMã đề 101 - Trang 2/2\ncâu hỏi đúng sai: Câu 1: Ba?\n*a) Ý một\nb) Ý hai\n*c) Ý ba\nd) Ý bốn');
+    assert.equal(r.cut, false);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A', 'ĐSĐS']);
+});

@@ -567,6 +567,19 @@ async function handleShareGet(id, env, request = null) {
             );
         }
 
+        const { text, title, c } = parseStoredShare(stored);
+
+        // Gia hạn trước khi trả 304: trình duyệt hay hỏi lại bằng If-None-Match, link dùng hằng ngày vẫn phải được gia hạn.
+
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (c === null || nowSec - c > SHARE_RENEW_AFTER_SECONDS) {
+            try {
+                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text, c: nowSec }), { expirationTtl: SHARE_TTL_SECONDS });
+            } catch (renewErr) {
+                console.error('KV share renew error:', renewErr);
+            }
+        }
+
         const clientEtag = request?.headers?.get('if-none-match');
         if (clientEtag && (clientEtag.trim() === `"${id}"` || clientEtag.trim() === id)) {
             return new Response(null, {
@@ -576,17 +589,6 @@ async function handleShareGet(id, env, request = null) {
                     'ETag': `"${id}"`
                 }
             });
-        }
-
-        const { text, title, c } = parseStoredShare(stored);
-
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (c === null || nowSec - c > SHARE_RENEW_AFTER_SECONDS) {
-            try {
-                await env.SHARES.put(id, JSON.stringify({ v: 1, title, text, c: nowSec }), { expirationTtl: SHARE_TTL_SECONDS });
-            } catch (renewErr) {
-                console.error('KV share renew error:', renewErr);
-            }
         }
 
         return jsonResponse(

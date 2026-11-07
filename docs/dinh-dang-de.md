@@ -54,6 +54,8 @@ câu 1: F
 ```
 
 ### Nhiều đáp án đúng
+Khi làm bài, chọn trúng một trong các đáp án đúng là được điểm; lúc tạo đề web báo "Câu 1 có nhiều đáp án đúng" để giáo
+viên kiểm tra lại (quyết định ngày 7/11/2026).
 ```de
 Câu 1: Số nào là số nguyên tố?
 *A. 2
@@ -245,6 +247,136 @@ câu 1: B
 câu 1 số phương án: 4
 ```
 
+### Dòng đáp án in đậm kiểu Markdown (chép từ chatbot) vẫn đọc được
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+**Đáp án: B**
+Câu 2: Sông dài nhất?
+A. Sông Hồng
+B. Sông Đà
+C. Sông Mê Kông
+D. Sông Mã
+**Đáp án:** C
+Câu 3: Núi cao nhất?
+A. Fansipan
+B. Bà Đen
+C. Ngọc Linh
+D. Tây Côn Lĩnh
+- Đáp án: **A**
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3: A
+```
+
+### Đáp án ghi cùng dòng phương án cuối, cách bằng tab
+```de
+Câu 1: 2 + 2 = ?
+A. 3
+B. 4
+C. 5
+D. 6	Đáp án đúng: B
+```
+```ket-qua
+câu 1: B
+câu 1 phương án D: 6
+```
+
+### Dòng đáp án giải thích "C đúng vì phương án A sai" vẫn là câu trắc nghiệm
+```de
+Câu 1: Chọn phát biểu đúng:
+A. Một
+B. Hai
+C. Ba
+D. Bốn
+Đáp án: C đúng vì phương án A sai, B sai, D sai.
+Câu 2: Chọn phát biểu đúng:
+A. Một
+B. Hai
+C. Ba
+D. Bốn
+Đáp án: C đúng vì phương án A sai.
+```
+```ket-qua
+số câu: 2
+câu 1 loại: trắc nghiệm
+câu 1: C
+câu 2: C
+```
+
+### Lời giải xét từng phương án ("Xét phương án A: …") lấy đáp án theo "Chọn C"
+"Phương án A" chỉ là nhắc tới phương án; đáp án là chữ cái đi sau "Chọn", "Đáp án", "Phương án đúng là".
+```de
+Câu 1: Kim loại nào tác dụng với HCl?
+A. Cu
+B. Ag
+C. Fe
+D. Au
+Lời giải:
+Xét phương án A: Cu đứng sau H nên không phản ứng.
+Xét phương án C: Fe đứng trước H. Chọn C.
+Câu 2: Kim loại nào tác dụng với HCl?
+A. Cu
+B. Ag
+C. Fe
+D. Au
+Lời giải: Ở phương án A, Cu đứng sau H nên không phản ứng. Chọn C.
+```
+```ket-qua
+số câu: 2
+câu 1: C
+câu 2: C
+```
+
+### "Vậy a bằng 2", "Vậy a ∈ (0; 1)" là lời giải có biến, không phải đáp án
+```de
+Câu 1: Tìm a biết a + 3 = 5.
+A. 1
+B. 2
+C. 4
+D. 5
+Ta có a + 3 = 5.
+Vậy a bằng 2.
+Chọn B.
+Câu 2: Tìm a để hàm số đồng biến.
+A. a > 1
+B. a < 0
+C. a = 2
+D. a = 3
+Vậy a ∈ (0; 1)
+Câu 3: Câu ba?
+A. một
+*B. hai
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2 tiêu đề: Câu ba?
+```
+
+### Cả câu, phương án và đáp án trên một dòng, cách bằng tab
+```de
+Câu 1: 2 + 2 = ?	A. 3	B. 4	C. 5	D. 6	Đáp án đúng: B
+Câu 2: 3 + 3 = ?
+[A] 5
+[B] 6
+[C] 7
+[D] 8	Đáp án đúng: B
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án D: 6
+câu 2: B
+câu 2 phương án D: 8
+```
+
 ### Lời giải có câu "Chọn B" thì dùng để lấy đáp án, không hiện ra
 ```de
 Câu 1: 5 x 6 = ?
@@ -270,6 +402,91 @@ Lời giải: Suy ra a = 2. Chọn D.
 ```
 ```ket-qua
 câu 1: D
+```
+
+### Lời giải nhắc cả phương án sai: chỉ lấy chữ cái được khẳng định là đáp án
+Lời giải hay giải thích vì sao các phương án khác sai. Chữ cái đứng ngay trước "sai", sau "không chọn"/"loại",
+hoặc nằm trong một danh sách "A, B, D" không phải đáp án.
+```de
+Câu 1: Câu một?
+A. một
+B. hai
+C. ba
+D. bốn
+Lời giải: Chọn C vì phương án A sai.
+Câu 2: Câu hai?
+A. một
+B. hai
+C. ba
+D. bốn
+Lời giải: Đáp án C. Phương án A sai vì thiếu dữ kiện, phương án B sai vì nhầm đơn vị.
+Câu 3: Câu ba?
+A. một
+B. hai
+C. ba
+D. bốn
+Lời giải: Chọn C. Các đáp án A, B, D đều sai.
+Câu 4: Câu bốn?
+A. một
+B. hai
+C. ba
+D. bốn
+Lời giải: Đáp án đúng là C, không chọn A vì A là bẫy.
+Câu 5: Câu năm?
+A. một
+B. hai
+C. ba
+D. bốn
+Phương án A sai vì thiếu dữ kiện. Chọn C.
+```
+```ket-qua
+số câu: 5
+câu 1: C
+câu 2: C
+câu 3: C
+câu 4: C
+câu 5: C
+```
+
+### Lời giải khẳng định hai đáp án khác nhau thì không đoán
+```de
+Câu 1: Câu một?
+A. một
+B. hai
+C. ba
+D. bốn
+Lời giải: Phương án B đúng, phương án C cũng đúng.
+Câu 2: Câu hai?
+*A. một
+B. hai
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Câu hai?
+```
+
+### Dòng "Vậy a = 2", "Suy ra b > 0" dưới phương án là lời giải có biến, không phải đáp án
+```de
+Câu 1: Tìm a biết a + 3 = 5.
+A. 1
+B. 3
+C. 4
+D. 5
+Ta có a + 3 = 5.
+Vậy a = 2
+Câu 2: Tìm b biết b > 0 và b² = 4.
+A. 1
+B. 3
+C. 4
+D. 5
+Suy ra b > 0
+Câu 3: Câu ba?
+A. một
+*B. hai
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Câu ba?
 ```
 
 ## 6. Bảng đáp án ở cuối đề
@@ -383,6 +600,201 @@ câu 2: A
 câu 3: A
 ```
 
+### Đáp án theo phần như đề THPT: dòng "Câu 1: a) Đ b) S…" của Phần II không thành đáp án câu 1 Phần I
+Phần II đánh số lại từ Câu 1, nên dòng đáp án đúng/sai của nó không được đè lên câu trắc nghiệm cùng số.
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+Câu 2: Thành phố lớn nhất miền Nam?
+A. Cần Thơ
+B. Huế
+C. TP. Hồ Chí Minh
+D. Vũng Tàu
+PHẦN II. ĐÚNG SAI
+câu hỏi đúng sai: Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+ĐÁP ÁN
+PHẦN I
+Câu 1 2
+Đáp án B C
+PHẦN II
+Câu 1: a) Đ b) S c) Đ d) S
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3 loại: đúng sai
+câu 3: ĐSĐS
+```
+
+### Hai phần cùng đánh số lại từ Câu 1, bảng đáp án chia theo phần
+Bảng đáp án chỉ tra theo số câu thì phần sau sẽ nhận nhầm đáp án của phần đầu. Phần thứ hai của bảng (sau dòng
+"Phần B", hoặc khi số câu trong bảng bắt đầu lại từ 1) áp cho phần thứ hai của đề.
+```de
+PHẦN A. ĐỌC HIỂU
+Câu 1: Đọc hỏi 1
+A. a
+B. b
+C. c
+D. d
+Câu 2: Đọc hỏi 2
+A. a
+B. b
+C. c
+D. d
+PHẦN B. NGỮ PHÁP
+Câu 1: Ngữ hỏi 1
+A. a
+B. b
+C. c
+D. d
+Câu 2: Ngữ hỏi 2
+A. a
+B. b
+C. c
+D. d
+ĐÁP ÁN
+Phần A
+1.A 2.B
+Phần B
+1.C 2.D
+```
+```ket-qua
+số câu: 4
+câu 1: A
+câu 2: B
+câu 3: C
+câu 4: D
+câu 4 tiêu đề: Ngữ hỏi 2
+```
+
+### Hai phần đánh số lại, bảng đáp án viết liền mỗi phần một dòng
+```de
+PHẦN A. ĐỌC HIỂU
+Câu 1: Đọc hỏi 1
+A. a
+B. b
+C. c
+D. d
+Câu 2: Đọc hỏi 2
+A. a
+B. b
+C. c
+D. d
+PHẦN B. NGỮ PHÁP
+Câu 1: Ngữ hỏi 1
+A. a
+B. b
+C. c
+D. d
+Câu 2: Ngữ hỏi 2
+A. a
+B. b
+C. c
+D. d
+ĐÁP ÁN
+1.A 2.B
+1.C 2.D
+```
+```ket-qua
+số câu: 4
+câu 3: C
+câu 4: D
+```
+
+### Bảng đáp án không chia được theo phần thì không đoán cho các câu trùng số
+Đề có hai phần đánh số lại nhưng bảng chỉ có một dãy: câu số 1, 2 có ở cả hai phần nên không biết đáp án thuộc phần
+nào; chỉ câu 3 (không trùng số) được nhận đáp án.
+```de
+PHẦN A
+Câu 1: Một?
+A. a
+B. b
+Câu 2: Hai?
+A. a
+B. b
+Câu 3: Ba?
+A. a
+B. b
+PHẦN B
+Câu 1: Bốn?
+A. a
+B. b
+Câu 2: Năm?
+A. a
+B. b
+ĐÁP ÁN
+1.A 2.B 3.B
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Ba?
+câu 1: B
+```
+
+### Phần tự luận đánh số lại không làm mất bảng đáp án của phần trắc nghiệm
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+Câu 2: 1 + 1 = ?
+A. 1
+B. 2
+C. 3
+D. 4
+PHẦN II. TỰ LUẬN
+Câu 1: Trình bày cảm nhận của em.
+Câu 2: Giải phương trình sau.
+BẢNG ĐÁP ÁN
+1.B 2.B
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: B
+```
+
+### Tiêu đề phần trong bảng đáp án có ghi điểm ("Phần I (2 điểm)")
+```de
+PHẦN I. ĐỌC HIỂU
+Câu 1: Hỏi 1?
+A. a
+B. b
+Câu 2: Hỏi 2?
+A. a
+B. b
+PHẦN II. VIẾT
+Câu 1: Hỏi 3?
+A. a
+B. b
+Câu 2: Hỏi 4?
+A. a
+B. b
+ĐÁP ÁN
+Phần I (2 điểm)
+1.A 2.B
+Phần II (8 điểm)
+1.B 2.A
+```
+```ket-qua
+số câu: 4
+câu 1: A
+câu 2: B
+câu 3: B
+câu 4: A
+```
+
 ### Câu trắc nghiệm không có đáp án bị bỏ, câu có đáp án vẫn giữ
 ```de
 Câu 1: Có đáp án
@@ -408,6 +820,23 @@ B. y
 ```
 ```ket-qua
 không đọc được
+```
+
+### Bảng hai dòng có nhãn "ĐA" ở đầu hàng đáp án
+```de
+Câu 1: Thủ đô Pháp?
+A. Berlin
+B. Paris
+Câu 2: Thủ đô Ý?
+A. Rome
+B. Paris
+Đáp án:
+Câu 1 2
+ĐA B A
+```
+```ket-qua
+câu 1: B
+câu 2: A
 ```
 
 ## 7. Câu đúng/sai
@@ -456,6 +885,127 @@ D. Hàm số đồng biến trên R
 ```ket-qua
 câu 1: ĐSĐS
 câu 1 phương án D: Hàm số đồng biến trên R
+```
+
+### Ý có công thức f(x) hay đơn vị "1 s" không bị nhầm là dòng đáp án
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số y = f(x).
+*A. Hàm số liên tục trên R
+B. Hàm số có 2 cực trị
+*C. Trên khoảng (1; 2) f(x) > 0
+D. Đồ thị đi qua gốc tọa độ
+câu hỏi đúng sai: Câu 2: Một vật chuyển động thẳng.
+*A. Vận tốc ban đầu bằng 0
+B. Gia tốc không đổi
+*C. Từ t = 1 s đến t = 2 s vật đi được 4 m
+D. Quãng đường tỉ lệ với thời gian
+```
+```ket-qua
+số câu: 2
+câu 1 số phương án: 4
+câu 1: ĐSĐS
+câu 2 số phương án: 4
+câu 2: ĐSĐS
+```
+
+### Đáp án đúng/sai viết trên nhiều dòng, hoặc lời giải từng ý
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số y = x².
+A. Hàm số chẵn
+B. Đồ thị đi qua điểm (1; 2)
+C. Hàm số có cực tiểu
+D. Hàm số đồng biến trên R
+Đáp án: a) Đúng, b) Sai
+c) Đúng, d) Sai
+câu hỏi đúng sai: Câu 2: Cho hàm số y = x².
+A. Hàm số chẵn
+B. Đồ thị đi qua điểm (1; 2)
+C. Hàm số có cực tiểu
+D. Hàm số đồng biến trên R
+Lời giải:
+a) Đúng. Vì f(-x) = f(x).
+b) Sai. Vì f(1) = 1.
+c) Đúng. Vì hàm số đạt cực tiểu tại x = 0.
+d) Sai. Vì hàm số nghịch biến trên (-∞; 0).
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: ĐSĐS
+câu 2 số phương án: 4
+```
+
+### Bảng đáp án đúng/sai cách nhau bằng tab (chép từ bảng Word)
+```de
+Câu 1: Một?
+A. x
+*B. y
+câu hỏi đúng sai: Câu 2: Hai?
+A. Nước sôi ở 100 độ C
+B. Nước đóng băng ở 10 độ C
+C. Nước là hợp chất
+D. Nước tinh khiết dẫn điện tốt
+BẢNG ĐÁP ÁN
+Câu 2:	a) Đ	b) S	c) Đ	d) S
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: ĐSĐS
+```
+
+### Câu không có tiền tố "câu hỏi đúng sai:" nhưng dòng đáp án ghi từng ý Đúng/Sai là câu đúng/sai
+Đề THPT từ 2025 có Phần II gồm các ý a), b), c), d). Dòng "Đáp án: a) Đúng b) Sai…" không bao giờ là "chọn A".
+```de
+PHẦN II. Câu trắc nghiệm đúng sai
+Câu 1. Cho hàm số y = x. Xét tính đúng sai:
+a) Hàm số đồng biến trên R.
+b) Hàm số nghịch biến trên R.
+c) Hàm số chẵn.
+d) Hàm số lẻ.
+Đáp án: a) Đúng b) Sai c) Sai d) Đúng
+```
+```ket-qua
+câu 1 loại: đúng sai
+câu 1: ĐSSĐ
+câu 1 số phương án: 4
+```
+
+### Đáp án đúng/sai chỉ nói một số ý thì không tự coi các ý còn lại là Sai
+Phải nói đủ từng ý (có thể trên nhiều dòng). Riêng kiểu liệt kê các ý Đúng ("a, c đúng", "Đáp án: a, c") thì các ý
+còn lại là Sai.
+```de
+câu hỏi đúng sai: Câu 1: Xét các mệnh đề
+A. 2 là số chẵn
+B. 3 là số chẵn
+C. 4 là số chẵn
+D. 5 là số chẵn
+Đáp án: a) Đúng, b) Sai
+câu hỏi đúng sai: Câu 2: Xét các số
+A. 2 là số chẵn
+B. 3 là số chẵn
+C. 4 là số chẵn
+D. 5 là số chẵn
+Đáp án: a, c đúng
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Xét các số
+câu 1: ĐSĐS
+```
+
+### Ý có nội dung chỉ là một chữ ("D. S") vẫn là ý, không phải dòng đáp án
+```de
+câu hỏi đúng sai: Câu 1: Chữ cái nào là phụ âm?
+*A. B
+B. A
+*C. C
+D. S
+```
+```ket-qua
+câu 1 số phương án: 4
+câu 1: ĐSĐS
+câu 1 phương án D: S
 ```
 
 ### Câu đúng/sai không có đáp án bị bỏ, giống câu trắc nghiệm thiếu đáp án
@@ -536,6 +1086,87 @@ A. 1
 ```
 ```ket-qua
 câu 1 tiêu đề: Cho đoạn code sau: / x = 1 / x = x + 1 / Giá trị của x là?
+câu 1: B
+```
+
+### Danh sách (a), (b), (c) trong đề bài không phải phương án
+Đề Hoá, Sinh hay liệt kê thí nghiệm hay chất bằng chữ thường rồi mới hỏi; phương án thật bắt đầu lại từ A.
+```de
+Câu 1: Cho các thí nghiệm sau:
+(a) Cho Na vào nước.
+(b) Cho Fe vào dung dịch HCl.
+(c) Cho Cu vào dung dịch HCl.
+Số thí nghiệm có khí thoát ra là
+A. 1
+*B. 2
+C. 3
+D. 0
+Câu 2: Cho các chất sau:
+a) NaCl
+b) HCl
+c) NaOH
+Có bao nhiêu chất là axit?
+*A. 1
+B. 2
+C. 3
+D. 0
+```
+```ket-qua
+số câu: 2
+câu 1 số phương án: 4
+câu 1: B
+câu 1 tiêu đề: Cho các thí nghiệm sau: / (a) Cho Na vào nước. / (b) Cho Fe vào dung dịch HCl. / (c) Cho Cu vào dung dịch HCl. / Số thí nghiệm có khí thoát ra là
+câu 2 số phương án: 4
+câu 2: A
+câu 2 phương án A: 1
+```
+
+### Dòng đề bài bắt đầu bằng "Phần 1 của…", "Phần vi mô…" không phải tiêu đề phần
+```de
+Câu 1: Tác phẩm có mấy phần?
+Phần 1 của tác phẩm nói về nội dung gì?
+A. Tình yêu
+*B. Chiến tranh
+C. Gia đình
+D. Quê hương
+Câu 2: Kinh tế học
+Phần vi mô của nền kinh tế nghiên cứu
+A. Quốc gia
+*B. Doanh nghiệp
+C. Thế giới
+D. Ngân hàng
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 tiêu đề: Tác phẩm có mấy phần? / Phần 1 của tác phẩm nói về nội dung gì?
+câu 2: B
+```
+
+### Ký hiệu [A], (a) trong công thức ở đề bài không phải phương án
+```de
+Câu 1: Cho dung dịch:
+[A]=0,1M và [B]=0,2M
+Tỉ lệ là
+A. 1:2
+*B. 2:1
+C. 1:1
+D. 3:1
+```
+```ket-qua
+câu 1 số phương án: 4
+câu 1: B
+câu 1 tiêu đề: Cho dung dịch: / [A]=0,1M và [B]=0,2M / Tỉ lệ là
+```
+
+### Phương án có tỉ lệ "a:1   b:2" không bị tách thành nhiều phương án
+```de
+Câu 1: Tỉ lệ thức nào đúng?
+A. a:1   b:2   c:3   d:4
+*B. a:2   b:4
+```
+```ket-qua
+câu 1 số phương án: 2
 câu 1: B
 ```
 
@@ -628,6 +1259,101 @@ A. 3
 ```ket-qua
 số câu: 2
 câu 2 phương án B: 4
+```
+
+### Tiêu đề, chân trang lặp lại mã đề và số trang không cắt đề, không dính vào phương án
+Chép chữ từ file PDF thì tiêu đề và chân trang của mỗi trang nằm xen giữa các câu.
+```de
+Mã đề thi 101
+Câu 1: Một?
+A. x
+*B. y
+C. z
+D. t
+Trang 1/3 - Mã đề 101
+Câu 2: Hai?
+*A. x
+B. y
+Mã đề thi 101 - Trang 2/3
+C. z
+D. t
+Mã đề thi 101                Trang 3/3
+Câu 3: Ba?
+A. x
+B. y
+*C. z
+D. t
+```
+```ket-qua
+số câu: 3
+câu 1 phương án D: t
+câu 2 số phương án: 4
+câu 2 phương án B: y
+câu 3: C
+```
+
+### File có hai mã đề khác nhau: chỉ đọc mã đề đầu
+```de
+Mã đề 101
+Câu 1: Một?
+A. x
+*B. y
+Câu 2: Hai?
+*A. x
+B. y
+Mã đề 102
+Câu 1: Hai?
+A. y
+*B. x
+Câu 2: Một?
+A. y
+*B. x
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: A
+```
+
+### Tiêu đề "B. TỰ LUẬN" sau phương án cuối không thành phương án
+```de
+A. TRẮC NGHIỆM
+Câu 1: Một?
+A. x
+B. y
+C. z
+*D. t
+B. TỰ LUẬN
+Câu 1: Trình bày ý kiến của em.
+```
+```ket-qua
+số câu: 1
+câu 1 số phương án: 4
+câu 1: D
+```
+
+### Chân trang có mã đề rồi Phần II đánh số lại không bị coi là đề thứ hai
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Một?
+A. x
+*B. y
+Câu 2: Hai?
+*A. x
+B. y
+Trang 1/2 - Mã đề 101
+PHẦN II. ĐÚNG SAI
+Mã đề 101 - Trang 2/2
+câu hỏi đúng sai: Câu 1: Ba?
+*a) Ý một
+b) Ý hai
+*c) Ý ba
+d) Ý bốn
+```
+```ket-qua
+số câu: 3
+câu 3 loại: đúng sai
+câu 3: ĐSĐS
 ```
 
 ### Dòng "HẾT PHẦN I" giữa đề không dính vào câu nào
@@ -737,7 +1463,13 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
 
 ## 11. Giới hạn đã biết
 
-- Ở câu đúng/sai, một ý chỉ gồm chữ Đ/S/T/F (ví dụ `D. S`) bị hiểu nhầm là dòng đáp án và mất ý đó. Phát biểu thật luôn dài hơn nên hiếm gặp.
+- Ở câu đúng/sai, một ý chỉ gồm chuỗi Đ/S (ví dụ `ĐS`) bị hiểu là dòng đáp án. Phát biểu thật luôn dài hơn nên hiếm gặp.
+- Phương án cách nhau đúng **một** dấu cách mà có `*` ở cuối (`B. y * C. z`) thì `*` được hiểu là của phương án sau. Dùng
+  tab, nhiều dấu cách, hoặc đặt `*` ngay trước chữ cái.
+- Đường dán `.txt` chưa đọc `**(A) …**` (in đậm Markdown với chữ cái trong ngoặc); dùng `**A. …**` hoặc dấu `*`.
+- Đề chỉ có **một** câu kèm bảng đáp án (`Đáp án: 1D`) không đọc được; ghi `Đáp án: D` ngay dưới câu.
+- Phần II đúng/sai không có tiền tố `câu hỏi đúng sai:` mà đáp án chỉ nằm ở bảng cuối đề thì câu đó bị bỏ (không đoán).
+  Thêm tiền tố, hoặc ghi `Đáp án: a) Đ b) S …` ngay dưới câu, hoặc dùng **Chuyển đổi file**.
 - Đoạn văn đứng giữa hai câu chỉ được chuyển xuống câu sau khi có **dòng trống** ngăn với phương án cuối. Không có dòng trống thì nó bị nối vào phương án cuối của câu trước.
 - Câu không đánh số (không có `Câu 1:`, `1.`…) không đọc được; dùng nút **Chuyển đổi file** để AI đánh số.
 

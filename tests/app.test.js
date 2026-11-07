@@ -44,3 +44,16 @@ test('nhận biết đề đã có đáp án', () => {
 test('tên đề lấy từ tên file, bỏ đuôi file', () => {
     assert.equal(app.fn('titleFromFileName')('De thi HK1.docx'), 'De thi HK1');
 });
+
+test('"Làm bài ngay" nhận đề có đáp án chỉ nằm trong lời giải "Chọn B" (như parser)', () => {
+    app.run('originalQuestions = []');
+    app.run(`UI.convertedText.value = ${JSON.stringify('Câu 1: 5 x 6 = ?\nA. 11\nB. 30\nC. 56\nD. 1\nLời giải: Ta có 5 x 6 = 30. Chọn B.')}`);
+    app.fn('useConvertedTextImmediately')();
+    assert.equal(app.run('originalQuestions.length'), 1);
+});
+
+test('đề có câu nhiều đáp án đúng vẫn tạo được, nhưng báo để giáo viên kiểm tra lại (quyết định 7/11/2026)', () => {
+    app.run('originalQuestions = []');
+    assert.equal(app.fn('parseQuizData')('Câu 1: Số nào là số nguyên tố?\n*A. 2\n*B. 3\nC. 4\nD. 6\nCâu 2: 1 + 1 = ?\nA. 1\n*B. 2', null, ''), true);
+    assert.match(app.lastToast, /Câu 1 có nhiều đáp án đúng/);
+});

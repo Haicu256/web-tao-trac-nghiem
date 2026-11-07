@@ -357,3 +357,11 @@ test('Argon #12: model chính trả nhãn sai khuôn thì worker thử model d�
     assert.equal(calls.length, 2);
     assert.equal((await res.json()).model, 'gemini-3.5-flash-lite');
 });
+
+test('share: trình duyệt hỏi lại bằng If-None-Match (304) vẫn gia hạn đề đã lưu hơn 30 ngày', async () => {
+    const old = Math.floor(Date.now() / 1000) - 40 * 86400;
+    const kv = fakeKV({ AAAAAAAAAAA: { v: 1, title: 'Đề', text: QUIZ, c: old } });
+    const res = await worker.fetch(new Request('https://x/api/share/AAAAAAAAAAA', { headers: { 'If-None-Match': '"AAAAAAAAAAA"' } }), { SHARES: kv });
+    assert.equal(res.status, 304);
+    assert.equal(kv.puts.length, 1);
+});

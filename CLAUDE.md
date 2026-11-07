@@ -15,6 +15,7 @@ Thư mục này là nơi phát triển chính. `~/Desktop/wtn` (Antigravity/Gemi
 |---|---|
 | `npm test` | chạy toàn bộ test (`node --test`, không cần thư viện ngoài) |
 | `npm run check` | test và `wrangler deploy --dry-run`; phải pass trước khi push |
+| `npm run fuzz` | sinh hàng nghìn đề có đáp án biết trước (văn bản, Word, nhãn AI ngẫu nhiên) và so kết quả; mã lỗi khi có đáp án bịa ra hoặc crash. Xem đầu file `scripts/fuzz.mjs` |
 | `npm run dev` | chạy web trên máy ở cổng 8787. Muốn thử `/api/convert` thì cần `.dev.vars` có `GEMINI_API_KEY`, `CF_AIG_TOKEN` |
 
 ## Deploy
@@ -46,6 +47,7 @@ kiểm tra ngay trên web thật sau khi deploy; lỗi thì `git revert` và pus
 - Thêm hoặc sửa kiểu đề parser đọc: thêm ví dụ (khối `de` và `ket-qua`) vào `docs/dinh-dang-de.md` trước. Parser là hơn 700 dòng regex, sửa một chỗ dễ hỏng chỗ khác, nên chạy lại toàn bộ test.
 - Chữ đến từ người dùng, từ file đề hay từ AI phải qua `escapeHTML` trước khi gán vào `innerHTML`.
 - Worker chạy trước file tĩnh (`run_worker_first`). Thêm file tĩnh mới thì phải thêm vào `isAllowedAsset` trong `worker.js`.
+- Không dùng lookbehind `(?<=` `(?<!` trong regex của `index.html`: Safari dưới 16.4 (iPhone đời cũ) báo lỗi cú pháp và cả trang không chạy. Test trong `tests/config.test.js` chặn việc này.
 - Thư viện CDN phải có `integrity` (SRI). Đổi phiên bản thì tính lại mã băm và so với cdnjs.
 - Viết chú thích khi cần giải thích *vì sao*; không có quy tắc cấm chú thích.
 - `tests/helpers/app.js` nạp các `<script>` nội tuyến của `index.html` vào `node:vm`. Đổi cấu trúc script thì sửa loader này.

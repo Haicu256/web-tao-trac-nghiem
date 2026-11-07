@@ -96,7 +96,7 @@ async function runThroughAI(raw) {
         } else {
             try {
                 const out = await labelWithAI(chunk.lines.map(l => strip(l).trim()));
-                chunkLabels = app.fn('reconcileLabels')(chunk.lines, out.labels);
+                chunkLabels = app.fn('reconcileLabels')(chunk.lines, out.labels, app.fn('lastQuestionNumber')(lines.slice(0, chunk.start), labels.slice(0, chunk.start)));
                 cachedAll &&= out.cached;
                 if (out.model) models.add(out.model);
             } catch (err) {

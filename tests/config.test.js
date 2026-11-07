@@ -48,3 +48,9 @@ test('.assetsignore chặn các thư mục không phải web', () => {
         assert.ok(lines.includes(entry), `.assetsignore thiếu ${entry}`);
     }
 });
+
+test('index.html không dùng lookbehind trong regex (Safari dưới 16.4 báo lỗi cú pháp và cả trang không chạy)', () => {
+    const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+    assert.equal((scripts.match(/\(\?<[=!]/g) || []).length, 0);
+});
