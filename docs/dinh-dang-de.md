@@ -390,6 +390,27 @@ câu 2: B
 câu 2 phương án D: 8
 ```
 
+### "Đáp án: Phương án B", "Suy ra B là phương án đúng"
+```de
+Câu 1: Thủ đô của Việt Nam là gì?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+Đáp án: Phương án B
+Câu 2: Kim loại nào dẫn điện tốt nhất?
+A. Cu
+B. Ag
+C. Al
+D. Fe
+Suy ra B là phương án đúng.
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: B
+```
+
 ### Lời giải có câu "Chọn B" thì dùng để lấy đáp án, không hiện ra
 ```de
 Câu 1: 5 x 6 = ?
@@ -1043,6 +1064,19 @@ câu 1: ĐSĐS
 câu 1 phương án D: S
 ```
 
+### Ý viết liền chữ ("D.S") vẫn là ý
+```de
+câu hỏi đúng sai: Câu 1: Ký hiệu nguyên tố
+*A. H
+B. O
+*C. N
+D.S
+```
+```ket-qua
+câu 1 số phương án: 4
+câu 1: ĐSĐS
+```
+
 ### Câu đúng/sai không có đáp án bị bỏ, giống câu trắc nghiệm thiếu đáp án
 Web không tự coi mọi ý là Sai, vì như vậy là chấm theo đáp án không có trong đề (quyết định ngày 7/11/2026).
 ```de
@@ -1438,6 +1472,27 @@ A. x
 số câu: 5
 câu 5: B
 câu 5 tiêu đề: Năm?
+```
+
+### Đề thứ hai mở đầu bằng "PHẦN I" (đề đầu không ghi mã): chỉ đọc đề đầu
+"PHẦN I" là phần đầu tiên nên là đầu một đề mới; chỉ "PHẦN II" trở đi mới là phần tiếp theo của đề đang đọc.
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Một?
+A. x
+*B. y
+Câu 2: Hai?
+*A. x
+B. y
+Mã đề 102
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Ba?
+A. x
+*B. y
+```
+```ket-qua
+số câu: 2
+câu 2 tiêu đề: Hai?
 ```
 
 ### Dòng "HẾT PHẦN I" giữa đề không dính vào câu nào

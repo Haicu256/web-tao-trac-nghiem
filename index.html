@@ -944,7 +944,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const end = m.index + m[0].length;
                 if (isRejectedAnswerMention(s, start, end) || isTFVerdictMention(s, end, m[3])) continue;
                 const keyword = m[1].toLowerCase().replace(/\s+/g, ' ');
-                if (keyword === 'phương án' && !/\S/.test(m[2]) && !/^\s*[:.\-–—]?\s*(?:là\s*|cũng\s*)?(?:đúng|chính\s*xác)(?![\p{L}\d])/iu.test(s.slice(end))) continue;
+                if (keyword === 'phương án' && !/\S/.test(m[2]) && !/^\s*[:.\-–—]?\s*(?:là\s*|cũng\s*)?(?:đúng|chính\s*xác)(?![\p{L}\d])/iu.test(s.slice(end))
+                    && !/(?:đáp\s*án|chọn|answer|key)\s*[:.\-–—]?\s*$/iu.test(s.slice(Math.max(0, start - 15), start))) continue;
                 if (keyword !== 'chọn' && /(?:xét|ở|với|trong|so\s*với|như|của)\s*$/iu.test(s.slice(Math.max(0, start - 12), start))) continue;
                 letters.add(m[3].toUpperCase());
             }
@@ -965,7 +966,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const after = line.slice(end);
             // "Vậy a = 2", "Vậy a ∈ (0; 1)", "Vậy a bằng 2", "Suy ra d đi qua …": chữ cái là biến trong lời giải.
             const connective = /^\s*(?:suy\s*ra|do\s*đó|vậy|khi\s*đó|nên|ta\s*có)\s+[a-f](?![\p{L}\d])/iu.test(line);
-            const isVariable = /^\s*[=<>≤≥≠∈∉⊂⊃⊆+\-*\/^]/u.test(after) || (connective && /^\s+(?!đúng|là\s*đáp)\p{Ll}/u.test(after));
+            const isVariable = /^\s*[=<>≤≥≠∈∉⊂⊃⊆+\-*\/^]/u.test(after) || (connective && /^\s+(?!đúng|chính\s*xác|là\s*(?:đáp|phương|lựa|câu\s*trả))\p{Ll}/u.test(after));
             // "Phương án A: Cu đứng sau H…" ở đầu dòng chỉ là nhắc tới phương án.
             const bareMention = /^\s*phương\s*án\s*[:.\-–—]?\s*[a-f](?![\p{L}\d])/iu.test(line) && !/^\s*[:.\-–—]?\s*(?:là\s*|cũng\s*)?(?:đúng|chính\s*xác)(?![\p{L}\d])/iu.test(after);
             if (!isVariable && !bareMention && !isRejectedAnswerMention(line, match.index, end) && !isTFVerdictMention(line, end, match[1])) letters.add(match[1].toUpperCase());
@@ -988,7 +989,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const SECTION_END_REGEX = /^(?:[-=_*~#]{2,}\s*)?hết\s+phần(?:\s|$)[^\n]{0,50}$/iu;
             const SECTION_HEADER_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:phần|chương|mục|tiết|section|part)\s+(?:(?:[ivxlcdm\d]+|[a-f]\b|thứ\s+[\p{L}\d]+)(?:\s*[:.\-–—]|\*+\s*[:.\-–—]?|[:.\-–—]?\s*\*+|\s+|$)|(?:trắc\s*nghiệm|tự\s*luận|đúng[\s\/\-–—]*sai|trả\s*lời\s*ngắn|nhiều\s*lựa\s*chọn)(?:\s*[:.\-–—]|\*+\s*[:.\-–—]?|[:.\-–—]?\s*\*+|\s+|$)|[:.\-–—])/iu;
             const EXPLANATION_LINE_REGEX = /^(?:lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:giải|chấm)(?:\s*chi\s*tiết)?|giải\s*thích(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*:|đáp\s*án\s*chi\s*tiết)\s*[:.\-–—]?/i;
-            const ANSWER_LINE_REGEX = /^(?:(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|answer|key)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)|(?:(?:chọn|suy\s*ra\s*chọn|do\s*đó\s*chọn|ta\s*chọn|vậy\s*chọn|suy\s*ra|do\s*đó|vậy)\s*(?:chọn)?(?:\s*(?:đáp\s*án|phương\s*án))?(?:\s*là)?))\s*[:.\-–—]?\s*([a-fA-F])(?!\p{L})/iu;
+            const ANSWER_LINE_REGEX = /^(?:(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|answer|key)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)|(?:(?:chọn|suy\s*ra\s*chọn|do\s*đó\s*chọn|ta\s*chọn|vậy\s*chọn|suy\s*ra|do\s*đó|vậy)\s*(?:chọn)?(?:\s*(?:đáp\s*án|phương\s*án))?(?:\s*là)?))\s*[:.\-–—]?\s*(?:(?:phương|đáp)\s*án\s*)?([a-fA-F])(?!\p{L})/iu;
             const EXAM_CODE_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\[?\s*(?:mã\s*đề(?:\s*thi)?|đề\s*(?:thi\s*)?số|exam\s*code|test\s*code|paper\s*code)\s*[:.\-–—]?\s*([a-zA-Z0-9_\-]+)\b/iu;
             let isEndOfQuiz = false;
             let inExplanationSection = false;
@@ -1119,7 +1120,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
                 const tokens = clean.split(/[\s,\-–—\/\.;|]+/).filter(Boolean);
                 // "D. S" là ý D có nội dung "S", không phải "Đúng, Sai" (chữ D không dấu cũng được hiểu là Đúng).
-                if (tokens.length >= 2 && tokens.length <= count && !/^[a-dA-D]\s*[.):]\s/.test(clean)) {
+                if (tokens.length >= 2 && tokens.length <= count && !/^[a-dA-D]\s*[.):]/.test(clean)) {
                     const bools = [];
                     let allBool = true;
                     for (const t of tokens) {
@@ -1246,16 +1247,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             function questionNumberingRestartsAfter(startIdx) {
                 const numberOf = l => { const m = l.trim().match(STRONG_QUESTION_START_REGEX); return m ? parseInt(m[1], 10) : null; };
                 const isPartHeader = l => { const t = l.trim(); return (SECTION_HEADER_REGEX.test(t) && !isPartWordInSentence(t)) || SECTION_TITLE_LINE_REGEX.test(t); };
+                const isLaterPart = l => isPartHeader(l) && (partHeaderNumber(l.trim()) ?? 2) > 1;
                 let maxBefore = 0;
                 let partSince = false;
                 for (let j = 0; j < startIdx; j++) {
                     const n = numberOf(lines[j]);
-                    if (n !== null) { if (n > maxBefore) maxBefore = n; partSince = false; } else if (isPartHeader(lines[j])) { partSince = true; maxBefore = 0; }
+                    if (n !== null) { if (n > maxBefore) maxBefore = n; partSince = false; } else if (isPartHeader(lines[j])) { partSince = isLaterPart(lines[j]); maxBefore = 0; }
                 }
                 for (let j = startIdx + 1; j < lines.length; j++) {
                     const n = numberOf(lines[j]);
                     if (n !== null) return n <= maxBefore && !partSince;
-                    if (isPartHeader(lines[j])) partSince = true;
+                    if (isLaterPart(lines[j])) partSince = true;
                 }
                 return false;
             }
@@ -2611,7 +2613,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         function renderMathInHtml(html) {
             if (typeof katex === 'undefined' || !katex || typeof katex.renderToString !== 'function' || !html || !html.includes('$')) return html;
-            return html.replace(MATH_SEGMENT_REGEX, (whole, lead, tex) => {
+            const renderOnce = text => text.replace(MATH_SEGMENT_REGEX, (whole, lead, tex) => {
                 if (tex.includes('<br>')) return whole;
                 try {
                     return lead + katex.renderToString(decodeHTMLEntities(tex), { throwOnError: false, strict: 'ignore', trust: false });
@@ -2619,6 +2621,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     return whole;
                 }
             });
+            // "$a$$b$": dấu "$" mở của công thức sau đã bị lần quét đầu dùng làm ký tự đứng trước, nên quét lại một lần.
+            const once = renderOnce(html);
+            return html.includes('$$') ? renderOnce(once) : once;
         }
 
         function questionsHaveMath(questions) {
@@ -3344,6 +3349,23 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         // Tiêu đề phần đánh dấu bằng chữ cái/La Mã: "B. TỰ LUẬN", "II. Tự luận (3 điểm)", "A. TRẮC NGHIỆM".
         const SECTION_TITLE_LINE_REGEX = /^(?:[A-E]|[IVX]{1,4})\s*[.):\-–—]\s*(?:PHẦN\s+)?(?:(?:TỰ\s*LUẬN|TRẮC\s*NGHIỆM|ĐỌC\s*HIỂU|LÀM\s*VĂN|VIẾT|ĐÚNG\s*[-–—\/]?\s*SAI|TRẢ\s*LỜI\s*NGẮN)(?![\p{L}])|(?:Tự\s*luận|Trắc\s*nghiệm|Đọc\s*hiểu|Làm\s*văn)\s*(?:\([^)]*\))?\s*[.:]?\s*$)/u;
         const PART_HEADER_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:phần|part|section)\s+(?:[ivxlcdm]+|\d+|[a-d])(?![\p{L}\d])/iu;
+        // Số thứ tự của tiêu đề phần: "Phần II" → 2, "Phần 3" → 3, "Phần B", "B. TỰ LUẬN" → 2; không đọc được thì null.
+        function partHeaderNumber(plain) {
+            const m = plain.match(/^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:phần|part|section)\s+([ivxlcdm]+|\d+|[a-d])(?![\p{L}\d])/iu) || plain.match(/^([A-E]|[IVX]{1,4})\s*[.):\-–—]/u);
+            if (!m) return null;
+            const t = m[1];
+            if (/^\d+$/.test(t)) return parseInt(t, 10);
+            if (/^[a-e]$/i.test(t) && !/^[iv]$/i.test(t)) return t.toUpperCase().charCodeAt(0) - 64;
+            const value = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+            const r = t.toLowerCase();
+            let total = 0;
+            for (let k = 0; k < r.length; k++) total += value[r[k]] < (value[r[k + 1]] || 0) ? -value[r[k]] : value[r[k]];
+            return total || null;
+        }
+        // Tiêu đề phần thứ hai trở đi (phần tiếp theo của cùng một đề); "PHẦN I" là phần đầu, có thể là đầu một đề mới.
+        function isLaterPartHeader(plain) {
+            return isPartHeaderLine(plain) && (partHeaderNumber(plain) ?? 2) > 1;
+        }
         function isPartHeaderLine(plain) {
             return (PART_HEADER_REGEX.test(plain) && !isPartWordInSentence(plain)) || SECTION_TITLE_LINE_REGEX.test(plain);
         }
@@ -3416,7 +3438,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let lastNum = null;
             const bareQuestionAfterAnswer = (i, plain) => {
                 const n = parseInt(plain, 10);
-                if (lastNum !== null && n !== lastNum + 1) return false;
+                if (lastNum !== null && n <= lastNum) return false;
                 for (let j = i + 1; j < lines.length && j <= i + 12; j++) {
                     const p = stripFormattingTags(lines[j]).trim();
                     if (LOOKS_LIKE_OPTION_REGEX.test(p)) return true;
@@ -3622,8 +3644,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const next = nextNumberAfter(i);
                 // Có tiêu đề phần ("PHẦN II") giữa câu trước và câu sau thì số câu bắt đầu lại là phần mới, không phải đề mới.
                 let partBetween = false;
-                for (let j = i - 1; j >= 0 && numberAt(j) === null; j--) if (isPartHeaderLine(plain[j])) partBetween = true;
-                for (let j = i + 1; j < plain.length && numberAt(j) === null; j++) if (isPartHeaderLine(plain[j])) partBetween = true;
+                for (let j = i - 1; j >= 0 && numberAt(j) === null; j--) if (isLaterPartHeader(plain[j])) partBetween = true;
+                for (let j = i + 1; j < plain.length && numberAt(j) === null; j++) if (isLaterPartHeader(plain[j])) partBetween = true;
                 const restarts = i > firstQuestion && next !== null && next <= maxNumber && !partBetween;
                 if (firstCode === null && !restarts) { firstCode = code; continue; }
                 if (code === firstCode) continue;

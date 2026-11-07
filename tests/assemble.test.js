@@ -551,3 +551,14 @@ test('reconcileLabels: dòng "**Đáp án: C**" sau các phương án bị AI g�
     assert.equal(fixed[5], 'dap_an');
     assert.equal(answerOf(app.parse(fn('assembleQuizText')(lines, fixed).text).questions[0]), 'C');
 });
+
+test('Đề đánh số trần nhảy số (1 rồi 3) ngay sau dòng đáp án vẫn đọc được câu 3 (đường chuyển file)', () => {
+    const r = convertLocally('1. Thủ đô Pháp?\nA. Berlin\n*B. Paris\nĐáp án: B\n3. Thủ đô Ý?\nA. Berlin\n*B. Rome');
+    assert.deepEqual(r.questions.map(q => plainText(q.title)), ['Thủ đô Pháp?', 'Thủ đô Ý?']);
+});
+
+test('Đề thứ hai mở đầu bằng "PHẦN I" bị cắt (đường chuyển file)', () => {
+    const r = convertLocally('PHẦN I. TRẮC NGHIỆM\nCâu 1: Một?\nA. x\n*B. y\nCâu 2: Hai?\n*A. x\nB. y\nMã đề 102\nPHẦN I. TRẮC NGHIỆM\nCâu 1: Ba?\nA. x\n*B. y');
+    assert.equal(r.cut, true);
+    assert.equal(r.questions.length, 2);
+});

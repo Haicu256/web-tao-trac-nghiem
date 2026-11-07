@@ -179,3 +179,8 @@ test('replaceOfficeMath chỉ giữ định dạng khi mọi phần của công 
     app.fn('replaceOfficeMath')(doc);
     assert.doesNotMatch(new XMLSerializer().serializeToString(doc), /FF0000/);
 });
+
+test('renderMathInHtml vẽ được hai công thức viết liền nhau "$a$$b$"', () => {
+    const out = render('Tính $a$$b$ nhé');
+    assert.equal((out.match(/class="katex"/g) || []).length, 2, out);
+});
