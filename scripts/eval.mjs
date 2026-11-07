@@ -3,9 +3,11 @@
 //   npm run eval -- --no-ai      chỉ chạy file .txt
 //   npm run eval -- --fresh      bỏ cache, gọi AI lại
 //   npm run eval -- W-05         chỉ chạy file có tên chứa "W-05"
+//   npm run eval -- --local      docx dùng bộ gắn nhãn dự phòng (không gọi AI) để đo riêng phần đó
 //   EVAL_ENDPOINT=http://127.0.0.1:8787/api/convert npm run eval   dùng worker chạy trên máy
-// Đường .txt chạy y như trình duyệt: parseQuizData. Đường docx: extractTextFromFile (mammoth, JSZip như trên web)
-// → splitIntoChunks → /api/convert → parseQuizData, giống convertRawFile + "Làm bài ngay".
+// Đường .txt chạy y như trình duyệt: parseQuizData. Đường docx giống convertRawFile + "Làm bài ngay":
+// extractTextFromFile (mammoth, JSZip như trên web) → prepareLines → chunkLines → AI gắn nhãn (/api/convert)
+// → assembleQuizText → parseQuizData. Xem docs/thiet-ke/gan-nhan-dong.md.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -22,6 +24,7 @@ const AI_GAP_MS = 3500;
 const args = process.argv.slice(2);
 const useAI = !args.includes('--no-ai');
 const fresh = args.includes('--fresh');
+const forceLocal = args.includes('--local');
 const filters = args.filter(a => !a.startsWith('--'));
 
 const nodeMammoth = require('mammoth');
@@ -54,37 +57,58 @@ const cache = fs.existsSync(CACHE_FILE) ? JSON.parse(fs.readFileSync(CACHE_FILE,
 let lastCall = 0;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function convertWithAI(text, startIndex) {
-    const key = crypto.createHash('sha256').update(`${ENDPOINT}\n${startIndex}\n${text}`).digest('hex');
-    if (!fresh && cache[key]) return { ...cache[key], cached: true };
-    const wait = lastCall + AI_GAP_MS - Date.now();
-    if (wait > 0) await sleep(wait);
-    lastCall = Date.now();
-    const res = await fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, startIndex }) });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`AI trả lỗi ${res.status}: ${data.error || ''}`);
-    cache[key] = { text: data.text || '', truncated: !!data.truncated, model: data.model || '' };
-    fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 1));
-    return cache[key];
+async function labelWithAI(plainLines) {
+    const key = crypto.createHash('sha256').update(`${ENDPOINT}\nlines\n${plainLines.join('\n')}`).digest('hex');
+    const cached = !fresh && cache[key];
+    let data = cached;
+    if (!cached) {
+        const wait = lastCall + AI_GAP_MS - Date.now();
+        if (wait > 0) await sleep(wait);
+        lastCall = Date.now();
+        const res = await fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lines: plainLines }) });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(`AI trả lỗi ${res.status}: ${data.error || ''}`);
+        data = { doan: data.doan, model: data.model || '' };
+    }
+    const labels = app.fn('labelsFromRanges')(data.doan, plainLines.length);
+    if (!labels) throw new Error('AI trả nhãn không khớp số dòng');
+    if (!cached) {
+        cache[key] = data;
+        fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+        fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 1));
+    }
+    return { labels, model: data.model, cached: !!cached };
 }
 
 async function runThroughAI(raw) {
-    const chunks = app.fn('splitIntoChunks')(raw, 6000);
-    let combined = '';
-    let startIndex = 1;
-    let truncated = false;
-    let cachedAll = true;
+    const strip = app.fn('stripFormattingTags');
+    const lines = app.fn('prepareLines')(raw);
+    const chunks = app.fn('chunkLines')(lines, 8000);
+    const labels = new Array(lines.length);
     const models = new Set();
-    for (const chunk of chunks) {
-        const out = await convertWithAI(chunk, startIndex);
-        cachedAll &&= !!out.cached;
-        if (out.model) models.add(out.model);
-        truncated ||= out.truncated;
-        combined += out.text + '\n\n';
-        startIndex += app.fn('countQuestionsInText')(out.text);
+    const localParts = [];
+    let cachedAll = true;
+    for (const [i, chunk] of chunks.entries()) {
+        let chunkLabels;
+        if (forceLocal) {
+            chunkLabels = app.fn('labelLinesLocally')(chunk.lines);
+            localParts.push(i + 1);
+        } else {
+            try {
+                const out = await labelWithAI(chunk.lines.map(l => strip(l).trim()));
+                chunkLabels = out.labels;
+                cachedAll &&= out.cached;
+                if (out.model) models.add(out.model);
+            } catch (err) {
+                console.log(`   (phần ${i + 1}: ${err.message} → dùng gắn nhãn dự phòng)`);
+                chunkLabels = app.fn('labelLinesLocally')(chunk.lines);
+                localParts.push(i + 1);
+            }
+        }
+        chunkLabels.forEach((label, j) => { labels[chunk.start + j] = label; });
     }
-    return { text: combined.trim(), chunks: chunks.length, truncated, cachedAll, models: [...models] };
+    const assembled = app.fn('assembleQuizText')(lines, labels);
+    return { text: assembled.text, unanswered: [...assembled.unanswered], chunks: chunks.length, cachedAll: cachedAll && !forceLocal, models: [...models], localParts };
 }
 
 // Đọc cấu trúc thô của kết quả AI, dùng khi đề không có đáp án (web sẽ từ chối làm bài, nhưng vẫn cần biết AI
@@ -145,12 +169,9 @@ async function evaluate({ rel, abs, expected }) {
     const raw = await app.fn('extractTextFromFile')(new File([buf], path.basename(abs)));
     if (expected.questions === undefined && !expected.rejected) return { raw, ok: false, questions: [], via: 'trích chữ' };
     const ai = await runThroughAI(raw);
-    // Giống convertRawFile: đề gốc không có dấu hiệu đáp án thì bỏ mọi dấu * AI tự thêm.
-    const finalized = app.fn('finalizeConvertedText')(ai.text, app.fn('checkTextHasAnswerHint')(raw));
-    ai.removedMarks = finalized.removedMarks;
-    ai.text = finalized.text;
-    const noAnswers = (expected.answers || []).length > 0 && expected.answers.every(a => a === '-');
-    if (noAnswers) return { raw, ai, ok: true, questions: readStructure(ai.text), via: 'AI (đọc cấu trúc)' };
+    // Đề có câu không đáp án: parser sẽ bỏ các câu đó khi làm bài, nên so trên đề đã dựng (người dùng thấy và sửa được).
+    const hasUnanswered = (expected.answers || []).some(a => a === '-');
+    if (hasUnanswered) return { raw, ai, ok: true, questions: readStructure(ai.text), via: 'dựng đề (đọc cấu trúc)' };
     return { raw, ai, ...app.parse(ai.text), via: 'AI → parser' };
 }
 
@@ -168,7 +189,7 @@ for (const set of sets) {
     }
     if (result.skipped) { console.log(`⏭️  ${set.rel}: ${result.skipped}`); continue; }
     const problems = compare(set.expected, result);
-    const tag = `${result.via}${result.ai?.models?.length ? ', ' + result.ai.models.join('+') : ''}${result.ai?.removedMarks ? `, bỏ ${result.ai.removedMarks} đáp án AI đoán` : ''}${result.ai?.cachedAll ? ', cache' : ''}${result.ai?.truncated ? ', BỊ CẮT' : ''}`;
+    const tag = `${result.via}${result.ai?.models?.length ? ', ' + result.ai.models.join('+') : ''}${result.ai?.localParts?.length ? `, gắn nhãn dự phòng ${result.ai.localParts.length}/${result.ai.chunks} phần` : ''}${result.ai?.unanswered?.length ? `, ${result.ai.unanswered.length} câu chưa có đáp án` : ''}${result.ai?.cachedAll ? ', cache' : ''}`;
     if (problems.length === 0) { pass++; console.log(`✅ ${set.rel} (${tag})`); }
     else {
         failures.push(set.rel);

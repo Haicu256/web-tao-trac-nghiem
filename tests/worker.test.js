@@ -147,6 +147,78 @@ test('convert: prompt yêu cầu AI giữ nguyên công thức $...$', async () 
     assert.ok(prompt.includes('Câu 1: Tính $\\frac{1}{2}$'));
 });
 
+// ===== Chế độ gắn nhãn dòng (docs/thiet-ke/gan-nhan-dong.md) =====
+const LINES = ['SỞ GD&ĐT', 'Câu 1: Thủ đô?', 'A. Huế', '⟦U⟧B. Hà Nội⟦/U⟧'];
+const labelReply = doan => okReply(JSON.stringify({ doan }));
+const GOOD_LABELS = [
+    { tu: 1, den: 1, loai: 'bo_qua' },
+    { tu: 2, den: 2, loai: 'cau_hoi' },
+    { tu: 3, den: 4, loai: 'phuong_an' },
+];
+
+test('gắn nhãn: trả về các đoạn nhãn và tên model', async () => {
+    fakeGemini(labelReply(GOOD_LABELS));
+    const res = await worker.fetch(post('/api/convert', { lines: LINES }), AI_ENV);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.deepEqual(data.doan, GOOD_LABELS);
+    assert.equal(data.model, 'gemini-3.1-flash-lite');
+    assert.equal(data.text, undefined, 'chế độ gắn nhãn không trả chữ');
+});
+
+test('gắn nhãn: bắt Gemini trả JSON đúng khuôn (responseSchema với danh sách nhãn cố định)', async () => {
+    const calls = fakeGemini(labelReply(GOOD_LABELS));
+    await worker.fetch(post('/api/convert', { lines: LINES }), AI_ENV);
+    const cfg = calls[0].body.generationConfig;
+    assert.equal(cfg.responseMimeType, 'application/json');
+    const item = cfg.responseSchema.properties.doan.items;
+    assert.deepEqual(item.required, ['tu', 'den', 'loai']);
+    assert.deepEqual(item.properties.loai.enum, ['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_cau_hoi', 'phuong_an', 'noi_dung_phuong_an', 'dap_an', 'bang_dap_an', 'bo_qua']);
+    assert.equal(item.properties.tu.type, 'INTEGER');
+});
+
+test('gắn nhãn: AI nhận dòng đã đánh số, không có thẻ định dạng', async () => {
+    const calls = fakeGemini(labelReply(GOOD_LABELS));
+    await worker.fetch(post('/api/convert', { lines: LINES }), AI_ENV);
+    const prompt = calls[0].body.contents[0].parts[0].text;
+    assert.ok(prompt.includes('L2: Câu 1: Thủ đô?'));
+    assert.ok(prompt.includes('L4: B. Hà Nội'));
+    assert.ok(!prompt.includes('⟦U⟧'));
+});
+
+test('gắn nhãn: đoạn nhãn bỏ sót hoặc trùng dòng thì báo lỗi để trình duyệt thử lại', async () => {
+    for (const bad of [
+        [{ tu: 1, den: 1, loai: 'bo_qua' }, { tu: 3, den: 4, loai: 'phuong_an' }],
+        [{ tu: 1, den: 2, loai: 'bo_qua' }, { tu: 2, den: 4, loai: 'phuong_an' }],
+        [{ tu: 1, den: 5, loai: 'bo_qua' }],
+    ]) {
+        fakeGemini(labelReply(bad));
+        const res = await worker.fetch(post('/api/convert', { lines: LINES }), AI_ENV);
+        assert.equal(res.status, 502, JSON.stringify(bad));
+    }
+});
+
+test('gắn nhãn: AI trả không phải JSON thì báo lỗi 502', async () => {
+    fakeGemini(okReply('Câu 1: đây là chữ chứ không phải JSON'));
+    const res = await worker.fetch(post('/api/convert', { lines: LINES }), AI_ENV);
+    assert.equal(res.status, 502);
+});
+
+test('gắn nhãn: từ chối danh sách dòng rỗng, sai kiểu hoặc quá dài', async () => {
+    assert.equal((await worker.fetch(post('/api/convert', { lines: [] }), AI_ENV)).status, 400);
+    assert.equal((await worker.fetch(post('/api/convert', { lines: ['a', 3] }), AI_ENV)).status, 400);
+    assert.equal((await worker.fetch(post('/api/convert', { lines: Array(2001).fill('x') }), AI_ENV)).status, 413);
+    assert.equal((await worker.fetch(post('/api/convert', { lines: ['a'.repeat(50_001)] }), AI_ENV)).status, 413);
+});
+
+test('gắn nhãn: model chính quá tải thì dùng model dự phòng', async () => {
+    const calls = fakeGeminiSequence([overloaded, { status: 200, body: labelReply(GOOD_LABELS) }]);
+    const res = await worker.fetch(post('/api/convert', { lines: LINES }), FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+    assert.equal((await res.json()).model, 'gemini-3.5-flash-lite');
+});
+
 test('convert: bỏ khối ``` mà AI lỡ bọc quanh kết quả', async () => {
     fakeGemini(okReply('```text\n' + QUIZ + '\n```'));
     const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);

@@ -3,8 +3,9 @@
 Web tạo đề và làm bài trắc nghiệm: https://web-tao-trac-nghiem.haicu25699652.workers.dev
 
 - `index.html`: toàn bộ giao diện, CSS và JS trong **một file** (giữ nguyên như vậy, quyết định ngày 7/11/2026).
-- `worker.js`: Cloudflare Worker. `/api/convert` gọi Gemini để chuẩn hoá đề từ docx/pdf, `/api/share` lưu đề vào KV để chia sẻ, và phục vụ file tĩnh theo danh sách cho phép.
+- `worker.js`: Cloudflare Worker. `/api/convert` với `{ lines }` nhờ Gemini **gắn nhãn từng dòng** theo JSON schema (AI không viết chữ), `/api/share` lưu đề vào KV để chia sẻ, và phục vụ file tĩnh theo danh sách cho phép. Kiểu cũ `{ text }` (AI viết lại đề) chỉ còn để trang mở từ trước không hỏng; sẽ bỏ.
 - `docs/dinh-dang-de.md`: các kiểu đề web phải đọc được. Đây cũng là test.
+- `docs/thiet-ke/gan-nhan-dong.md`: vì sao AI chỉ gắn nhãn, còn code dựng đề và quyết định đáp án. **Không bao giờ cho AI tự đánh dấu đáp án** (đo ngày 7/11/2026: AI bịa 15/40 đáp án ở đề không có đáp án dù prompt cấm).
 
 Thư mục này là nơi phát triển chính. `~/Desktop/wtn` (Antigravity/Gemini) chỉ là kho cũ: không copy file từ đó sang, và không theo quy tắc, test hay spec trong đó.
 
