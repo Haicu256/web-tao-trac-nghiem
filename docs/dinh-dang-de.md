@@ -97,6 +97,21 @@ câu 5: B
 câu 4 tiêu đề: Four?
 ```
 
+### Ghi chú điểm, mức độ sau số câu ("Câu 1 (0,25 điểm):", "Câu 2 [NB]:") không vào đề bài
+```de
+Câu 1 (0,25 điểm): Thủ đô?
+A. Huế
+*B. Hà Nội
+Câu 2 [NB]: Thủ đô Pháp?
+A. Berlin
+*B. Paris
+```
+```ket-qua
+số câu: 2
+câu 1 tiêu đề: Thủ đô?
+câu 2 tiêu đề: Thủ đô Pháp?
+```
+
 ### Đánh số trần 1. và 2)
 ```de
 1. Thủ đô Pháp?
@@ -148,6 +163,32 @@ câu 2: B
 câu 3: B
 câu 4: B
 câu 4 phương án B: y
+```
+
+### Phương án có gạch đầu dòng ("• A.", "- A.") hoặc dấu chấm toàn chiều rộng ("A．")
+Chép danh sách từ Word sang hay giữ lại dấu đầu dòng.
+```de
+Câu 1: Thủ đô?
+• A. Huế
+• B. Hà Nội
+• C. Vinh
+Đáp án: B
+Câu 2: Thủ đô Pháp?
+- A. Berlin
+- B. Paris
+Đáp án: B
+Câu 3: Thủ đô Ý?
+A． Rome
+B． Paris
+Đáp án: A
+```
+```ket-qua
+số câu: 3
+câu 1 số phương án: 3
+câu 1: B
+câu 1 phương án B: Hà Nội
+câu 2: B
+câu 3: A
 ```
 
 ### Nhiều phương án trên một dòng, cách nhau bằng tab hoặc từ 2 dấu cách
@@ -409,6 +450,43 @@ Suy ra B là phương án đúng.
 số câu: 2
 câu 1: B
 câu 2: B
+```
+
+### Viết tắt "ĐA:", "Đ/A:" và mũi tên "→ Đáp án B"
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội
+ĐA: B
+Câu 2: Sông dài nhất?
+A. Sông Hồng
+B. Sông Mê Kông
+Đ/A: B
+Câu 3: Núi cao nhất?
+A. Fansipan
+B. Bà Đen
+→ Đáp án A
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: B
+câu 3: A
+```
+
+### Dòng đề bài bắt đầu bằng "Đa…" không phải "ĐA:" (đáp án)
+Chỉ "ĐA", "Đ/A", "Đ.A" viết hoa (hoặc có dấu "/") là viết tắt của "Đáp án".
+```de
+Câu 1: Ai đề xuất thuyết chọn lọc tự nhiên?
+Đa-uyn: nhà tự nhiên học người Anh.
+A. Lamac
+B. Menđen
+Đáp án: B
+```
+```ket-qua
+số câu: 1
+câu 1: B
+câu 1 tiêu đề: Ai đề xuất thuyết chọn lọc tự nhiên? / Đa-uyn: nhà tự nhiên học người Anh.
 ```
 
 ### Lời giải có câu "Chọn B" thì dùng để lấy đáp án, không hiện ra
@@ -1188,6 +1266,36 @@ câu 1 tiêu đề: Cho các thí nghiệm sau: / (a) Cho Na vào nước. / (b)
 câu 2 số phương án: 4
 câu 2: A
 câu 2 phương án A: 1
+```
+
+### Hội thoại "A: …", "B: …" trong đề bài (đề tiếng Anh) không phải phương án
+Người nói ghi bằng chữ cái và dấu hai chấm, rồi phương án thật bắt đầu lại từ "A." nên dãy "A:", "B:" là đề bài.
+Có gạch đầu dòng ("- A: …") cũng vậy.
+```de
+Câu 1: Choose the best response.
+A: "Would you like a cup of tea?"
+B: "______"
+A. Yes, please.
+B. No, I don't.
+C. I like it.
+D. Not at all.
+Đáp án: A
+Câu 2: Choose the best response.
+- A: "Thank you very much."
+- B: "______"
+A. Not at all.
+B. Yes, I do.
+Đáp án: A
+```
+```ket-qua
+số câu: 2
+câu 1 số phương án: 4
+câu 1: A
+câu 1 tiêu đề: Choose the best response. / A: "Would you like a cup of tea?" / B: "______"
+câu 1 phương án A: Yes, please.
+câu 2 số phương án: 2
+câu 2: A
+câu 2 tiêu đề: Choose the best response. / - A: "Thank you very much." / - B: "______"
 ```
 
 ### Dòng đề bài bắt đầu bằng "Phần 1 của…", "Phần vi mô…" không phải tiêu đề phần

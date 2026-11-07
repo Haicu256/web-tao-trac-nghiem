@@ -504,6 +504,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 .replace(/\r\n/g, '\n')
                 .replace(/\r/g, '\n')
+                // Dấu toàn chiều rộng (bộ gõ Trung/Nhật) như dấu thường: "A．", "（*）".
+                .replace(/[．：（）]/g, ch => ({ '．': '.', '：': ':', '（': '(', '）': ')' })[ch])
+                // Dấu đầu dòng của danh sách Word trước chữ cái phương án: "• A. Huế", "- B. Hà Nội". Không bỏ trước "A:"
+                // vì "- A: …", "- B: …" là hội thoại trong đề tiếng Anh.
+                .replace(/^([ \t]*)[•◦▪●○■□➢➤►\-–—][ \t]+(?=(?:\*+[ \t]*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*?[ \t]*[.)\/])[ \t])/gmu, '$1')
+                // "→ Đáp án B", "=> Chọn C": bỏ mũi tên; "ĐA: B", "Đ/A: B" là "Đáp án: B" (chỉ khi viết hoa hay có dấu
+                // "/", ".", vì dòng đề bài có thể bắt đầu bằng "Đa-uyn:").
+                .replace(/^([ \t]*)(?:→|=>|⇒|➔|->)[ \t]*(?=(?:đáp\s*án|chọn|đ[ \t]*[\/.]?[ \t]*a[ \t]*[:.\-–—]))/gimu, '$1')
+                .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?)(?:Đ[ \t]*A|[Đđ][ \t]*[\/.][ \t]*[Aa])(?=[ \t]*[:.\-–—])/gmu, '$1Đáp án')
+                // Ghi chú điểm / mức độ ngay sau số câu: "Câu 1 (0,25 điểm):", "Câu 2 [NB]:" → "Câu 1:".
+                .replace(/^([ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:câu|bài|question)[ \t]*\d+)[ \t]*[(\[][^()\[\]\n]{1,30}[)\]][ \t]*(?=[:.])/gimu, '$1')
                 .replace(/^([ \t]*đáp\s*án\s*[:.\-–—])[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$)/gimu, '$1\n');
         }
 
@@ -1663,17 +1674,20 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         }
                         currentQ.blankAfterOptions = false;
                         const optLetter = prefixMatch[1] || prefixMatch[2] || (prefixMatch[3] || '').charAt(0);
-                        // Danh sách chữ thường "(a) … (b) …" trong đề bài (đề Hoá, Sinh), rồi phương án thật bắt đầu lại
-                        // từ "A" hoa: dãy chữ thường là đề bài.
+                        const optColon = !!prefixMatch[3] && prefixMatch[3].endsWith(':');
+                        // Danh sách chữ thường "(a) … (b) …" trong đề bài (đề Hoá, Sinh), hay hội thoại "A: …", "B: …" (đề
+                        // tiếng Anh), rồi phương án thật bắt đầu lại từ "A" hoa với dấu khác: dãy trước là đề bài. Dãy "A:"
+                        // đã có phương án được đánh dấu đúng thì không chuyển (có thể là hai câu bị gộp).
                         if (currentQ.type !== 'true_false' && optLetter === 'A' && currentQ.options.length > 0
-                            && currentQ.options.every(o => o.optLetter && o.optLetter !== o.optLetter.toUpperCase())) {
+                            && (currentQ.options.every(o => o.optLetter && o.optLetter !== o.optLetter.toUpperCase())
+                                || (!optColon && currentQ.options.every(o => o.optColon && !o.isCorrect)))) {
                             const listed = currentQ.options.flatMap(o => o.sourceLines || []);
                             currentQ.title = [currentQ.title, ...listed].filter(Boolean).join('<br>');
                             currentQ.options = [];
                         }
                         const optionText = escapeHTML(rawText);
                         const isTextStar = isStarCorrect && !isPrefixStar;
-                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar, isPrefixStar, isTextStar, textWithStar: isTextStar ? escapeHTML(textWithStar) : undefined, optLetter, sourceLines: [escapeHTML(trimmedLine)] });
+                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar, isPrefixStar, isTextStar, textWithStar: isTextStar ? escapeHTML(textWithStar) : undefined, optLetter, optColon, sourceLines: [escapeHTML(trimmedLine)] });
                     } else {
                         if (currentQ.options.length === 0) {
                             currentQ.title = currentQ.title ? (currentQ.title + '<br>' + escapeHTML(trimmedLine)) : escapeHTML(trimmedLine);
@@ -3723,15 +3737,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     const m = plain.match(OPTION_PREFIX_REGEX);
                     const text = m ? plain.slice(m[0].length) : plain.replace(/^\*+\s*/, '');
                     const rawLetter = m ? (m[2] || m[3] || m[4]) : '';
-                    // Danh sách chữ thường "(a) … (b) …" trong đề bài (đề Hoá, Sinh), rồi phương án thật bắt đầu lại từ
-                    // "A" hoa: dãy chữ thường là đề bài.
+                    const colon = !!m?.[4] && /:\s*$/.test(m[0]);
+                    // Danh sách chữ thường "(a) … (b) …" trong đề bài (đề Hoá, Sinh), hay hội thoại "A: …", "B: …" (đề
+                    // tiếng Anh), rồi phương án thật bắt đầu lại từ "A" hoa với dấu khác: dãy trước là đề bài.
                     if (!question.trueFalse && rawLetter === 'A' && question.options.length > 0
-                        && question.options.every(o => o.rawLetter && o.rawLetter !== o.rawLetter.toUpperCase())) {
+                        && (question.options.every(o => o.rawLetter && o.rawLetter !== o.rawLetter.toUpperCase())
+                            || (!colon && question.options.every(o => o.colon && !o.prefixStar)))) {
                         question.options.forEach(o => o.lines.forEach(addStem));
                         question.options = [];
                     }
                     const starNextToLetter = !!m && /\*/.test(m[0].replace(/^\*+\s*/, ''));
-                    question.options.push({ raw, text, letter: rawLetter.toUpperCase(), rawLetter, lines: [plain], prefixStar: /^\*(?!\*)/.test(plain) || starNextToLetter });
+                    question.options.push({ raw, text, letter: rawLetter.toUpperCase(), rawLetter, colon, lines: [plain], prefixStar: /^\*(?!\*)/.test(plain) || starNextToLetter });
                 } else if (label === 'noi_dung_phuong_an') {
                     const last = question.options[question.options.length - 1];
                     last.text += ' ' + plain;

@@ -562,3 +562,11 @@ test('Đề thứ hai mở đầu bằng "PHẦN I" bị cắt (đường chuy�
     assert.equal(r.cut, true);
     assert.equal(r.questions.length, 2);
 });
+
+test('Hội thoại "A: …", "B: …" trước phương án "A." là đề bài (đường chuyển file)', () => {
+    const r = convertLocally('Câu 1: Choose the best response.\nA: "Would you like a cup of tea?"\nB: "______"\nA. Yes, please.\nB. No, I don\'t.\nC. I like it.\nD. Not at all.\nĐáp án: A\nCâu 2: Ai đề xuất thuyết tiến hoá?\nĐa-uyn: nhà tự nhiên học.\nA. Lamac\nB. Menđen\nĐA: B');
+    assert.deepEqual(r.questions.map(answerOf), ['A', 'B']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 2]);
+    assert.ok(plainText(r.questions[0].title).includes('B: "______"'), r.questions[0].title);
+    assert.ok(plainText(r.questions[1].title).includes('Đa-uyn: nhà tự nhiên học.'), r.questions[1].title);
+});
