@@ -19,6 +19,11 @@ test('mọi biến worker.js cần đều có trong vars hoặc secrets.required
     }
 });
 
+test('có model dự phòng khác model chính (Gemini từng quá tải ngày 7/11/2026)', () => {
+    assert.ok(wrangler.vars.GEMINI_FALLBACK_MODEL, 'thiếu vars.GEMINI_FALLBACK_MODEL');
+    assert.notEqual(wrangler.vars.GEMINI_FALLBACK_MODEL, wrangler.vars.GEMINI_MODEL);
+});
+
 test('secrets.required chỉ chứa thứ đã tạo trên Cloudflare (thiếu là deploy lỗi)', () => {
     assert.deepEqual([...wrangler.secrets.required].sort(), ['CF_AIG_TOKEN', 'GEMINI_API_KEY']);
 });

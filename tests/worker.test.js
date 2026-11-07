@@ -24,6 +24,88 @@ function fakeGemini(reply, status = 200) {
 
 const okReply = text => ({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] });
 
+function fakeGeminiSequence(steps) {
+    const calls = [];
+    globalThis.fetch = async (url, opts) => {
+        calls.push({ url, body: JSON.parse(opts.body) });
+        const step = steps[Math.min(calls.length, steps.length) - 1];
+        if (step instanceof Error) throw step;
+        return new Response(JSON.stringify(step.body), { status: step.status, headers: { 'Content-Type': 'application/json' } });
+    };
+    return calls;
+}
+
+const overloaded = { status: 503, body: { error: { code: 503, message: 'This model is currently experiencing high demand.' } } };
+const FALLBACK_ENV = { ...AI_ENV, GEMINI_MODEL: 'gemini-3.1-flash-lite', GEMINI_FALLBACK_MODEL: 'gemini-3.5-flash-lite' };
+
+test('convert: Gemini quá tải (503) thì thử lại bằng model dự phòng', async () => {
+    const calls = fakeGeminiSequence([overloaded, { status: 200, body: okReply(QUIZ) }]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+    assert.match(calls[0].url, /models\/gemini-3\.1-flash-lite:/);
+    assert.match(calls[1].url, /models\/gemini-3\.5-flash-lite:/);
+    const data = await res.json();
+    assert.equal(data.text, QUIZ);
+    assert.equal(data.model, 'gemini-3.5-flash-lite');
+});
+
+test('convert: model chính quá thời gian chờ thì cũng thử model dự phòng', async () => {
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const calls = fakeGeminiSequence([timeout, { status: 200, body: okReply(QUIZ) }]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+});
+
+test('convert: Gemini báo 429 (hết hạn ngạch model) thì thử model dự phòng', async () => {
+    const calls = fakeGeminiSequence([{ status: 429, body: { error: 'quota' } }, { status: 200, body: okReply(QUIZ) }]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+});
+
+test('convert: lỗi xác thực không thử model dự phòng', async () => {
+    const calls = fakeGeminiSequence([{ status: 401, body: { error: 'bad key' } }]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal(res.status, 401);
+    assert.equal(calls.length, 1);
+});
+
+test('convert: không cấu hình model dự phòng thì báo lỗi như cũ', async () => {
+    const calls = fakeGeminiSequence([overloaded]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
+    assert.equal(res.status, 503);
+    assert.equal(calls.length, 1);
+});
+
+test('convert: cả hai model đều quá tải thì báo lỗi quá tải', async () => {
+    const calls = fakeGeminiSequence([overloaded, overloaded]);
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal(res.status, 503);
+    assert.equal(calls.length, 2);
+    assert.match((await res.json()).error, /quá tải|không khả dụng/);
+});
+
+test('convert: model dự phòng dùng cấu hình riêng theo tên model', async () => {
+    const calls = fakeGeminiSequence([overloaded, { status: 200, body: okReply(QUIZ) }]);
+    await worker.fetch(post('/api/convert', { text: QUIZ }), { ...FALLBACK_ENV, GEMINI_FALLBACK_MODEL: 'gemini-2.5-flash' });
+    assert.deepEqual(calls[0].body.generationConfig, { temperature: 1, maxOutputTokens: 16384 });
+    assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 1024 });
+});
+
+test('convert: kết quả ghi rõ model nào đã trả lời', async () => {
+    fakeGemini(okReply(QUIZ));
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
+    assert.equal((await res.json()).model, 'gemini-3.1-flash-lite');
+});
+
+test('convert: prompt cấm thêm dấu * khi đề không có dấu hiệu đáp án', async () => {
+    const calls = fakeGemini(okReply(QUIZ));
+    await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
+    assert.match(calls[0].body.contents[0].parts[0].text, /KHÔNG thêm dấu \* vào bất kỳ dòng nào/);
+});
+
 function fakeKV(initial = {}) {
     const data = new Map(Object.entries(initial).map(([k, v]) => [k, JSON.stringify(v)]));
     const puts = [];

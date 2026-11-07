@@ -586,6 +586,29 @@ số câu: 2
 câu 2 phương án B: 4
 ```
 
+### Dòng "HẾT PHẦN I" giữa đề không dính vào câu nào
+```de
+Câu 1: Nội dung câu 1
+A. một
+*B. hai
+C. ba
+D. bốn
+
+HẾT PHẦN I
+
+Câu 2: Nội dung câu 2
+A. một
+B. hai
+*C. ba
+D. bốn
+```
+```ket-qua
+số câu: 2
+câu 1 phương án D: bốn
+câu 2 tiêu đề: Nội dung câu 2
+câu 2: C
+```
+
 ### Ghi chú của giám thị ở cuối đề
 ```de
 Câu 1: 1 + 1 = ?

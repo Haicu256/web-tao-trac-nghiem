@@ -63,7 +63,7 @@ async function convertWithAI(text, startIndex) {
     const res = await fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, startIndex }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(`AI trả lỗi ${res.status}: ${data.error || ''}`);
-    cache[key] = { text: data.text || '', truncated: !!data.truncated };
+    cache[key] = { text: data.text || '', truncated: !!data.truncated, model: data.model || '' };
     fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
     fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 1));
     return cache[key];
@@ -75,14 +75,16 @@ async function runThroughAI(raw) {
     let startIndex = 1;
     let truncated = false;
     let cachedAll = true;
+    const models = new Set();
     for (const chunk of chunks) {
         const out = await convertWithAI(chunk, startIndex);
         cachedAll &&= !!out.cached;
+        if (out.model) models.add(out.model);
         truncated ||= out.truncated;
         combined += out.text + '\n\n';
         startIndex += app.fn('countQuestionsInText')(out.text);
     }
-    return { text: combined.trim(), chunks: chunks.length, truncated, cachedAll };
+    return { text: combined.trim(), chunks: chunks.length, truncated, cachedAll, models: [...models] };
 }
 
 // Đọc cấu trúc thô của kết quả AI, dùng khi đề không có đáp án (web sẽ từ chối làm bài, nhưng vẫn cần biết AI
@@ -143,6 +145,10 @@ async function evaluate({ rel, abs, expected }) {
     const raw = await app.fn('extractTextFromFile')(new File([buf], path.basename(abs)));
     if (expected.questions === undefined && !expected.rejected) return { raw, ok: false, questions: [], via: 'trích chữ' };
     const ai = await runThroughAI(raw);
+    // Giống convertRawFile: đề gốc không có dấu hiệu đáp án thì bỏ mọi dấu * AI tự thêm.
+    const finalized = app.fn('finalizeConvertedText')(ai.text, app.fn('checkTextHasAnswerHint')(raw));
+    ai.removedMarks = finalized.removedMarks;
+    ai.text = finalized.text;
     const noAnswers = (expected.answers || []).length > 0 && expected.answers.every(a => a === '-');
     if (noAnswers) return { raw, ai, ok: true, questions: readStructure(ai.text), via: 'AI (đọc cấu trúc)' };
     return { raw, ai, ...app.parse(ai.text), via: 'AI → parser' };
@@ -162,7 +168,7 @@ for (const set of sets) {
     }
     if (result.skipped) { console.log(`⏭️  ${set.rel}: ${result.skipped}`); continue; }
     const problems = compare(set.expected, result);
-    const tag = `${result.via}${result.ai?.cachedAll ? ', cache' : ''}${result.ai?.truncated ? ', BỊ CẮT' : ''}`;
+    const tag = `${result.via}${result.ai?.models?.length ? ', ' + result.ai.models.join('+') : ''}${result.ai?.removedMarks ? `, bỏ ${result.ai.removedMarks} đáp án AI đoán` : ''}${result.ai?.cachedAll ? ', cache' : ''}${result.ai?.truncated ? ', BỊ CẮT' : ''}`;
     if (problems.length === 0) { pass++; console.log(`✅ ${set.rel} (${tag})`); }
     else {
         failures.push(set.rel);

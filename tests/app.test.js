@@ -56,6 +56,25 @@ test('nhận biết đề đã có đáp án', () => {
     assert.equal(hasHint('Câu 1: a?\nA. x\nB. y\nC. z'), false);
 });
 
+test('đề gốc không có đáp án: bỏ mọi dấu * AI tự thêm và đếm số dấu đã bỏ', () => {
+    const ai = 'Câu 1: Thủ đô?\nA. Huế\n*B. Hà Nội\nC. Vinh\n\ncâu hỏi đúng sai: Câu 2: Xét\n*A. p\nB. q\n  * C. r\nD. s';
+    const { text, removedMarks } = app.fn('finalizeConvertedText')(ai, false);
+    assert.equal(removedMarks, 3);
+    assert.equal(text, 'Câu 1: Thủ đô?\nA. Huế\nB. Hà Nội\nC. Vinh\n\ncâu hỏi đúng sai: Câu 2: Xét\nA. p\nB. q\n  C. r\nD. s');
+});
+
+test('đề gốc có đáp án: giữ nguyên kết quả của AI', () => {
+    const ai = 'Câu 1: Thủ đô?\nA. Huế\n*B. Hà Nội';
+    assert.deepEqual({ ...app.fn('finalizeConvertedText')(ai, true) }, { text: ai, removedMarks: 0 });
+});
+
+test('bỏ dấu * không đụng vào dấu * nằm trong nội dung hay công thức', () => {
+    const ai = 'Câu 1: Tính $a*b$\nA. 2*3\nB. $x^*$\n*C. 6';
+    const { text, removedMarks } = app.fn('finalizeConvertedText')(ai, false);
+    assert.equal(removedMarks, 1);
+    assert.equal(text, 'Câu 1: Tính $a*b$\nA. 2*3\nB. $x^*$\nC. 6');
+});
+
 test('tên đề lấy từ tên file, bỏ đuôi file', () => {
     assert.equal(app.fn('titleFromFileName')('De thi HK1.docx'), 'De thi HK1');
 });

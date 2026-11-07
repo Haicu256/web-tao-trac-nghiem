@@ -20,7 +20,8 @@
   },
   "vars": {
     "CF_AIG_ACCOUNT_ID": "9cfdacf13184881724759ce98fa45d5a",
-    "GEMINI_MODEL": "gemini-3.1-flash-lite"
+    "GEMINI_MODEL": "gemini-3.1-flash-lite",
+    "GEMINI_FALLBACK_MODEL": "gemini-3.5-flash-lite"
   },
 
   "kv_namespaces": [
