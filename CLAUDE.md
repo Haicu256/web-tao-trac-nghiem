@@ -24,6 +24,13 @@ Thư mục này là nơi phát triển chính. `~/Desktop/wtn` (Antigravity/Gemi
 4. Xem check "Workers Builds" của commit trên GitHub. Build lỗi thì Cloudflare giữ bản cũ và không báo gì khác, nên luôn phải xem.
 5. Thử web thật: `GET /` có header `content-security-policy`; `POST /api/convert` với một đề nhỏ trả 200.
 
+Muốn thử thay đổi của `worker.js` với secret thật mà **chưa** đưa lên web chính:
+`npx wrangler versions upload --message "..."` (thêm `--var TEN:gia_tri` nếu cần), rồi gọi
+`https://<8 ký tự đầu của Version ID>-web-tao-trac-nghiem.haicu25699652.workers.dev`.
+Phiên bản này dùng chung KV thật, nên đừng tạo link chia sẻ thử trên đó.
+
+Đo độ chính xác đọc đề: `npm run eval` (xem đầu file `scripts/eval.mjs`). Đề thật để trong `test_exams/private/` kèm `expected.json`, không lên git.
+
 ## Cấu hình Cloudflare
 
 - Secret (giá trị chỉ có trên Cloudflare): `GEMINI_API_KEY`, `CF_AIG_TOKEN`. `secrets.required` chỉ được liệt kê secret đã tạo, thiếu là deploy lỗi.

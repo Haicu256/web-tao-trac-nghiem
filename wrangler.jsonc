@@ -4,6 +4,7 @@
   "main": "worker.js",
   "compatibility_date": "2026-05-25",
   "keep_vars": true,
+  "preview_urls": true,
   "observability": {
     "enabled": true
   },
