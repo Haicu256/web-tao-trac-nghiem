@@ -54,15 +54,24 @@ dòng "Đáp án: B", lời giải "Chọn B", bảng đáp án) vẫn dùng đ�
   tự coi là Sai, trừ kiểu liệt kê các ý Đúng ("Đáp án: a, c").
 - Lời giải chỉ cho đáp án khi mọi lời khẳng định ("Chọn C", "Đáp án đúng là C") chỉ cùng một chữ cái; chữ cái đứng trước
   "sai", sau "không/loại", trong danh sách "A, B" hay là biến ("Vậy a = 2") không tính.
-- Bảng đáp án của đề nhiều phần đánh số lại (Phần I câu 1-18, Phần II câu 1-4) được chia theo phần; không chia khớp được
-  thì câu trùng số không nhận đáp án từ bảng.
+- Bảng đáp án của đề nhiều phần đánh số lại (Phần I câu 1-18, Phần II câu 1-4) được chia theo phần rồi ghép theo từng
+  loại câu (phần có đáp án chữ cái với phần trắc nghiệm, phần có Đ/S với phần đúng/sai); đề chỉ có một phần loại đó thì
+  dùng cả bảng. Không ghép được thì không dùng bảng và nhắc ghi "Phần I", "Phần II".
+- Đáp án gán theo **chữ cái ghi trong đề**, không theo vị trí: câu mất một phương án (A, C, D) thì "Đáp án: C" vẫn là
+  phương án C; hai phương án cùng chữ cái (câu bị gộp) thì không gán.
 
 ## Sửa nhãn AI sai bằng quy tắc (`reconcileLabels`)
 
 Prompt không bảo đảm được, nên các lỗi nhãn thấy rõ được sửa bằng code: dòng "Câu N:" đúng số kế tiếp (kể cả ở đầu phần
-gửi AI sau) là câu mới; dòng trông như phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi
-hay phương án; tiêu đề/chân trang trang PDF ("Trang 2/4 - Mã đề 101") luôn bỏ qua. `npm run fuzz -- labels` thử hàng
-nghìn dãy nhãn ngẫu nhiên trên đề không có đáp án để xem còn đường nào nhãn tạo ra được đáp án.
+gửi AI sau) là câu mới; dòng có tiền tố "câu hỏi đúng sai:" là câu đúng/sai; dòng trông như **phương án kế tiếp** của dãy
+("B." sau "A.") là phương án, dù AI gắn là đầu câu hay dòng nối tiếp; sau các phương án, dòng "Đáp án: …", "Chọn …",
+"Lời giải" là dòng đáp án; dòng "đầu câu" không số ngay sau câu có số chưa có phương án là phần tiếp của đề bài; tiêu đề
+"ĐÁP ÁN" không thể là câu hỏi hay phương án; "PHẦN II…" và tiêu đề/chân trang trang PDF ("Trang 2/4 - Mã đề 101") luôn
+bỏ qua.
+
+`npm run fuzz -- labels` thử hàng nghìn dãy nhãn ngẫu nhiên trên đề không có đáp án (không được ra đáp án nào);
+`npm run fuzz -- noise` gắn nhầm 1-2 nhãn kiểu hợp lý trên đề có đáp án (được mất đáp án, không được ra đáp án khác với
+file). Đo ngày 7/11/2026: trước khi thêm các quy tắc trên và gán theo chữ cái, 88/7500 lượt ra đáp án sai; sau đó 6/30000.
 
 ## Không đổi
 

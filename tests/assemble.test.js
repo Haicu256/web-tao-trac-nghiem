@@ -492,3 +492,62 @@ test('Chân trang "Trang 1/2 - Mã đề 101" rồi Phần II đánh số lại:
     assert.equal(r.cut, false);
     assert.deepEqual(r.questions.map(answerOf), ['B', 'A', 'ĐSĐS']);
 });
+
+test('Tiêu đề trang "Mã đề 101 - Trang 2/2" trong phần đánh số lại không cắt đề (đường chuyển file, không có mã ở đầu)', () => {
+    const r = convertLocally('PHẦN I. TRẮC NGHIỆM\nCâu 1: Một?\nA. x\n*B. y\nCâu 2: Hai?\n*A. x\nB. y\nCâu 3: Ba?\nA. x\n*B. y\nPHẦN II. TRẮC NGHIỆM\nCâu 1: Bốn?\n*A. x\nB. y\nMã đề 101 - Trang 2/2\nCâu 2: Năm?\nA. x\n*B. y');
+    assert.equal(r.cut, false);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A', 'B', 'A', 'B']);
+});
+
+test('Đề thứ hai không ghi "Trang" (Mã đề 102, số câu bắt đầu lại, không có tiêu đề phần) vẫn bị cắt', () => {
+    const r = convertLocally('Câu 1: Một?\nA. x\n*B. y\nCâu 2: Hai?\n*A. x\nB. y\n----- HẾT -----\nMã đề 102\nCâu 1: Hai?\nA. y\n*B. x');
+    assert.equal(r.cut, true);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A']);
+});
+
+test('AI gắn nhầm ý b) là dòng đáp án: các ý còn lại vẫn nhận đúng Đ/S theo chữ cái, không bị lệch', () => {
+    const lines = ['câu hỏi đúng sai: Câu 1: Xét các phát biểu', 'a) Ý một.', 'b) Ý hai.', 'c) Ý ba.', 'd) Ý bốn.', 'Đáp án: a) Sai, b) Đúng', 'c) Đúng, d) Sai'];
+    const out = fn('assembleQuizText')(lines, labels('TODOODD'));
+    const q = app.parse(out.text).questions[0];
+    // Câu còn ý a, c, d: a Sai, c Đúng, d Sai (không phải a Sai, c Đúng(b), d Đúng(c)).
+    assert.deepEqual([...q.options].map(o => plainText(o.text)), ['Ý một.', 'Ý ba.', 'Ý bốn.']);
+    assert.equal(answerOf(q), 'SĐS');
+});
+
+test('AI gắn nhầm phương án C là dòng nối tiếp: "Đáp án: D" vẫn là phương án D (theo chữ cái), không lệch sang C', () => {
+    const lines = ['Câu 1: Thủ đô?', 'A. Huế', 'B. Vinh', 'C. Đà Nẵng', 'D. Hà Nội', 'Đáp án: D'];
+    const out = fn('assembleQuizText')(lines, labels('QOOCOD'));
+    const q = app.parse(out.text).questions[0];
+    const correct = [...q.options].filter(o => o.isCorrect).map(o => plainText(o.text));
+    assert.deepEqual(correct, ['Hà Nội']);
+});
+
+test('Câu bị gộp (chữ cái phương án lặp A–D rồi A–D): "Đáp án: B" mơ hồ nên không gán', () => {
+    const r = app.parse('Câu 1: Một?\nA. x\nB. y\nC. z\nD. t\nA. p\nB. q\nC. r\nD. s\nĐáp án: B\nCâu 2: Hai?\n*A. x\nB. y');
+    assert.deepEqual([...r.questions].map(q => plainText(q.title)), ['Hai?']);
+});
+
+test('reconcileLabels: dòng "PHẦN II. TRẮC NGHIỆM" bị AI gắn là nội dung thì thành bỏ qua', () => {
+    const out = fn('reconcileLabels')(['Câu 1: x?', 'A. 1', 'B. 2', 'PHẦN II. TRẮC NGHIỆM', 'Câu 1: y?'], labels('QOOSQ'));
+    assert.equal(out[3], 'bo_qua');
+});
+
+test('reconcileLabels: dòng có tiền tố "câu hỏi đúng sai:" mà AI gắn là câu trắc nghiệm thì thành câu đúng/sai', () => {
+    const out = fn('reconcileLabels')(['câu hỏi đúng sai: Câu 1: Xét', 'a) Ý một.', 'b) Ý hai.'], labels('QOO'));
+    assert.equal(out[0], 'cau_hoi_dung_sai');
+});
+
+test('reconcileLabels: phương án kế tiếp ("B. …") bị AI gắn là dòng nối tiếp của A thì thành phương án', () => {
+    const lines = ['Câu 1: Thủ đô?', 'A. Huế', '⟦U⟧B. Hà Nội⟦/U⟧', 'C. Vinh', 'D. Đà Nẵng'];
+    const fixed = fn('reconcileLabels')(lines, labels('QOCOO'));
+    assert.equal(fixed[2], 'phuong_an');
+    const q = app.parse(fn('assembleQuizText')(lines, fixed).text).questions[0];
+    assert.equal(answerOf(q), 'B');
+});
+
+test('reconcileLabels: dòng "**Đáp án: C**" sau các phương án bị AI gắn là dòng nối tiếp thì thành dòng đáp án', () => {
+    const lines = ['Câu 1: x?', 'A.10', 'B.17', 'C.24', 'D.31', '⟦B⟧Đáp án: C⟦/B⟧'];
+    const fixed = fn('reconcileLabels')(lines, labels('QOOOOC'));
+    assert.equal(fixed[5], 'dap_an');
+    assert.equal(answerOf(app.parse(fn('assembleQuizText')(lines, fixed).text).questions[0]), 'C');
+});

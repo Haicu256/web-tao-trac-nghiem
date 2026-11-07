@@ -789,7 +789,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             for (let line of lines) {
                 // "D. 6⇥Đáp án đúng: B": dòng đáp án viết tiếp sau phương án, cách bằng tab hoặc nhiều dấu cách.
                 const trailingAnswer = line.match(/^(.*\S)(?:\t+|[ ]{2,})((?:đáp\s*án|chọn)(?:\s*(?:đúng|là))*\s*[:.\-–—]?\s*[A-Fa-f](?![\p{L}\d]).*)$/iu);
-                if (trailingAnswer && /(?:^|\s)(?:\*+\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*?\s*[.:\/\-–—)])\s/u.test(stripFormattingTags(trailingAnswer[1]))) {
+                if (trailingAnswer && /(?:^|\s)(?:\*+\s*)?(?:(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*?\s*[.:\/\-–—)])\s|[a-fA-F]\*?\.[\d√(+\-−])/u.test(stripFormattingTags(trailingAnswer[1]))) {
                     result.push(...splitInlineOptions(trailingAnswer[1]).split('\n'), trailingAnswer[2]);
                     continue;
                 }
@@ -1154,18 +1154,35 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 return { verdicts, assigned: 1 };
             }
 
+            // Chữ cái ghi trong đề (A, B… hay a, b…) quyết định phương án nào, không phải vị trí: câu mất một phương án
+            // (A, C, D, khi AI gắn nhầm nhãn hay đề gõ thiếu) thì "Đáp án: C" vẫn là phương án C, "Đáp án: B" không là gì.
+            function letterIndexOf(option, i) {
+                return option.optLetter ? option.optLetter.toUpperCase().charCodeAt(0) - 65 : i;
+            }
+            function optionIndexOf(q, letter) {
+                const want = String(letter).toUpperCase().charCodeAt(0) - 65;
+                const found = q.options.map((o, i) => (letterIndexOf(o, i) === want ? i : -1)).filter(i => i >= 0);
+                // Hai phương án cùng chữ cái (câu bị gộp: A–D rồi A–D) thì không biết là phương án nào.
+                return found.length === 1 ? found[0] : -1;
+            }
+            function tfLetterCount(q) {
+                return q.options.reduce((m, o, i) => Math.max(m, letterIndexOf(o, i) + 1), q.options.length);
+            }
+
             // Gộp đáp án đúng/sai qua nhiều dòng: chỉ điền ý chưa có, không ghi đè. Câu đã có dấu * thì giữ nguyên.
             // Câu chỉ có đáp án khi mọi ý đều đã được nói Đ hay S; ý không được nhắc tới không tự coi là Sai, trừ khi
             // dòng đáp án là kiểu liệt kê các ý Đúng ("Đáp án: a, c", "a, c đúng").
             function applyTFVerdicts(q, read) {
                 if (q.options.some(o => o.isStarCorrect)) return;
-                q.tfVerdicts = q.tfVerdicts || new Array(q.options.length).fill(null);
-                read.verdicts.forEach((v, i) => { if (i < q.tfVerdicts.length && q.tfVerdicts[i] === null && v !== null) q.tfVerdicts[i] = v; });
+                q.tfVerdicts = q.tfVerdicts || new Array(tfLetterCount(q)).fill(null);
+                read.verdicts.forEach((v, k) => { if (k < q.tfVerdicts.length && q.tfVerdicts[k] === null && v !== null) q.tfVerdicts[k] = v; });
                 if (read.kind === 'letters' || read.listedTrue) q.tfVerdicts = q.tfVerdicts.map(v => (v === null ? false : v));
-                // Chưa đủ ý thì chưa đánh dấu ý nào (bộ lọc cuối coi câu đúng/sai có một ý Đúng là đã có đáp án).
-                const complete = q.tfVerdicts.every(v => v !== null);
+                // Ý nào nhận đáp án theo chữ cái của ý. Chưa đủ mọi ý thì chưa đánh dấu ý nào (bộ lọc cuối coi câu đúng/sai
+                // có một ý Đúng là đã có đáp án).
+                const verdictOf = (o, i) => q.tfVerdicts[letterIndexOf(o, i)];
+                const complete = q.options.every((o, i) => verdictOf(o, i) === true || verdictOf(o, i) === false);
                 if (complete) q.hasExplicitTFAnswer = true;
-                q.options.forEach((o, i) => { o.isCorrect = complete && q.tfVerdicts[i] === true; o.isExplicitAnswer = o.isCorrect; });
+                q.options.forEach((o, i) => { o.isCorrect = complete && verdictOf(o, i) === true; o.isExplicitAnswer = o.isCorrect; });
             }
 
             // Dạng dùng cho bảng đáp án: chỉ nhận khi dòng nói đủ mọi ý (hoặc liệt kê các ý Đúng).
@@ -1233,7 +1250,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 let partSince = false;
                 for (let j = 0; j < startIdx; j++) {
                     const n = numberOf(lines[j]);
-                    if (n !== null) { if (n > maxBefore) maxBefore = n; partSince = false; } else if (isPartHeader(lines[j])) partSince = true;
+                    if (n !== null) { if (n > maxBefore) maxBefore = n; partSince = false; } else if (isPartHeader(lines[j])) { partSince = true; maxBefore = 0; }
                 }
                 for (let j = startIdx + 1; j < lines.length; j++) {
                     const n = numberOf(lines[j]);
@@ -1282,6 +1299,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     }
                     // Tiêu đề/chân trang lặp lại cùng mã đề (chép từ PDF) không phải đề mới.
                     if (firstExamCode && code.toLowerCase() === firstExamCode.toLowerCase()) return;
+                    // "Mã đề 101 - Trang 2/2" là tiêu đề trang: chưa có mã nào thì đây là mã của đề đang đọc.
+                    if (!firstExamCode && /(?:trang|page)\s*\d+/iu.test(trimmedLine)) {
+                        firstExamCode = code;
+                        return;
+                    }
                     if (hasStartedQuiz && hasQuestionsFollowup(lineIndex)) {
                         // Chưa thấy mã đề nào mà số câu chạy tiếp: đây là mã của chính đề đang đọc (ở chân trang 1).
                         if (!firstExamCode && !questionNumberingRestartsAfter(lineIndex)) {
@@ -1327,13 +1349,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     // Phần II đề THPT: câu không có tiền tố "câu hỏi đúng sai:" mà dòng đáp án ghi từng ý Đúng/Sai
                     // ("Đáp án: a) Đúng b) Sai …", "Đáp án: ĐSSĐ") là câu đúng/sai, không phải "chọn A".
                     if (currentQ.type !== 'true_false' && /^(?:đáp\s*án|answer|key)/i.test(trimmedLine)) {
-                        const tfLike = readTFVerdicts(trimmedLine, currentQ.options.length);
+                        const tfLike = readTFVerdicts(trimmedLine, tfLetterCount(currentQ));
                         if (tfLike && tfLike.kind !== 'letters' && tfLike.pure && tfLike.verdicts.every(v => v !== null)) currentQ.type = 'true_false';
                     }
                     if (currentQ.type === 'true_false') {
-                        const full = readTFVerdicts(trimmedLine, currentQ.options.length);
+                        const full = readTFVerdicts(trimmedLine, tfLetterCount(currentQ));
                         // "a) Đúng. Vì ..." nói về một ý đã có (không phải ý mới tiếp theo) là lời giải từng ý.
-                        const tfRead = full && (full.assigned >= 2 || /^(?:đáp\s*án|answer|key)/i.test(trimmedLine)) ? full : readSingleTFVerdict(trimmedLine, currentQ.options.length);
+                        const tfRead = full && (full.assigned >= 2 || /^(?:đáp\s*án|answer|key)/i.test(trimmedLine)) ? full : readSingleTFVerdict(trimmedLine, tfLetterCount(currentQ));
                         if (tfRead) {
                             applyTFVerdicts(currentQ, tfRead);
                             inExplanationSection = true;
@@ -1348,7 +1370,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     if (ansMatch) {
                         if (currentQ.type !== 'true_false') {
                             const letter = answerLineLetter(trimmedLine, ansMatch);
-                            const optIdx = letter ? letter.charCodeAt(0) - 65 : -1;
+                            const optIdx = letter ? optionIndexOf(currentQ, letter) : -1;
                             if (optIdx >= 0 && optIdx < currentQ.options.length) {
                                 if (!currentQ.options.some(o => o.isStarCorrect)) {
                                     currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
@@ -1369,7 +1391,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             for (let j = lineIndex + 1; j < lines.length; j++) {
                                 const nextL = lines[j].trim();
                                 if (!nextL) continue;
-                                nextTf = readTFVerdicts(nextL, currentQ.options.length);
+                                nextTf = readTFVerdicts(nextL, tfLetterCount(currentQ));
                                 break;
                             }
                             if (nextTf && nextTf.assigned >= 2) {
@@ -1390,7 +1412,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             break;
                         }
                         if (nextLetter && currentQ.type !== 'true_false') {
-                            const optIdx = nextLetter.charCodeAt(0) - 65;
+                            const optIdx = optionIndexOf(currentQ, nextLetter);
                             if (optIdx >= 0 && optIdx < currentQ.options.length) {
                                 if (!currentQ.options.some(o => o.isStarCorrect)) {
                                     currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
@@ -1411,7 +1433,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             const inlineAns = findExplanationAnswer(trimmedLine);
                             if (inlineAns) {
                                 const letter = inlineAns[1].toUpperCase();
-                                const optIdx = letter.charCodeAt(0) - 65;
+                                const optIdx = optionIndexOf(currentQ, letter);
                                 if (optIdx >= 0 && optIdx < currentQ.options.length) {
                                     if (!currentQ.options.some(o => o.isStarCorrect)) {
                                         currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
@@ -1478,7 +1500,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         const q = lastExplanationQ;
                         const pending = !q.hasExplicitTFAnswer || (q.tfVerdicts || []).some(v => v === null);
                         if (pending && !q.options.some(o => o.isStarCorrect)) {
-                            const tfRead = readTFVerdicts(trimmedLine, q.options.length) || readSingleTFVerdict(trimmedLine, q.options.length);
+                            const tfRead = readTFVerdicts(trimmedLine, tfLetterCount(q)) || readSingleTFVerdict(trimmedLine, tfLetterCount(q));
                             if (tfRead) {
                                 applyTFVerdicts(q, tfRead);
                                 return;
@@ -1491,7 +1513,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         const followAns = findExplanationAnswer(trimmedLine);
                         if (followAns) {
                             const letter = followAns[1].toUpperCase();
-                            const optIdx = letter.charCodeAt(0) - 65;
+                            const optIdx = optionIndexOf(lastExplanationQ, letter);
                             if (optIdx >= 0 && optIdx < lastExplanationQ.options.length) {
                                 lastExplanationQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
                                 lastExplanationQ.options[optIdx].isExplicitAnswer = true;
@@ -1716,16 +1738,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
             });
 
+            let tableNotMatched = false;
             if (answerTableLines.length > 0) {
-                // Đề nhiều phần đánh số lại từ 1: phần thứ k của bảng chỉ áp cho phần thứ k của đề. Không chia được rõ
-                // (số phần của bảng khác số phần của đề) thì không đoán cho những câu trùng số; người dùng tự đánh dấu.
+                // Đề nhiều phần đánh số lại từ 1 (Phần I câu 1-18, Phần II câu 1-4): bảng đáp án chia theo phần (dòng
+                // "Phần II" hoặc số câu bắt đầu lại) rồi ghép theo từng loại câu, theo thứ tự: các phần của bảng có đáp án chữ
+                // cái với các phần của đề có câu trắc nghiệm, các phần có Đ/S với các phần có câu đúng/sai. Đề chỉ có một
+                // phần loại đó thì dùng cả bảng (trừ số câu có đáp án khác nhau). Không ghép được thì không đoán.
                 const segments = splitAnswerTableByPart(answerTableLines);
-                // Phần chỉ có câu tự luận / trả lời ngắn (không có phương án) không có trong bảng: chỉ đếm các phần có câu
-                // có phương án, đánh lại thứ tự cho liền.
-                const withOptions = parsedQuestions.filter(q => q.options.length >= 2);
-                const partOrder = [...new Set(withOptions.map(q => q.part || 0))].sort((a, b) => a - b);
-                const partCount = Math.max(partOrder.length, 1);
-                const perPart = partCount > 1 && segments.length === partCount;
                 const keyMaps = tableLines => {
                     const mc = parseAnswerTable(tableLines.join('\n'));
                     const tf = new Map();
@@ -1743,33 +1762,62 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     }
                     return { mc, tf };
                 };
-                const segmentMaps = perPart ? segments.map(keyMaps) : null;
-                const wholeMaps = keyMaps(segments.flat());
-                const keyOf = q => `${q.type === 'true_false' ? 'tf' : 'mc'}:${q.qNum}`;
+                const segmentMaps = segments.map(keyMaps);
+                // Phần chỉ có câu tự luận / trả lời ngắn (không có phương án) không có trong bảng.
+                const withOptions = parsedQuestions.filter(q => q.options.length >= 2);
+                const kindOf = q => (q.type === 'true_false' ? 'tf' : 'mc');
+                const plan = {};
+                for (const kind of ['mc', 'tf']) {
+                    const tableParts = segmentMaps.map(m => m[kind]).filter(m => m.size > 0);
+                    const quizParts = [...new Set(withOptions.filter(q => kindOf(q) === kind).map(q => q.part || 0))].sort((x, y) => x - y);
+                    if (tableParts.length === 0 || quizParts.length === 0) {
+                        plan[kind] = null;
+                    } else if (tableParts.length === quizParts.length) {
+                        plan[kind] = { byPart: new Map(quizParts.map((part, k) => [part, tableParts[k]])) };
+                    } else if (quizParts.length === 1) {
+                        const merged = new Map();
+                        const conflict = new Set();
+                        for (const m of tableParts) {
+                            for (const [key, value] of m) {
+                                if (!merged.has(key)) merged.set(key, value);
+                                else if (String(merged.get(key)) !== String(value)) conflict.add(key);
+                            }
+                        }
+                        conflict.forEach(key => merged.delete(key));
+                        plan[kind] = { whole: merged };
+                    } else {
+                        plan[kind] = null;
+                        tableNotMatched = true;
+                    }
+                }
+                const keyOf = q => `${kindOf(q)}:${q.qNum}`;
                 const sameNumber = new Map();
                 withOptions.forEach(q => sameNumber.set(keyOf(q), (sameNumber.get(keyOf(q)) || 0) + 1));
                 parsedQuestions.forEach((q, idx) => {
                     if (q.options.length < 2) return;
-                    if (!perPart && sameNumber.get(keyOf(q)) > 1) return;
-                    const maps = perPart ? segmentMaps[partOrder.indexOf(q.part || 0)] : wholeMaps;
+                    const p = plan[kindOf(q)];
+                    if (!p) return;
+                    const map = p.byPart ? p.byPart.get(q.part || 0) : p.whole;
+                    if (!map) return;
+                    // Một phần mà hai câu trùng số (gõ nhầm, câu bị gộp) thì không biết đáp án của câu nào.
+                    if (p.whole && sameNumber.get(keyOf(q)) > 1) return;
                     const targetNum = q.qNum || (idx + 1);
                     // Câu có số thì chỉ tra đúng số đó; chỉ câu không đánh số mới tra theo thứ tự.
-                    const lookup = map => map.get(targetNum) || map.get(String(targetNum)) || (q.numbered ? undefined : map.get(idx + 1));
+                    const lookup = m => m.get(targetNum) || m.get(String(targetNum)) || (q.numbered ? undefined : m.get(idx + 1));
                     if (q.type !== 'true_false' && !q.options.some(o => o.isCorrect)) {
-                        const ansLetter = lookup(maps.mc);
+                        const ansLetter = lookup(map);
                         if (ansLetter) {
-                            const optIdx = ansLetter.charCodeAt(0) - 65;
+                            const optIdx = optionIndexOf(q, ansLetter);
                             if (optIdx >= 0 && optIdx < q.options.length) {
                                 q.options[optIdx].isCorrect = true;
                             }
                         }
                     } else if (q.type === 'true_false' && !q.hasExplicitTFAnswer && !q.options.some(o => o.isCorrect)) {
-                        const tfAns = lookup(maps.tf);
+                        const tfAns = lookup(map);
                         if (tfAns) {
                             q.options.forEach((opt, oIdx) => {
-                                if (oIdx < tfAns.length) {
-                                    opt.isCorrect = tfAns[oIdx];
-                                }
+                                const k = letterIndexOf(opt, oIdx);
+                                if (k < tfAns.length) opt.isCorrect = tfAns[k];
                             });
                             q.hasExplicitTFAnswer = true;
                         }
@@ -1794,6 +1842,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             if (unstarredTFCount > 0) dropMsgs.push(`${unstarredTFCount} câu Đúng/Sai chưa có đáp án`);
             if (nonStandardTFCount > 0) dropMsgs.push(`${nonStandardTFCount} câu Đúng/Sai không có 4 ý (chấm theo tỷ lệ)`);
             const notes = dropMsgs.length > 0 ? [`Đã xử lý ${dropMsgs.join('; ')}`] : [];
+            if (tableNotMatched) notes.push('Bảng đáp án không khớp các phần của đề nên chưa dùng: hãy ghi "Phần I", "Phần II"… trước đáp án của từng phần');
             // Câu trắc nghiệm có nhiều đáp án đúng vẫn chấm như cũ (chọn trúng một là được điểm) nhưng báo để giáo viên
             // kiểm tra lại đề (người dùng chọn ngày 7/11/2026).
             const multiAnswerNums = withCorrectAnswer.filter(q => q.type !== 'true_false' && q.options.filter(o => o.isCorrect).length > 1).map(q => q.qNum);
@@ -1844,7 +1893,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (hasMultipleExamCodes) {
                     showToast("⚠️ Phát hiện nhiều mã đề, chỉ đọc mã đề đầu; hãy tách file.", 6000);
                 } else if (dropMsgs.length > 0) {
-                    showToast(`⚠️ Không thể tạo đề (đã bỏ ${dropMsgs.join(' và ')}).`, 5000);
+                    showToast(`⚠️ Không thể tạo đề (đã bỏ ${dropMsgs.join(' và ')}).${tableNotMatched ? ' Bảng đáp án không khớp các phần của đề: hãy ghi "Phần I", "Phần II"… trước đáp án của từng phần.' : ''}`, 7000);
                 } else {
                     showToast("Không tìm thấy câu hỏi hợp lệ trong file (hoặc thiếu dấu * đáp án)!");
                 }
@@ -3294,6 +3343,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         }
         // Tiêu đề phần đánh dấu bằng chữ cái/La Mã: "B. TỰ LUẬN", "II. Tự luận (3 điểm)", "A. TRẮC NGHIỆM".
         const SECTION_TITLE_LINE_REGEX = /^(?:[A-E]|[IVX]{1,4})\s*[.):\-–—]\s*(?:PHẦN\s+)?(?:(?:TỰ\s*LUẬN|TRẮC\s*NGHIỆM|ĐỌC\s*HIỂU|LÀM\s*VĂN|VIẾT|ĐÚNG\s*[-–—\/]?\s*SAI|TRẢ\s*LỜI\s*NGẮN)(?![\p{L}])|(?:Tự\s*luận|Trắc\s*nghiệm|Đọc\s*hiểu|Làm\s*văn)\s*(?:\([^)]*\))?\s*[.:]?\s*$)/u;
+        const PART_HEADER_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:phần|part|section)\s+(?:[ivxlcdm]+|\d+|[a-d])(?![\p{L}\d])/iu;
+        function isPartHeaderLine(plain) {
+            return (PART_HEADER_REGEX.test(plain) && !isPartWordInSentence(plain)) || SECTION_TITLE_LINE_REGEX.test(plain);
+        }
         // Tiêu đề / chân trang lặp lại ở mỗi trang (chép chữ từ PDF): "Trang 2/4 - Mã đề 101", "Mã đề thi 101 Trang 3/3".
         // Một mục của bảng đáp án viết như câu hỏi: "Câu 35: D", "Câu 2: ĐSĐS", "Câu 1: a) Đ b) S c) Đ d) S".
         const ANSWER_ENTRY_REGEX = /^(?:câu|question|bài)\s*\d+\s*[:.\-–—)]\s*(?:[A-Fa-f]|[ĐSđs]{2,6}|(?:[a-dA-D]\s*[).:\-–—]\s*(?:đúng|sai|đ|s)(?![\p{L}\d])\s*[,;.]?\s*){2,})\s*[.;,]?$/iu;
@@ -3498,8 +3551,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Dòng trông rõ là phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi hay phương án.
                 const optMatch = plain.match(OPTION_PREFIX_REGEX);
                 const optLetter = optMatch ? (optMatch[2] || optMatch[3] || optMatch[4]).toUpperCase() : null;
-                if ((out[i] === 'cau_hoi' || out[i] === 'cau_hoi_dung_sai') && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
+                if (['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_phuong_an'].includes(out[i]) && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
                 if (ANSWER_TABLE_HEADING_REGEX.test(plain) && ['cau_hoi', 'cau_hoi_dung_sai', 'phuong_an', 'noi_dung_phuong_an'].includes(out[i])) out[i] = 'bang_dap_an';
+                if (isPartHeaderLine(plain) && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'bo_qua';
+                // Sau các phương án, dòng mở đầu bằng "Đáp án:", "Chọn C", "Lời giải" là dòng đáp án: gắn là dòng nối tiếp thì
+                // phương án cuối mang luôn chữ in đậm/gạch chân của dòng đáp án và bị hiểu nhầm là đáp án.
+                if (out[i] === 'noi_dung_phuong_an' && optionHasLetter && ANSWER_LINE_START_REGEX.test(plain)) out[i] = 'dap_an';
+                // Tiền tố "câu hỏi đúng sai:" ghi rõ trong dòng thì đây là câu đúng/sai dù AI gắn là câu trắc nghiệm.
+                if (out[i] === 'cau_hoi' && TF_PREFIX_REGEX.test(plain)) out[i] = 'cau_hoi_dung_sai';
                 const strong = plain.match(STRONG_QUESTION_START_REGEX);
                 if (strong && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'bo_qua'].includes(out[i]) && lastNumber !== null && parseInt(strong[1], 10) === lastNumber + 1) {
                     out[i] = TF_PREFIX_REGEX.test(plain) ? 'cau_hoi_dung_sai' : 'cau_hoi';
@@ -3553,14 +3612,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     // Chân trang "Trang 1/2 - Mã đề 101": chỉ ghi nhận mã đề.
                     const footer = PAGE_FURNITURE_REGEX.test(plain[i]) && plain[i].match(/(?:mã\s*đề(?:\s*thi)?|đề\s*số|exam\s*code|test\s*code)\s*[:.]?\s*([\p{L}\p{N}_\-]+)/iu);
                     if (footer && firstCode === null) firstCode = footer[1].toLowerCase();
+                    // Phần mới đánh số lại từ Câu 1: số câu "bắt đầu lại" chỉ so trong phần đang đọc.
+                    if (isPartHeaderLine(plain[i])) maxNumber = 0;
                     continue;
                 }
                 const code = m[1].toLowerCase();
+                // "Mã đề 101 - Trang 2/2" là tiêu đề trang: chưa có mã nào thì đây là mã của đề đang đọc.
+                if (firstCode === null && /(?:trang|page)\s*\d+/iu.test(plain[i])) { firstCode = code; continue; }
                 const next = nextNumberAfter(i);
                 // Có tiêu đề phần ("PHẦN II") giữa câu trước và câu sau thì số câu bắt đầu lại là phần mới, không phải đề mới.
                 let partBetween = false;
-                for (let j = i - 1; j >= 0 && numberAt(j) === null; j--) if ((PART_BOUNDARY_REGEX.test(plain[j]) && !isPartWordInSentence(plain[j])) || SECTION_TITLE_LINE_REGEX.test(plain[j])) partBetween = true;
-                for (let j = i + 1; j < plain.length && numberAt(j) === null; j++) if ((PART_BOUNDARY_REGEX.test(plain[j]) && !isPartWordInSentence(plain[j])) || SECTION_TITLE_LINE_REGEX.test(plain[j])) partBetween = true;
+                for (let j = i - 1; j >= 0 && numberAt(j) === null; j--) if (isPartHeaderLine(plain[j])) partBetween = true;
+                for (let j = i + 1; j < plain.length && numberAt(j) === null; j++) if (isPartHeaderLine(plain[j])) partBetween = true;
                 const restarts = i > firstQuestion && next !== null && next <= maxNumber && !partBetween;
                 if (firstCode === null && !restarts) { firstCode = code; continue; }
                 if (code === firstCode) continue;

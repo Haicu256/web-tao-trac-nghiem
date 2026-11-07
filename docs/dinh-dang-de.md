@@ -360,6 +360,19 @@ câu 1: B
 câu 2 tiêu đề: Câu ba?
 ```
 
+### Phương án viết liền số ("D.31") rồi đáp án cuối dòng
+```de
+Câu 1: Giá trị nào?
+A.10
+B.17
+C.24
+D.31	Đáp án đúng: A
+```
+```ket-qua
+câu 1: A
+câu 1 phương án D: 31
+```
+
 ### Cả câu, phương án và đáp án trên một dòng, cách bằng tab
 ```de
 Câu 1: 2 + 2 = ?	A. 3	B. 4	C. 5	D. 6	Đáp án đúng: B
@@ -710,9 +723,9 @@ câu 3: C
 câu 4: D
 ```
 
-### Bảng đáp án không chia được theo phần thì không đoán cho các câu trùng số
-Đề có hai phần đánh số lại nhưng bảng chỉ có một dãy: câu số 1, 2 có ở cả hai phần nên không biết đáp án thuộc phần
-nào; chỉ câu 3 (không trùng số) được nhận đáp án.
+### Bảng đáp án không chia được theo phần thì không đoán
+Đề có hai phần trắc nghiệm đánh số lại nhưng bảng chỉ có một dãy: không biết bảng là của phần nào, nên không dùng bảng
+(web nhắc ghi "Phần I", "Phần II" trước đáp án của từng phần).
 ```de
 PHẦN A
 Câu 1: Một?
@@ -735,9 +748,7 @@ B. b
 1.A 2.B 3.B
 ```
 ```ket-qua
-số câu: 1
-câu 1 tiêu đề: Ba?
-câu 1: B
+không đọc được
 ```
 
 ### Phần tự luận đánh số lại không làm mất bảng đáp án của phần trắc nghiệm
@@ -793,6 +804,30 @@ câu 1: A
 câu 2: B
 câu 3: B
 câu 4: A
+```
+
+### Bảng đáp án có hai phần mà đề chỉ còn một phần: số câu có hai đáp án khác nhau thì không đoán
+```de
+Câu 1: Một?
+A. x
+B. y
+C. z
+D. t
+Câu 2: Hai?
+A. x
+B. y
+C. z
+D. t
+ĐÁP ÁN
+Phần I
+1.D
+Phần II
+1.B 2.C
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Hai?
+câu 1: C
 ```
 
 ### Câu trắc nghiệm không có đáp án bị bỏ, câu có đáp án vẫn giữ
@@ -1170,6 +1205,28 @@ câu 1 số phương án: 2
 câu 1: B
 ```
 
+### Đề thiếu một phương án: đáp án theo chữ cái ghi trong đề, không theo vị trí
+Câu 1 gõ thiếu phương án C nên "Đáp án: D" là phương án D (thứ ba trên màn hình). Câu 2 ghi "Đáp án: C" nhưng không có
+phương án C nên không có đáp án (bị bỏ).
+```de
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Vinh
+D. Hà Nội
+Đáp án: D
+Câu 2: Câu hai?
+A. một
+B. hai
+D. bốn
+Đáp án: C
+```
+```ket-qua
+số câu: 1
+câu 1 số phương án: 3
+câu 1: C
+câu 1 phương án C: Hà Nội
+```
+
 ### Phương án nhiều dòng (không có dòng trống ở giữa)
 ```de
 Câu 1: Chọn câu đúng
@@ -1354,6 +1411,33 @@ d) Ý bốn
 số câu: 3
 câu 3 loại: đúng sai
 câu 3: ĐSĐS
+```
+
+### Tiêu đề trang có mã đề nằm giữa phần đã đánh số lại không cắt đề (đề không ghi mã ở đầu)
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Một?
+A. x
+*B. y
+Câu 2: Hai?
+*A. x
+B. y
+Câu 3: Ba?
+A. x
+*B. y
+PHẦN II. TRẮC NGHIỆM
+Câu 1: Bốn?
+*A. x
+B. y
+Mã đề 101 - Trang 2/2
+Câu 2: Năm?
+A. x
+*B. y
+```
+```ket-qua
+số câu: 5
+câu 5: B
+câu 5 tiêu đề: Năm?
 ```
 
 ### Dòng "HẾT PHẦN I" giữa đề không dính vào câu nào

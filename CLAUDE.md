@@ -15,7 +15,7 @@ Thư mục này là nơi phát triển chính. `~/Desktop/wtn` (Antigravity/Gemi
 |---|---|
 | `npm test` | chạy toàn bộ test (`node --test`, không cần thư viện ngoài) |
 | `npm run check` | test và `wrangler deploy --dry-run`; phải pass trước khi push |
-| `npm run fuzz` | sinh hàng nghìn đề có đáp án biết trước (văn bản, Word, nhãn AI ngẫu nhiên) và so kết quả; mã lỗi khi có đáp án bịa ra hoặc crash. Xem đầu file `scripts/fuzz.mjs` |
+| `npm run fuzz` | sinh hàng nghìn đề có đáp án biết trước (văn bản, Word, đề nhiều phần, nhãn AI ngẫu nhiên / gắn nhầm) và so kết quả; mã lỗi khi có đáp án bịa ra hoặc crash. Xem đầu file `scripts/fuzz.mjs` |
 | `npm run dev` | chạy web trên máy ở cổng 8787. Muốn thử `/api/convert` thì cần `.dev.vars` có `GEMINI_API_KEY`, `CF_AIG_TOKEN` |
 
 ## Deploy

@@ -4,6 +4,10 @@
 //                                    (prepareLines → labelLinesLocally → assembleQuizText → parseQuizData)
 //   npm run fuzz -- docx 600         chỉ đề Word có gạch chân / tô sáng / chữ màu / in đậm đánh dấu đáp án
 //   npm run fuzz -- labels 2500      đề KHÔNG có đáp án + nhãn AI ngẫu nhiên: không dãy nhãn nào được làm ra đáp án
+//   npm run fuzz -- parts 2000       đề nhiều phần (trắc nghiệm / đúng sai / tự luận) đánh số lại từng phần, bảng đáp án
+//                                    theo phần, chân trang mã đề, lời giải "Xét phương án A", "Vậy a bằng 2"...
+//   npm run fuzz -- noise 1500       đề nhiều phần CÓ đáp án + AI gắn nhầm 1-2 nhãn kiểu hợp lý: được phép mất đáp án,
+//                                    không được ra đáp án khác với file (so theo nội dung phương án / ý)
 //   thêm --seed=N để đổi bộ đề, --show=N để in N ví dụ mỗi nhóm lỗi
 // Thoát với mã 1 nếu có đáp án bị bịa ra từ đề không có bằng chứng (text, docx), hoặc bị lỗi chạy (crash).
 // Các nhóm lỗi đã biết, mức thấp (xem docs/dinh-dang-de.md, mục "Giới hạn đã biết") chỉ được in ra.
@@ -22,7 +26,7 @@ const app = loadApp({ JSZip, mammoth: mammothLikeBrowser, DOMParser, XMLSerializ
 const fn = name => app.fn(name);
 
 const args = process.argv.slice(2);
-const modes = args.filter(a => ['text', 'docx', 'labels'].includes(a));
+const modes = args.filter(a => ['text', 'docx', 'labels', 'parts', 'noise'].includes(a));
 const countArg = Number(args.find(a => /^\d+$/.test(a)) || 0);
 let seed = Number((args.find(a => a.startsWith('--seed=')) || '--seed=777').slice(7));
 const SHOW = Number((args.find(a => a.startsWith('--show=')) || '--show=1').slice(7));
@@ -306,9 +310,148 @@ function runLabels(tries) {
     printGroups(`Nhãn AI ngẫu nhiên (${NO_ANSWER_EXAMS.length} đề × ${tries} dãy nhãn)`, kinds, ex => ex.r.lines.map((l, i) => `    ${String(ex.r.labels[i]).padEnd(18)} ${l}`).join('\n'));
 }
 
-const run = modes.length ? modes : ['text', 'docx', 'labels'];
+// ---------------- Đề nhiều phần ----------------
+function mcPartQuestion(n, mode) {
+    const correct = Math.floor(rnd() * 4);
+    const other = (correct + 1 + Math.floor(rnd() * 3)) % 4;
+    const optKind = pick(['words', 'words', 'ratio', 'glued']);
+    const opts = [0, 1, 2, 3].map(i => (optKind === 'ratio' ? `a:${i + 1}   b:${i + 2}` : optKind === 'glued' ? String(10 + i * 7) : `${words(1 + Math.floor(rnd() * 2))} ${i}`));
+    const ev = mode === 'table' ? 'table' : pick(['star', 'triple', 'line', 'mdline', 'chooseWhy', 'consider', 'variable', 'correctWhy', 'trailing', 'none']);
+    const lines = [`Câu ${n}: ${words(4)}?`];
+    opts.forEach((t, i) => {
+        const marker = optKind === 'glued' ? `${LETTERS[i]}.` : `${LETTERS[i]}. `;
+        let line = `${marker}${t}`;
+        if (i === correct && ev === 'star') line = `*${line}`;
+        if (i === correct && ev === 'triple') line = `***${marker}${t}***`;
+        if (i === 3 && ev === 'trailing') line += `\tĐáp án đúng: ${LETTERS[correct]}`;
+        lines.push(line);
+    });
+    const X = LETTERS[correct], Y = LETTERS[other];
+    if (ev === 'line') lines.push(`Đáp án: ${X}`);
+    if (ev === 'mdline') lines.push(`**Đáp án: ${X}**`);
+    if (ev === 'chooseWhy') lines.push(`Lời giải: Chọn ${X} vì phương án ${Y} sai.`);
+    if (ev === 'consider') lines.push('Lời giải:', `Xét phương án ${Y}: không thỏa mãn điều kiện.`, `Xét phương án ${X}: thỏa mãn. Chọn ${X}.`);
+    if (ev === 'variable') lines.push('Ta có a + 3 = 5.', 'Vậy a bằng 2.', `Chọn ${X}.`);
+    if (ev === 'correctWhy') lines.push(`Đáp án: ${X} đúng vì phương án ${Y} sai.`);
+    return { n, lines, answer: ev === 'none' ? null : X, opts };
+}
+function tfPartQuestion(n) {
+    const truth = [0, 1, 2, 3].map(() => chance(0.5));
+    if (!truth.some(Boolean)) truth[Math.floor(rnd() * 4)] = true;
+    const word = v => (v ? 'Đúng' : 'Sai');
+    const ev = pick(['star', 'line', 'twoLines', 'perStatement', 'compact']);
+    const lines = [`câu hỏi đúng sai: Câu ${n}: ${words(4)}.`];
+    truth.forEach((v, i) => lines.push(`${ev === 'star' && v ? '*' : ''}${'abcd'[i]}) ${words(3)} ${i}.`));
+    if (ev === 'line') lines.push(`Đáp án: ${truth.map((v, i) => `${'abcd'[i]}) ${word(v)}`).join(' ')}`);
+    if (ev === 'twoLines') lines.push(`Đáp án: a) ${word(truth[0])}, b) ${word(truth[1])}`, `c) ${word(truth[2])}, d) ${word(truth[3])}`);
+    if (ev === 'perStatement') lines.push('Lời giải:', ...truth.map((v, i) => `${'abcd'[i]}) ${word(v)}. Vì ${words(2)}.`));
+    if (ev === 'compact') lines.push(`Đáp án: ${truth.map(v => (v ? 'Đ' : 'S')).join('')}`);
+    return { n, lines, answer: truth.map(v => (v ? 'Đ' : 'S')).join(''), truth, statements: lines.slice(1, 5).map(l => l.replace(/^\*?[a-d]\)\s*/, '')) };
+}
+function genPartsExam() {
+    const romans = ['I', 'II', 'III'];
+    {
+        const shape = pick(['A', 'A', 'B', 'C']);
+        const parts = shape === 'B' ? [{ kind: 'mc', mode: 'table' }, { kind: 'mc', mode: 'table' }] : [{ kind: 'mc', mode: shape === 'A' && chance(0.5) ? 'table' : 'inline' }];
+        if (shape !== 'B' && chance(0.6)) parts.push({ kind: 'tf' });
+        if (chance(0.4)) parts.push({ kind: 'essay' });
+        const out = chance(0.3) ? ['Mã đề 101'] : [];
+        parts.forEach((part, pi) => {
+            const title = { mc: 'TRẮC NGHIỆM', tf: 'ĐÚNG SAI', essay: 'TỰ LUẬN' }[part.kind];
+            out.push(pick([`PHẦN ${romans[pi]}. ${title}`, `Phần ${romans[pi]}: ${title.toLowerCase()}`]));
+            part.qs = [];
+            for (let k = 1, count = part.kind === 'essay' ? 1 + Math.floor(rnd() * 2) : 1 + Math.floor(rnd() * 3); k <= count; k++) {
+                if (part.kind === 'essay') { out.push(`Câu ${k}: Trình bày ${words(3)}.`); continue; }
+                const q = part.kind === 'mc' ? mcPartQuestion(k, part.mode) : tfPartQuestion(k);
+                part.qs.push(q);
+                out.push(...q.lines);
+                if (chance(0.15)) out.push(pick(['Trang 1/2 - Mã đề 101', 'Mã đề 101 - Trang 2/2', 'Trang 2']));
+            }
+        });
+        const tableParts = parts.filter(p => p.mode === 'table');
+        if (tableParts.length) {
+            out.push(pick(['ĐÁP ÁN', 'BẢNG ĐÁP ÁN']));
+            tableParts.forEach((p, k) => {
+                const head = tableParts.length > 1 || chance(0.4) ? pick([`Phần ${romans[parts.indexOf(p)]}`, `Phần ${romans[parts.indexOf(p)]} (${2 + k} điểm)`, `PHẦN ${romans[parts.indexOf(p)]}:`, '']) : '';
+                if (head) out.push(head);
+                const answers = p.qs.map(() => LETTERS[Math.floor(rnd() * 4)]);
+                out.push(p.qs.map((q, j) => `${q.n}.${answers[j]}`).join(' '));
+                p.tableAnswers = answers;
+            });
+        }
+        // Đáp án mong đợi theo thứ tự đọc: câu trong phần có bảng lấy đáp án từ bảng.
+        const want = [];
+        const items = [];
+        parts.forEach(p => (p.qs || []).forEach((q, j) => {
+            const a = p.mode === 'table' ? p.tableAnswers[j] : q.answer;
+            if (a) want.push(a);
+            items.push({ title: q.lines[0].replace(/^câu hỏi đúng sai:\s*/i, '').replace(/^Câu\s*\d+:\s*/, ''), answer: a, q, tf: p.kind === 'tf' });
+        }));
+        return { text: out.join('\n'), want, items, parts };
+    }
+}
+
+function runParts(n) {
+    const groups = new Map();
+    for (let c = 0; c < n; c++) {
+        const { text, want, parts } = genPartsExam();
+        for (const path of ['txt', 'convert']) {
+            let got;
+            try { got = path === 'txt' ? parseTxt(text) : convertText(text); } catch (err) { got = { crash: String(err) }; report.crashed++; }
+            const answers = got.crash ? 'CRASH' : got.ok ? got.questions.map(q => q.answer).join(',') : '';
+            if (answers !== want.join(',')) addGroup(groups, `${path} | ${parts.map(p => p.kind + (p.mode ? ':' + p.mode : '')).join('+')}`, { text, want, answers });
+        }
+    }
+    printGroups(`Đề nhiều phần (${n} đề × 2 đường)`, groups, ex => ex.text.split('\n').map(l => '    | ' + l).join('\n') + `\n    mong đợi [${ex.want}], đọc ra [${ex.answers}]`);
+}
+
+// ---------------- Nhãn AI nhầm (hợp lý) trên đề có đáp án ----------------
+const CONFUSE = { cau_hoi: ['noi_dung_cau_hoi', 'noi_dung_phuong_an'], noi_dung_cau_hoi: ['cau_hoi', 'bo_qua'], phuong_an: ['noi_dung_phuong_an', 'cau_hoi', 'dap_an'],
+    noi_dung_phuong_an: ['phuong_an', 'dap_an'], dap_an: ['noi_dung_phuong_an', 'bo_qua', 'noi_dung_cau_hoi'], bang_dap_an: ['bo_qua', 'dap_an'],
+    bo_qua: ['noi_dung_cau_hoi', 'noi_dung_phuong_an'], cau_hoi_dung_sai: ['cau_hoi', 'noi_dung_cau_hoi'] };
+function runNoise(n) {
+    const groups = new Map();
+    let runs = 0;
+    for (let c = 0; c < n; c++) {
+        const ex = genPartsExam();
+        const byTitle = new Map(ex.items.map(it => [it.title, it]));
+        const base = convertText(ex.text);
+        for (let t = 0; t < 5; t++) {
+            const labels = [...base.labels];
+            const changed = [];
+            for (let k = 0, m = 1 + Math.floor(rnd() * 2); k < m; k++) {
+                const at = Math.floor(rnd() * labels.length);
+                if (!CONFUSE[labels[at]]) continue;
+                const from = labels[at];
+                labels[at] = pick(CONFUSE[from]);
+                changed.push(`${from}→${labels[at]}`);
+            }
+            runs++;
+            const r = convertText(ex.text, (chunk, start) => labels.slice(start, start + chunk.length));
+            for (const q of r.questions) {
+                const it = byTitle.get(q.title.split(' / ')[0].trim());
+                if (!it || !it.answer || q.answer === '-') continue;
+                // So theo nội dung: phương án / ý được đánh Đúng phải là phương án / ý Đúng trong file (cho phép chữ bị nối thêm).
+                let wrong;
+                if (!it.tf) {
+                    const marked = q.answer.split(',').map(ch => norm(q.options[ch.charCodeAt(0) - 65] || ''));
+                    wrong = marked.length !== 1 || !marked[0].startsWith(norm(it.q.opts[it.answer.charCodeAt(0) - 65]));
+                } else {
+                    wrong = q.options.some((text, k) => { const at = it.q.statements.findIndex(st => norm(text).startsWith(norm(st))); return at < 0 || it.q.truth[at] !== (q.answer[k] === 'Đ'); });
+                }
+                if (wrong) addGroup(groups, changed.join(' & '), { r, title: it.title, got: q.answer, want: it.answer });
+            }
+        }
+    }
+    // Không tính là lỗi chặn (cần nhãn sai); dùng để thấy đường nào nhãn sai làm ra đáp án sai.
+    printGroups(`Nhãn AI nhầm trên đề có đáp án (${runs} lượt)`, groups, ex => `    câu "${ex.title}": ra ${ex.got}, đúng là ${ex.want}\n` + ex.r.lines.map((l, i) => `    ${String(ex.r.labels[i]).padEnd(18)} ${l}`).join('\n'));
+}
+
+const run = modes.length ? modes : ['text', 'docx', 'labels', 'parts', 'noise'];
 if (run.includes('text')) runText(countArg || 3000);
 if (run.includes('docx')) await runDocx(countArg || 400);
 if (run.includes('labels')) runLabels(countArg || 1500);
+if (run.includes('parts')) runParts(countArg || 2000);
+if (run.includes('noise')) runNoise(countArg || 1500);
 console.log(`\nĐáp án bịa ra từ đề không có bằng chứng: ${report.fabricated}. Lỗi chạy: ${report.crashed}.`);
 process.exit(report.fabricated || report.crashed ? 1 : 0);
