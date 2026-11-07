@@ -204,6 +204,8 @@ async function handleConvert(request, env) {
         const gateway = env.CF_AIG_GATEWAY?.trim() || 'default';
         const model = env.GEMINI_MODEL?.trim() || 'gemini-3.1-flash-lite';
         const isGemini3 = model.startsWith('gemini-3');
+        // Chỉ Gemini 2.5 nhận thinkingBudget; dòng 3.x đổi sang thinkingLevel và chưa rõ có chấp nhận
+        // tham số cũ không, nên với 3.x không gửi gì (giống bản đã chạy ổn trên production).
         const supportsThinking = model.startsWith('gemini-2.5');
         const geminiUrl = `https://gateway.ai.cloudflare.com/v1/${accountId}/${gateway}/google-ai-studio/v1beta/models/${model}:generateContent`;
 

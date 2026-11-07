@@ -1,15 +1,12 @@
-# wrangler files
-.wrangler
-.wrangler_config/
+# Cloudflare / wrangler
+.wrangler/
 .dev.vars*
 !.dev.vars.example
 .env*
 !.env.example
 
-# node & testing
+# Node
 node_modules/
-test-results/
-playwright-report/
-blob-report/
-.playwright-mcp/
-graphify-out/
+
+# Cấu hình Claude Code riêng của máy này (có đường dẫn tuyệt đối)
+.claude/
