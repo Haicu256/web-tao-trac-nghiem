@@ -4,7 +4,7 @@ const SHARE_RENEW_AFTER_SECONDS = 60 * 60 * 24 * 30;
 const MAX_SHARE_CHARS = 300_000;
 const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
 const MAX_TITLE_CHARS = 100;
-const CSP_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; media-src 'self'; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; img-src 'self' data:; frame-ancestors 'none';";
+const CSP_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; media-src 'self'; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; img-src 'self' data:; frame-ancestors 'none';";
 
 export default {
     async fetch(request, env) {
@@ -577,6 +577,7 @@ QUY TẮC BẮT BUỘC:
    - Nếu cuối văn bản có phần "[BẢNG ĐÁP ÁN CHUNG CỦA ĐỀ ĐỂ TRA CỨU]", hãy dùng bảng đó để gắn dấu * cho các câu hỏi có số thứ tự tương ứng trong phần này, và KHÔNG in lại bảng đáp án đó ở kết quả đầu ra.
    - LOẠI BỎ LỜI GIẢI / GIẢI THÍCH CHI TIẾT: Nếu sau các phương án có phần lời giải hoặc giải thích chi tiết (ví dụ: "Lời giải:...", "Hướng dẫn giải:...", "Giải thích:...", "Đáp án đúng là B vì..."), hãy sử dụng thông tin đó để xác định và đánh dấu * vào phương án đúng, nhưng TUYỆT ĐỐI KHÔNG xuất lại đoạn văn bản lời giải/giải thích đó ở kết quả đầu ra. Chỉ xuất tiêu đề câu hỏi và các phương án lựa chọn.
    - KHÔNG thêm bất kỳ lời chào, giải thích, ghi chú hay kết luận nào ngoài các câu hỏi đã chuẩn hóa.
+   - CÔNG THỨC TOÁN: Công thức viết bằng LaTeX trong cặp dấu $...$ (ví dụ $\\frac{1}{2}$, $x^{2}$, $\\sqrt{3}$) phải được giữ nguyên từng ký tự, kể cả hai dấu $. Không đổi sang dạng khác, không bỏ dấu $, không tính ra kết quả.
 
 A. ĐỐI VỚI CÂU HỎI TRẮC NGHIỆM ĐÚNG/SAI:
 - Nhận diện: Các câu hỏi yêu cầu xác định Đúng hay Sai cho từng phát biểu/nhận định (True/False). LƯU Ý: Nếu văn bản gốc là bảng ngân hàng câu hỏi có cột phụ ghi ĐÚNG/SAI để đánh dấu phương án đúng cho câu hỏi trắc nghiệm 4 lựa chọn thông thường (chỉ 1 ý ĐÚNG và 3 ý SAI), thì đó là câu trắc nghiệm thông thường ở mục B (đặt dấu * vào phương án ĐÚNG), KHÔNG phải câu hỏi đúng/sai mục A.

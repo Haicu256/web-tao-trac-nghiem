@@ -598,13 +598,70 @@ số câu: 1
 câu 1 phương án B: 2
 ```
 
-## 10. Giới hạn đã biết
+## 10. Công thức toán
+
+Công thức viết bằng LaTeX trong cặp dấu `$...$` (ví dụ `$\frac{1}{2}$`, `$x^{2}$`, `$\sqrt{3}$`).
+Khi làm bài, web vẽ công thức bằng KaTeX. File Word dùng Equation có sẵn của Word được tự đổi sang dạng này
+khi bấm **Chuyển đổi file** (xem `docs/thiet-ke/cong-thuc-toan.md`).
+Quy ước: ngay sau `$` mở và ngay trước `$` đóng không có dấu cách, nên `$5 and $10` vẫn là chữ thường.
+
+### Công thức trong câu hỏi và phương án được giữ nguyên
+```de
+Câu 1: Rút gọn biểu thức $\frac{x^{2}-1}{x+1}$ với $x \neq -1$.
+A. $x+1$
+*B. $x-1$
+C. $\frac{1}{x-1}$
+D. $x^{2}$
+```
+```ket-qua
+câu 1: B
+câu 1 tiêu đề: Rút gọn biểu thức $\frac{x^{2}-1}{x+1}$ với $x \neq -1$.
+câu 1 phương án C: $\frac{1}{x-1}$
+```
+
+### Hệ phương trình trong câu hỏi
+```de
+Câu 1: Nghiệm của hệ $\begin{cases} x+y=3 \\ x-y=1 \end{cases}$ là
+A. $(1;2)$
+*B. $(2;1)$
+```
+```ket-qua
+câu 1: B
+câu 1 tiêu đề: Nghiệm của hệ $\begin{cases} x+y=3 \\ x-y=1 \end{cases}$ là
+```
+
+### Dấu * trong công thức không phải đáp án
+```de
+Câu 1: Tính $a*b$ với $a=2, b=3$
+A. $5$
+*B. $6$
+C. $a*b$
+```
+```ket-qua
+câu 1: B
+câu 1 phương án C: $a*b$
+```
+
+### Công thức trong câu đúng/sai
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số $y = x^{3} - 3x$.
+*A. Hàm số có hai điểm cực trị
+B. $y'(0) = 3$
+*C. $\lim_{x \to +\infty} y = +\infty$
+D. Đồ thị đi qua điểm $(1; 2)$
+```
+```ket-qua
+câu 1: ĐSĐS
+câu 1 phương án C: $\lim_{x \to +\infty} y = +\infty$
+```
+
+## 11. Giới hạn đã biết
 
 - Ở câu đúng/sai, một ý chỉ gồm chữ Đ/S/T/F (ví dụ `D. S`) bị hiểu nhầm là dòng đáp án và mất ý đó. Phát biểu thật luôn dài hơn nên hiếm gặp.
 - Đoạn văn đứng giữa hai câu chỉ được chuyển xuống câu sau khi có **dòng trống** ngăn với phương án cuối. Không có dòng trống thì nó bị nối vào phương án cuối của câu trước.
 - Câu không đánh số (không có `Câu 1:`, `1.`…) không đọc được; dùng nút **Chuyển đổi file** để AI đánh số.
 
-## 11. An toàn
+## 12. An toàn
 
 ### Thẻ HTML trong đề hiện ra như chữ, không chạy
 ```de

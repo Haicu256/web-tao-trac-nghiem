@@ -54,6 +54,7 @@ function makeBrowser() {
         querySelectorAll: () => [],
         addEventListener() {},
         documentElement: fakeElement('html'),
+        head: fakeElement('head'),
         body: fakeElement('body'),
     };
     const storage = new Map();
@@ -97,6 +98,8 @@ export function loadApp() {
             return { ok, questions: run('originalQuestions') };
         },
         fn: name => context[name],
+        setGlobal(name, value) { context[name] = value; },
+        document: context.document,
         get lastToast() { return context.document.getElementById('toast').textContent; },
     };
 }

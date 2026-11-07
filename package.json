@@ -9,6 +9,8 @@
     "check": "node --test \"tests/*.test.js\" && wrangler deploy --dry-run"
   },
   "devDependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "katex": "0.18.11",
     "wrangler": "^4.151.1"
   }
 }

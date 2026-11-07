@@ -353,7 +353,9 @@ câu hỏi đúng sai: Câu 1: Cho hàm số y = f(x). Xét tính đúng/sai c�
 *A. Hàm số đồng biến trên khoảng (0; 2)
 B. Hàm số có 3 điểm cực trị
 *C. Đồ thị hàm số đi qua gốc tọa độ O
-D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
+D. Giá trị nhỏ nhất của hàm số bằng 1
+
+<b>Công thức toán:</b> viết trong cặp dấu $...$, ví dụ $\frac{1}{2}$, $x^{2}$, $\sqrt{3}$</pre>
         </div>
 
         <div id="config-section" class="card">
@@ -1661,7 +1663,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 qBox.id = `qbox-${qIndex}`;
                 const qTitle = document.createElement('div');
                 qTitle.className = 'question-title';
-                qTitle.innerHTML = `Câu ${qIndex + 1}: ${q.title}`;
+                qTitle.innerHTML = `Câu ${qIndex + 1}: ${renderMathInHtml(q.title)}`;
                 qBox.appendChild(qTitle);
 
                 const optionsDiv = document.createElement('div');
@@ -1682,7 +1684,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
 
                         const textSpan = document.createElement('span');
                         textSpan.className = 'tf-text';
-                        textSpan.innerHTML = opt.text;
+                        textSpan.innerHTML = renderMathInHtml(opt.text);
                         statementDiv.appendChild(textSpan);
 
                         const checkboxGroup = document.createElement('div');
@@ -1780,7 +1782,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                         const prefix = String.fromCharCode(65 + oIndex);
                         const cleanAriaText = decodeHTMLEntities(opt.text.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
                         btn.setAttribute('aria-label', `Câu ${qIndex + 1}, đáp án ${prefix}: ${cleanAriaText}`);
-                        btn.innerHTML = `<b>${prefix}.</b> ${opt.text}`;
+                        btn.innerHTML = `<b>${prefix}.</b> ${renderMathInHtml(opt.text)}`;
                         btn.onclick = () => handleSelection(btn, optionsDiv, qIndex, oIndex, mode);
                         optionsDiv.appendChild(btn);
                     });
@@ -1910,8 +1912,25 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             return calculateScore();
         }
 
-        function startQuiz() {
-            if (!originalQuestions || originalQuestions.length === 0) return;
+        let quizStarting = false;
+        async function startQuiz() {
+            if (!originalQuestions || originalQuestions.length === 0 || quizStarting) return;
+            quizStarting = true;
+            try {
+                if (questionsHaveMath(originalQuestions)) {
+                    try {
+                        await ensureKatex();
+                    } catch (e) {
+                        showToast('Không tải được phần hiển thị công thức, công thức sẽ hiện ở dạng chữ.', 4000);
+                    }
+                }
+                startQuizNow();
+            } finally {
+                quizStarting = false;
+            }
+        }
+
+        function startQuizNow() {
             clearTimeout(immediateResultTimer);
             UI.footer.style.display = 'none';
             UI.freeMessage.style.display = 'none';
@@ -2118,6 +2137,238 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
             return str;
         }
 
+        // ===== Công thức toán: OMML (Equation của Word) → LaTeX. Xem docs/thiet-ke/cong-thuc-toan.md =====
+        const OMML_SYMBOLS = {
+            '≤': '\\le ', '≥': '\\ge ', '≠': '\\ne ', '±': '\\pm ', '∓': '\\mp ', '×': '\\times ', '÷': '\\div ', '·': '\\cdot ', '⋅': '\\cdot ',
+            '∞': '\\infty ', '→': '\\to ', '←': '\\leftarrow ', '↔': '\\leftrightarrow ', '⇒': '\\Rightarrow ', '⇐': '\\Leftarrow ', '⇔': '\\Leftrightarrow ',
+            '∈': '\\in ', '∉': '\\notin ', '∋': '\\ni ', '⊂': '\\subset ', '⊃': '\\supset ', '⊆': '\\subseteq ', '⊇': '\\supseteq ', '∪': '\\cup ', '∩': '\\cap ',
+            '∅': '\\varnothing ', '∀': '\\forall ', '∃': '\\exists ', '¬': '\\neg ', '∧': '\\land ', '∨': '\\lor ',
+            '≈': '\\approx ', '≡': '\\equiv ', '∼': '\\sim ', '≅': '\\cong ', '∝': '\\propto ', '∠': '\\angle ', '⊥': '\\perp ', '∥': '\\parallel ',
+            '△': '\\triangle ', '∆': '\\Delta ', '°': '^{\\circ}', '′': "'", '″': "''",
+            'α': '\\alpha ', 'β': '\\beta ', 'γ': '\\gamma ', 'Γ': '\\Gamma ', 'δ': '\\delta ', 'Δ': '\\Delta ', 'ε': '\\varepsilon ', 'ϵ': '\\epsilon ',
+            'ζ': '\\zeta ', 'η': '\\eta ', 'θ': '\\theta ', 'Θ': '\\Theta ', 'ι': '\\iota ', 'κ': '\\kappa ', 'λ': '\\lambda ', 'Λ': '\\Lambda ', 'μ': '\\mu ',
+            'ν': '\\nu ', 'ξ': '\\xi ', 'Ξ': '\\Xi ', 'π': '\\pi ', 'Π': '\\Pi ', 'ρ': '\\rho ', 'σ': '\\sigma ', 'Σ': '\\Sigma ', 'τ': '\\tau ', 'υ': '\\upsilon ',
+            'φ': '\\varphi ', 'ϕ': '\\phi ', 'Φ': '\\Phi ', 'χ': '\\chi ', 'ψ': '\\psi ', 'Ψ': '\\Psi ', 'ω': '\\omega ', 'Ω': '\\Omega ',
+            '…': '\\ldots ', '⋯': '\\cdots ', '−': '-', '∗': '*', '∣': '|', 'ℝ': '\\mathbb{R}', 'ℕ': '\\mathbb{N}', 'ℤ': '\\mathbb{Z}', 'ℚ': '\\mathbb{Q}', 'ℂ': '\\mathbb{C}',
+            '{': '\\{', '}': '\\}', '%': '\\%', '#': '\\#', '&': '\\&', '$': '\\$', '\\': '\\backslash ', '~': '\\sim ', '^': '\\wedge ', '_': '\\_'
+        };
+        const OMML_FUNCTIONS = new Set(['sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'arcsin', 'arccos', 'arctan', 'sinh', 'cosh', 'tanh', 'coth',
+            'log', 'ln', 'lg', 'exp', 'lim', 'max', 'min', 'sup', 'inf', 'det', 'gcd', 'deg', 'arg', 'ker', 'dim']);
+        const OMML_NAMED_OPERATORS = new Set(['tg', 'cotg', 'arctg', 'arccotg']);
+        const OMML_NARY = { '∫': '\\int', '∬': '\\iint', '∭': '\\iiint', '∮': '\\oint', '∑': '\\sum', '∏': '\\prod', '∐': '\\coprod', '⋃': '\\bigcup', '⋂': '\\bigcap', '⋁': '\\bigvee', '⋀': '\\bigwedge' };
+        const OMML_ACCENTS = {
+            '⃗': '\\overrightarrow', '→': '\\overrightarrow', '⃖': '\\overleftarrow', '⃡': '\\overleftrightarrow',
+            '̅': '\\overline', '¯': '\\overline', '‾': '\\overline', '̂': '\\widehat', '^': '\\widehat',
+            '̃': '\\widetilde', '~': '\\widetilde', '̇': '\\dot', '̈': '\\ddot', '̌': '\\check', '̆': '\\breve', '́': '\\acute', '̀': '\\grave'
+        };
+        const OMML_DELIMITERS = { '': '.', '{': '\\{', '}': '\\}', '‖': '\\|', '⟨': '\\langle ', '⟩': '\\rangle ', '〈': '\\langle ', '〉': '\\rangle ', '⌊': '\\lfloor ', '⌋': '\\rfloor ', '⌈': '\\lceil ', '⌉': '\\rceil ' };
+
+        function ommlElementChildren(node) {
+            const out = [];
+            for (let c = node ? node.firstChild : null; c; c = c.nextSibling) if (c.nodeType === 1) out.push(c);
+            return out;
+        }
+        function ommlChild(node, name) {
+            return ommlElementChildren(node).find(c => c.localName === name) || null;
+        }
+        function ommlVal(el) {
+            if (!el) return null;
+            const v = el.getAttribute('m:val') || el.getAttribute('val');
+            return v === null || v === undefined ? '' : v;
+        }
+        function ommlProp(node, prName, name) {
+            const pr = ommlChild(node, prName);
+            const el = pr ? ommlChild(pr, name) : null;
+            return el ? ommlVal(el) : null;
+        }
+        function ommlIsOn(value) {
+            return value !== null && !['0', 'off', 'false'].includes(String(value).toLowerCase());
+        }
+        function ommlChildren(node) {
+            return ommlElementChildren(node).map(ommlNodeToLatex).join('');
+        }
+        function ommlPart(node, name) {
+            const el = ommlChild(node, name);
+            return el ? ommlChildren(el).replace(/ {2,}/g, ' ').trim() : '';
+        }
+        function ommlBase(node) {
+            const s = ommlPart(node, 'e');
+            return /^(?:[A-Za-z0-9]|\\[A-Za-z]+)$/.test(s) ? s : `{${s}}`;
+        }
+        function ommlEscapeText(text) {
+            return text.replace(/[{}%#&$_\\]/g, c => (c === '\\' ? '\\textbackslash{}' : '\\' + c));
+        }
+        function ommlRunToLatex(run) {
+            const text = ommlElementChildren(run).filter(c => c.localName === 't').map(c => c.textContent || '').join('');
+            if (!text) return '';
+            const name = text.trim();
+            if (OMML_FUNCTIONS.has(name)) return `\\${name} `;
+            if (OMML_NAMED_OPERATORS.has(name)) return `\\operatorname{${name}} `;
+            const props = ommlChild(run, 'rPr');
+            if (props && ommlChild(props, 'nor')) return `\\text{${ommlEscapeText(text)}}`;
+            return Array.from(text).map(c => OMML_SYMBOLS[c] ?? c).join('');
+        }
+        function ommlRows(node, rowName) {
+            return ommlElementChildren(node).filter(c => c.localName === rowName);
+        }
+        function ommlDelimiter(chr) {
+            return OMML_DELIMITERS[chr] ?? chr;
+        }
+        function ommlNodeToLatex(node) {
+            const name = node.localName;
+            switch (name) {
+                case 'r': return ommlRunToLatex(node);
+                case 'f': {
+                    const num = ommlPart(node, 'num');
+                    const den = ommlPart(node, 'den');
+                    const type = ommlProp(node, 'fPr', 'type');
+                    if (type === 'lin') return `{${num}}/{${den}}`;
+                    if (type === 'noBar') return `\\genfrac{}{}{0pt}{}{${num}}{${den}}`;
+                    return `\\frac{${num}}{${den}}`;
+                }
+                case 'sSup': return `${ommlBase(node)}^{${ommlPart(node, 'sup')}}`;
+                case 'sSub': return `${ommlBase(node)}_{${ommlPart(node, 'sub')}}`;
+                case 'sSubSup': return `${ommlBase(node)}_{${ommlPart(node, 'sub')}}^{${ommlPart(node, 'sup')}}`;
+                case 'sPre': return `{}_{${ommlPart(node, 'sub')}}^{${ommlPart(node, 'sup')}}${ommlBase(node)}`;
+                case 'rad': {
+                    const deg = ommlPart(node, 'deg');
+                    const body = ommlPart(node, 'e');
+                    return ommlIsOn(ommlProp(node, 'radPr', 'degHide')) || !deg ? `\\sqrt{${body}}` : `\\sqrt[${deg}]{${body}}`;
+                }
+                case 'd': {
+                    const beg = ommlProp(node, 'dPr', 'begChr') ?? '(';
+                    const end = ommlProp(node, 'dPr', 'endChr') ?? ')';
+                    const sep = ommlProp(node, 'dPr', 'sepChr') ?? '|';
+                    const parts = ommlRows(node, 'e');
+                    const only = parts.length === 1 ? ommlElementChildren(parts[0]) : [];
+                    if (only.length === 1 && only[0].localName === 'eqArr') {
+                        const rows = ommlRows(only[0], 'e').map(r => ommlChildren(r).replace(/ {2,}/g, ' ').trim()).join('\\\\');
+                        if (beg === '{' && end === '') return `\\begin{cases}${rows}\\end{cases}`;
+                        return `\\left${ommlDelimiter(beg)}\\begin{array}{l}${rows}\\end{array}\\right${ommlDelimiter(end)}`;
+                    }
+                    const inner = parts.map(p => ommlChildren(p).replace(/ {2,}/g, ' ').trim()).join(OMML_SYMBOLS[sep] ?? sep);
+                    return `\\left${ommlDelimiter(beg)}${inner}\\right${ommlDelimiter(end)}`;
+                }
+                case 'nary': {
+                    const chr = ommlProp(node, 'naryPr', 'chr') || '∫';
+                    const sub = ommlIsOn(ommlProp(node, 'naryPr', 'subHide')) ? '' : ommlPart(node, 'sub');
+                    const sup = ommlIsOn(ommlProp(node, 'naryPr', 'supHide')) ? '' : ommlPart(node, 'sup');
+                    return `${OMML_NARY[chr] || '\\int'}${sub ? `_{${sub}}` : ''}${sup ? `^{${sup}}` : ''} ${ommlPart(node, 'e')}`;
+                }
+                case 'func': return `${ommlPart(node, 'fName')}{${ommlPart(node, 'e')}}`;
+                case 'limLow': return `${ommlBase(node)}_{${ommlPart(node, 'lim')}}`;
+                case 'limUpp': return `${ommlBase(node)}^{${ommlPart(node, 'lim')}}`;
+                case 'acc': {
+                    const chr = ommlProp(node, 'accPr', 'chr') || '̂';
+                    return `${OMML_ACCENTS[chr] || '\\widehat'}{${ommlPart(node, 'e')}}`;
+                }
+                case 'bar': return `${ommlProp(node, 'barPr', 'pos') === 'top' ? '\\overline' : '\\underline'}{${ommlPart(node, 'e')}}`;
+                case 'groupChr': {
+                    const chr = ommlProp(node, 'groupChrPr', 'chr') || '⏟';
+                    const top = chr === '⏞' || ommlProp(node, 'groupChrPr', 'pos') === 'top';
+                    return `${top ? '\\overbrace' : '\\underbrace'}{${ommlPart(node, 'e')}}`;
+                }
+                case 'm': {
+                    const rows = ommlRows(node, 'mr').map(row => ommlRows(row, 'e').map(c => ommlChildren(c).replace(/ {2,}/g, ' ').trim()).join('&'));
+                    return `\\begin{matrix}${rows.join('\\\\')}\\end{matrix}`;
+                }
+                case 'eqArr': return `\\begin{array}{l}${ommlRows(node, 'e').map(r => ommlChildren(r).replace(/ {2,}/g, ' ').trim()).join('\\\\')}\\end{array}`;
+                default:
+                    return /Pr$/.test(name) ? '' : ommlChildren(node);
+            }
+        }
+        function ommlToLatex(node) {
+            return ommlChildren(node).replace(/ {2,}/g, ' ').trim();
+        }
+        function replaceOfficeMath(xmlDoc) {
+            const isMathRoot = el => el.localName === 'oMath' || el.localName === 'oMathPara';
+            const targets = [];
+            const all = xmlDoc.getElementsByTagName('*');
+            for (let i = 0; i < all.length; i++) {
+                const el = all[i];
+                if (!isMathRoot(el)) continue;
+                let parent = el.parentNode;
+                while (parent && parent.nodeType === 1 && !isMathRoot(parent)) parent = parent.parentNode;
+                if (!parent || parent.nodeType !== 1) targets.push(el);
+            }
+            const wordNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+            for (const el of targets) {
+                const maths = el.localName === 'oMathPara' ? ommlElementChildren(el).filter(c => c.localName === 'oMath') : [el];
+                const text = maths.map(ommlToLatex).filter(Boolean).map(s => `$${s}$`).join(' ');
+                const run = xmlDoc.createElementNS(wordNs, 'w:r');
+                const t = xmlDoc.createElementNS(wordNs, 'w:t');
+                t.setAttribute('xml:space', 'preserve');
+                t.appendChild(xmlDoc.createTextNode(text));
+                run.appendChild(t);
+                el.parentNode.replaceChild(run, el);
+            }
+            return targets.length;
+        }
+        function countLegacyEquations(xmlDoc) {
+            let count = 0;
+            const all = xmlDoc.getElementsByTagName('*');
+            for (let i = 0; i < all.length; i++) {
+                if (all[i].localName === 'OLEObject' && /^Equation\./i.test(all[i].getAttribute('ProgID') || '')) count++;
+            }
+            return count;
+        }
+
+        // ===== Công thức toán: vẽ $...$ bằng KaTeX khi làm bài =====
+        const MATH_SEGMENT_REGEX = /\$(?=[^\s$])((?:\\\$|[^$])*?[^\s$\\])\$(?!\d)/g;
+        const MATH_DETECT_REGEX = new RegExp(MATH_SEGMENT_REGEX.source);
+        const KATEX_VERSION = '0.18.11';
+        const KATEX_BASE_URL = `https://cdnjs.cloudflare.com/ajax/libs/KaTeX/${KATEX_VERSION}/`;
+        const KATEX_CSS_SRI = 'sha512-P0yrJ9fZYAz71mx0p68JgoPBpvjXPW2H0m+AXYSzzL9kT6AyDQ9eDQNLfqdjSYgphq4Hi6llKmesa6mdQgZOHw==';
+        const KATEX_JS_SRI = 'sha512-hqULNlSWGNtoWUsYyRSpdOdww05s2hqNof5e1P4WxIVfLpL8ThFH/QqNNtax5fElgRkNZGkFyeKAmVvdZ/kpSA==';
+        let katexLoading = null;
+
+        function renderMathInHtml(html) {
+            if (typeof katex === 'undefined' || !katex || typeof katex.renderToString !== 'function' || !html || !html.includes('$')) return html;
+            return html.replace(MATH_SEGMENT_REGEX, (whole, tex) => {
+                if (tex.includes('<br>')) return whole;
+                try {
+                    return katex.renderToString(decodeHTMLEntities(tex), { throwOnError: false, strict: 'ignore', trust: false });
+                } catch (e) {
+                    return whole;
+                }
+            });
+        }
+
+        function questionsHaveMath(questions) {
+            return (questions || []).some(q => MATH_DETECT_REGEX.test(q.title || '') || (q.options || []).some(o => MATH_DETECT_REGEX.test(o.text || '')));
+        }
+
+        function ensureKatex(timeoutMs = 8000) {
+            if (typeof katex !== 'undefined' && katex) return Promise.resolve();
+            if (katexLoading) return katexLoading;
+            katexLoading = new Promise((resolve, reject) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = KATEX_BASE_URL + 'katex.min.css';
+                link.integrity = KATEX_CSS_SRI;
+                link.crossOrigin = 'anonymous';
+                link.referrerPolicy = 'no-referrer';
+                document.head.appendChild(link);
+
+                const script = document.createElement('script');
+                script.src = KATEX_BASE_URL + 'katex.min.js';
+                script.integrity = KATEX_JS_SRI;
+                script.crossOrigin = 'anonymous';
+                script.referrerPolicy = 'no-referrer';
+                const fail = (err) => {
+                    clearTimeout(timer);
+                    katexLoading = null;
+                    script.remove();
+                    reject(err);
+                };
+                const timer = setTimeout(() => fail(new Error('Tải KaTeX quá lâu')), timeoutMs);
+                script.onload = () => { clearTimeout(timer); resolve(); };
+                script.onerror = () => fail(new Error('Không tải được KaTeX'));
+                document.head.appendChild(script);
+            });
+            return katexLoading;
+        }
+
         async function preprocessDocxFormat(arrayBuffer) {
             if (typeof JSZip === 'undefined') return arrayBuffer;
             try {
@@ -2136,9 +2387,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1</pre>
                 const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
                 if (xmlDoc.getElementsByTagName('parsererror').length > 0) return arrayBuffer;
 
-                const hasMath = xmlDoc.getElementsByTagName('m:oMath').length > 0 || xmlDoc.getElementsByTagName('oMath').length > 0 || xmlDoc.getElementsByTagName('m:oMathPara').length > 0 || xmlDoc.getElementsByTagName('w:object').length > 0 || xmlDoc.getElementsByTagName('object').length > 0;
-                if (hasMath) {
-                    showToast('Tài liệu có công thức toán đặc thù, vui lòng kiểm tra lại kết quả.', 6000);
+                replaceOfficeMath(xmlDoc);
+                const legacyEquations = countLegacyEquations(xmlDoc);
+                if (legacyEquations > 0) {
+                    showToast(`Đề có ${legacyEquations} công thức MathType/Equation 3.0 mà web không đọc được. Trong Word chọn MathType → Convert Equations → Microsoft Office Math, lưu lại rồi tải lên.`, 10000);
                 }
 
                 const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';

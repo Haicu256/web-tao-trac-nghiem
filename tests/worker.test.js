@@ -57,6 +57,14 @@ test('convert: không đặt GEMINI_MODEL thì dùng gemini-3.1-flash-lite', asy
     assert.match(calls[0].url, /models\/gemini-3\.1-flash-lite:/);
 });
 
+test('convert: prompt yêu cầu AI giữ nguyên công thức $...$', async () => {
+    const calls = fakeGemini(okReply(QUIZ));
+    await worker.fetch(post('/api/convert', { text: 'Câu 1: Tính $\\frac{1}{2}$\nA. 1\n*B. 2' }), AI_ENV);
+    const prompt = calls[0].body.contents[0].parts[0].text;
+    assert.match(prompt, /\$\.\.\.\$/);
+    assert.ok(prompt.includes('Câu 1: Tính $\\frac{1}{2}$'));
+});
+
 test('convert: bỏ khối ``` mà AI lỡ bọc quanh kết quả', async () => {
     fakeGemini(okReply('```text\n' + QUIZ + '\n```'));
     const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
@@ -167,6 +175,18 @@ test('file tĩnh: chỉ phục vụ danh sách cho phép, kèm header bảo mậ
     assert.equal(home.status, 200);
     assert.match(home.headers.get('content-security-policy'), /default-src 'self'/);
     assert.equal(home.headers.get('x-frame-options'), 'DENY');
+});
+
+test('CSP cho phép CSS và font của KaTeX từ cdnjs, không mở thêm gì khác', async () => {
+    const res = await worker.fetch(new Request('https://x/'), { ASSETS: fakeAssets() });
+    const csp = Object.fromEntries(res.headers.get('content-security-policy').split(';').map(s => s.trim()).filter(Boolean).map(s => {
+        const [k, ...v] = s.split(/\s+/);
+        return [k, v];
+    }));
+    assert.ok(csp['style-src'].includes('https://cdnjs.cloudflare.com'));
+    assert.ok(csp['font-src'].includes('https://cdnjs.cloudflare.com'));
+    assert.deepEqual(csp['connect-src'], ["'self'"]);
+    assert.ok(!csp['script-src'].includes("'unsafe-eval'"));
 });
 
 test('API không tồn tại trả 404 dạng JSON', async () => {
