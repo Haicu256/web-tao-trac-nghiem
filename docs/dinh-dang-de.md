@@ -243,6 +243,43 @@ câu 4 tiêu đề: Read the following passage and choose the best option for ea
 câu 4: D
 ```
 
+### Phương án viết liền chữ cái ("A.Huế    *B.Hà Nội"), có gạch đầu dòng ("• A. Huế    • *B. Hà Nội") trên một dòng
+```de
+Câu 1: Thủ đô?
+A.Huế    *B.Hà Nội    C.Vinh    D.Đà Nẵng
+Câu 2: Thủ đô Pháp?
+• A. Rome    • *B. Paris    • C. Huế    • D. Vinh
+```
+```ket-qua
+câu 1: B
+câu 1 phương án B: Hà Nội
+câu 2: B
+câu 2 phương án A: Rome
+```
+
+### Câu 5–6 phương án trên một dòng cách một dấu cách
+```de
+Câu 1: Chọn số nguyên tố
+A. 4 B. 6 C. 8 D. 9 *E. 11 F. 12
+```
+```ket-qua
+câu 1 số phương án: 6
+câu 1: E
+câu 1 phương án F: 12
+```
+
+### Gạch đầu dòng trước số câu ("- Câu 1:", danh sách Word/HTML)
+```de
+- Câu 1: 1 + 1 bằng mấy?
+- A. 1
+- *B. 2
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: 1 + 1 bằng mấy?
+câu 1: B
+```
+
 ### Nhiều phương án trên một dòng, cách nhau bằng tab hoặc từ 2 dấu cách
 ```de
 Câu 1: 2 + 2 = ?
@@ -1342,6 +1379,103 @@ Mã đề 102: 1.B 2.C
 không đọc được
 ```
 
+### Khoảng câu "Câu 1 đến câu 4: B A B A"
+```de
+Câu 1: Câu 1?
+A. 1
+B. 2
+Câu 2: Câu 2?
+A. 1
+B. 2
+Câu 3: Câu 3?
+A. 1
+B. 2
+Câu 4: Câu 4?
+A. 1
+B. 2
+BẢNG ĐÁP ÁN
+Câu 1 đến câu 4: B A B A
+```
+```ket-qua
+số câu: 4
+câu 1: B
+câu 2: A
+câu 3: B
+câu 4: A
+```
+
+### Đề nhiều phần đánh số liên tục (Câu 1–4) dùng một bảng đáp án chung
+```de
+PHẦN I. ĐỌC HIỂU
+Câu 1: Một?
+A. x
+B. y
+Câu 2: Hai?
+A. x
+B. y
+PHẦN II. TỔNG HỢP
+Câu 3: Ba?
+A. x
+B. y
+Câu 4: Bốn?
+A. x
+B. y
+BẢNG ĐÁP ÁN
+1.A 2.B 3.A 4.B
+```
+```ket-qua
+số câu: 4
+câu 1: A
+câu 2: B
+câu 3: A
+câu 4: B
+```
+
+### Bảng nhiều mã đề có mã 2 chữ số ("Câu | 01 | 02")
+```de
+Mã đề 02
+Câu 1: Câu một?
+A. Sai
+B. Đúng
+ĐÁP ÁN
+Câu | 01 | 02
+1 | A | B
+```
+```ket-qua
+câu 1: B
+```
+
+### Dòng "Mã đề thi gồm 40 câu" không phải mã đề khác
+```de
+Mã đề 101
+Câu 1: Câu một?
+A. a
+*B. b
+Mã đề thi gồm 40 câu hỏi trắc nghiệm.
+Câu 2: Câu hai?
+*A. a
+B. b
+```
+```ket-qua
+số câu: 2
+câu 2: A
+```
+
+### Dấu * trong nội dung ("A. *p") làm hai phương án giống hệt nhau thì là nội dung; bảng đáp án dùng được
+```de
+Câu 1: Khai báo nào là con trỏ trong C?
+A. *p
+B. p
+C. &p
+D. p->next
+BẢNG ĐÁP ÁN
+1. D
+```
+```ket-qua
+câu 1: D
+câu 1 phương án A: *p
+```
+
 ### Hai phần cùng đánh số lại từ Câu 1, bảng đáp án chia theo phần
 Bảng đáp án chỉ tra theo số câu thì phần sau sẽ nhận nhầm đáp án của phần đầu. Phần thứ hai của bảng (sau dòng
 "Phần B", hoặc khi số câu trong bảng bắt đầu lại từ 1) áp cho phần thứ hai của đề.
@@ -1906,6 +2040,108 @@ câu 1 tiêu đề: Thủ đô Pháp?
 câu 1: B
 ```
 
+### "a and c đúng": chữ "and" không phải ý a, d
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số f(x).
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+Đáp án: a and c đúng
+```
+```ket-qua
+câu 1: ĐSĐS
+```
+
+### Bảng đáp án đúng/sai nhiều câu trên một dòng ("1. ĐSĐS  2. SĐSS"), "Câu 1) ĐSĐS"
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số f(x).
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+câu hỏi đúng sai: Câu 2: Cho tứ diện.
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+BẢNG ĐÁP ÁN
+1. ĐSĐS  2. SĐSS
+```
+```ket-qua
+câu 1: ĐSĐS
+câu 2: SĐSS
+```
+
+### "Câu 1) ĐSĐS" trong bảng đáp án đúng/sai
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số f(x).
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+BẢNG ĐÁP ÁN
+Câu 1) ĐSĐS
+```
+```ket-qua
+câu 1: ĐSĐS
+```
+
+### "ĐÁP ÁN: Câu 1: ĐSĐS" (tiêu đề và mục đầu của bảng cùng dòng)
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số f(x).
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+câu hỏi đúng sai: Câu 2: Cho tứ diện.
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+ĐÁP ÁN: Câu 1: ĐSĐS
+Câu 2: SĐSS
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSS
+```
+
+### Bảng đáp án có chuỗi Đ/S dài hơn số ý của câu thì không dùng cho câu đó
+```de
+câu hỏi đúng sai: Câu 1: Cho hàm số f(x).
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+Câu 3: Thủ đô?
+A. Huế
+*B. Hà Nội
+BẢNG ĐÁP ÁN
+Câu 1: ĐSĐSĐ
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Thủ đô?
+```
+
+### "Phương án A sai, phương án B sai" không phải đáp án đúng/sai
+"Phương án" là cách nói của câu trắc nghiệm; ý của câu đúng/sai ghi "a) Sai", "ý a sai".
+```de
+câu hỏi đúng sai: Câu 1: Tìm a?
+A. 1
+B. 2
+Lời giải: Phương án A sai, phương án B sai.
+Câu 2: Thủ đô?
+A. Huế
+*B. Hà Nội
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Thủ đô?
+```
+
 ## 8. Nội dung nhiều dòng
 
 ### Câu hỏi nhiều dòng
@@ -2085,6 +2321,40 @@ B. Stones
 số câu: 3
 câu 1 phương án B: goes
 câu 3 tiêu đề: Read the following passage and answer the questions from 2 to 3. / Tom lives in a small village near the sea. / What does Tom collect?
+```
+
+### Danh sách "(A)", "(B)" trong đề bài rồi phương án "A.", "B." thật
+```de
+Câu 1: Xét các hiện tượng sau:
+(A) Quang điện ngoài.
+(B) Tán sắc ánh sáng.
+Hiện tượng nào thể hiện tính chất hạt?
+A. Chỉ (A)
+B. Cả (A) và (B)
+C. Chỉ (B)
+D. Không hiện tượng nào
+Đáp án: B
+```
+```ket-qua
+câu 1 số phương án: 4
+câu 1: B
+câu 1 tiêu đề: Xét các hiện tượng sau: / (A) Quang điện ngoài. / (B) Tán sắc ánh sáng. / Hiện tượng nào thể hiện tính chất hạt?
+```
+
+### Đoạn văn đánh số câu ("Câu 1: Đọc đoạn văn sau… từ câu 2 đến câu 3") là phần dẫn của các câu sau
+```de
+Câu 1: Đọc đoạn văn sau và trả lời các câu hỏi từ câu 2 đến câu 3:
+Biến đổi khí hậu là vấn đề toàn cầu.
+Câu 2: Hậu quả?
+*A. Lũ lụt
+B. Mưa
+Câu 3: Nguyên nhân?
+A. x
+*B. y
+```
+```ket-qua
+số câu: 2
+câu 2 tiêu đề: Đọc đoạn văn sau và trả lời các câu hỏi từ câu 2 đến câu 3: / Biến đổi khí hậu là vấn đề toàn cầu. / Nguyên nhân?
 ```
 
 ### Dòng đề bài bắt đầu bằng "Phần 1 của…", "Phần vi mô…" không phải tiêu đề phần

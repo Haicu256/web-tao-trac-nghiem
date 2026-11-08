@@ -708,7 +708,10 @@ function tooLargeMessage() {
 function looksLikeQuiz(text) {
     if (typeof text !== 'string') return false;
     // Rút gọn dãy dấu cách/tab và dùng [ \t]* ở đầu dòng: "\n" × 60000 hay dấu cách dài từng làm regex chạy bậc hai.
-    const normalized = text.normalize('NFC').replace(/[ \t]{3,}/g, '  ');
+    // Như cleanInputText của trang: bỏ gạch đầu dòng ("• A.", "- A.") và dấu toàn chiều rộng ("A．").
+    const normalized = text.normalize('NFC').replace(/[ \t]{3,}/g, '  ')
+        .replace(/[．：（）]/g, ch => ({ '．': '.', '：': ':', '（': '(', '）': ')' })[ch])
+        .replace(/^[ \t]*[•◦▪●○■□➢➤►\-–—+][ \t]+/gm, '');
     const qMatches = (normalized.match(/^[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:(câu\s*hỏi|câu|q|bài|question|exercise|problem)\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+\b)|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/gim) || []).length
         + (normalized.match(/^[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?\d+(?:\.\d+)?[ \t]*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
     const optMatches = (normalized.match(/^[ \t]*(?:\*+[ \t]*)?(?:\*{1,3}[ \t]*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length

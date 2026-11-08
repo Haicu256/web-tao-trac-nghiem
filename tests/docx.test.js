@@ -138,3 +138,10 @@ test('Danh sách tự đánh số La Mã của Word ((I), (II), (III)) giữ s�
         + ['A. (I) và (II)', 'B. (II) và (III)'].map(t => para(run(t))).join(''), { numbering: numbering('upperRoman', '(%1)', [1]) }));
     assert.ok(raw.includes('(I) Kim loại có ánh kim') && raw.includes('(III) Kim loại mềm hơn phi kim'), raw);
 });
+
+test('Ý a) b) c) d) tự đánh số của Word bắt đầu lại ở mỗi câu "câu hỏi đúng sai: Câu N"', async () => {
+    const body = [1, 2].map(n => para(run(`câu hỏi đúng sai: Câu ${n}: Xét ${n}`)) + ['một', 'hai', 'ba', 'bốn'].map(t => listPara(1, run(t))).join('')).join('')
+        + para(run('BẢNG ĐÁP ÁN')) + para(run('Câu 1: ĐSĐS')) + para(run('Câu 2: SĐSĐ'));
+    const r = await convert(body, { numbering: numbering('lowerLetter', '%1)', [1]) });
+    assert.deepEqual(r.questions.map(answerOf), ['ĐSĐS', 'SĐSĐ']);
+});

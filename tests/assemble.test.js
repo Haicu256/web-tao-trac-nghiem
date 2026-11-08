@@ -696,3 +696,22 @@ test('Đoạn văn điền từ: câu chỉ có phương án nhận đoạn văn
     for (const q of r.questions.slice(2)) assert.ok(plainText(q.title).includes('Tom (3) ___ a doctor.'), q.title);
     assert.ok(!plainText(r.questions[2].title).includes('My village'), r.questions[2].title);
 });
+
+test('reconcileLabels vòng 7: tiêu đề và hàng bảng đều gắn là dòng đáp án; ý đúng/sai gắn là dòng đáp án; "A." gắn là đề bài; câu ở phần đúng/sai', () => {
+    const run = (lines, codes) => [...app.parse(fn('assembleQuizText')(lines, fn('reconcileLabels')(lines, labels(codes))).text).questions].map(answerOf);
+    assert.deepEqual(run(['Câu 1: 1 + 1 = ?', 'A. 1', 'B. 2', 'Câu 2: 2+2?', 'A. 4', 'B. 5', 'BẢNG ĐÁP ÁN', '1.B 2.A'], 'QOOQOODD'), ['B', 'A']);
+    assert.deepEqual(run(['câu hỏi đúng sai: Câu 1: Cho hàm số', 'a) f liên tục', 'b) f đồng biến', 'c) f có cực trị', 'd) f chẵn', 'a) Đúng', 'b) Sai', 'c) Đúng', 'd) Sai'], 'TOOOODDDD'), ['ĐSĐS']);
+    assert.deepEqual(run(['Câu 1: Kim loại kiềm?', 'A. Natri', 'B. Nhôm', 'C. Sắt', 'D. Đồng', 'Đáp án: A'], 'QSOOOD'), ['A']);
+    const tf = ['PHẦN II. Câu trắc nghiệm đúng sai', 'Câu 1: Cho hàm số', 'a) Ý một', 'b) Ý hai', 'c) Ý ba', 'd) Ý bốn', 'BẢNG ĐÁP ÁN', 'Câu 1: ĐSĐS'];
+    assert.equal(fn('reconcileLabels')(tf, labels('XSOOOOKK'))[1], 'cau_hoi_dung_sai');
+    assert.deepEqual(run(tf, 'XSOOOOKK'), ['ĐSĐS']);
+});
+
+test('Bộ gắn nhãn dự phòng: "Đáp án:" rồi dòng "B. Hà Nội" là đáp án của câu, không phải bảng đáp án', () => {
+    assert.deepEqual(convertLocally('Câu 1: Thủ đô của Việt Nam là gì?\nA. Huế\nB. Hà Nội\nĐáp án:\nB. Hà Nội').questions.map(answerOf), ['B']);
+});
+
+test('Bộ gắn nhãn dự phòng: dòng khoảng câu "Câu 1 đến câu 4: B A B A" sau tiêu đề đáp án là bảng đáp án', () => {
+    const q = [1, 2, 3, 4].map(n => `Câu ${n}: Câu ${n}?\nA. 1\nB. 2`).join('\n');
+    assert.deepEqual(convertLocally(`${q}\nBẢNG ĐÁP ÁN\nCâu 1 đến câu 4: B A B A`).questions.map(answerOf), ['B', 'A', 'B', 'A']);
+});

@@ -383,3 +383,11 @@ test('gắn nhãn: dòng "<" + nhiều dấu cách không làm worker chạy lâ
     assert.equal(res.status, 200);
     assert.ok(performance.now() - t0 < 1000, `${Math.round(performance.now() - t0)}ms`);
 });
+
+test('share: đề có phương án gạch đầu dòng ("• A.") hay dấu toàn chiều rộng ("A．") vẫn tạo được link', async () => {
+    const kv = { async get() { return null; }, async put() {} };
+    for (const text of ['Câu 1: Thủ đô?\n• A. Huế\n• *B. Hà Nội\n• C. Vinh', 'Câu 1: Thủ đô?\nA． Huế\n*B． Hà Nội']) {
+        const res = await worker.fetch(post('/api/share', { text }), { SHARES: kv });
+        assert.equal(res.status, 200, text);
+    }
+});
