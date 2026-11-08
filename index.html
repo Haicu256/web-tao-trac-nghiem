@@ -1023,6 +1023,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let partHasQuestions = false;
             let lastNumInPart = 0;
             let partIsTF = false;
+            let leadingPassage = null;
             const trimmedLines = lines.map(l => (l || '').trim());
 
             // Chia bảng đáp án theo phần: dòng "Phần II", "PHẦN 2: …" hoặc số câu bắt đầu lại ("1.A 2.B" rồi "1.C 2.D").
@@ -1401,7 +1402,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     return;
                 }
 
-                const isSectionHeader = (SECTION_HEADER_REGEX.test(trimmedLine) && !isPartWordInSentence(trimmedLine)) || SECTION_TITLE_LINE_REGEX.test(trimmedLine);
+                // "B. Tự luận" ngay sau "A." là phương án kế tiếp của câu đang đọc, không phải tiêu đề phần "B. TỰ LUẬN".
+                const lastOpt = currentQ?.options[currentQ.options.length - 1];
+                const expectedOpt = !currentQ ? null : (lastOpt ? (lastOpt.optLetter ? String.fromCharCode(lastOpt.optLetter.toUpperCase().charCodeAt(0) + 1) : null) : 'A');
+                const lineLetter = (trimmedLine.match(/^\*?\s*([A-Fa-f])\s*[.):]/) || [])[1];
+                const isNextOption = !!expectedOpt && !!lineLetter && lineLetter.toUpperCase() === expectedOpt;
+                const isSectionHeader = (SECTION_HEADER_REGEX.test(trimmedLine) && !isPartWordInSentence(trimmedLine)) || (SECTION_TITLE_LINE_REGEX.test(trimmedLine) && !isNextOption);
                 if (isSectionHeader || SECTION_END_REGEX.test(trimmedLine)) {
                     // Trong bảng đáp án, "Phần II" là chỗ chia bảng theo phần của đề.
                     if (isEndOfQuiz) {
@@ -1599,7 +1605,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (isNewQuestion) {
                     inExplanationSection = false;
                     lastExplanationQ = null;
-                    const carriedStem = currentQ?.pendingTail || [];
+                    const carriedStem = (currentQ?.pendingTail?.length ? currentQ.pendingTail : null) || leadingPassage || [];
+                    leadingPassage = null;
                     if (currentQ) {
                         currentQ.pendingTail = [];
                         parsedQuestions.push(currentQ);
@@ -1643,6 +1650,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         numbered: !!rawNum,
                         part: partIndex,
                         title: [...carriedStem, escapeHTML(clean.trim())].filter(Boolean).join('<br>'),
+                        sharedIntro: carriedStem.length > 0 ? carriedStem : null,
                         options: [],
                         type: isTrueFalse || partIsTF ? 'true_false' : 'multiple_choice'
                     };
@@ -1755,7 +1763,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     } else {
                         if (currentQ.options.length === 0) {
                             currentQ.title = currentQ.title ? (currentQ.title + '<br>' + escapeHTML(trimmedLine)) : escapeHTML(trimmedLine);
-                        } else if (currentQ.blankAfterOptions) {
+                        } else if (currentQ.blankAfterOptions || currentQ.pendingTail?.length || PASSAGE_INTRO_REGEX.test(trimmedLine)) {
+                            // Sau dòng trống, hay từ câu dẫn "Read the following passage…" trở đi: phần dẫn của câu sau.
                             (currentQ.pendingTail ||= []).push(escapeHTML(trimmedLine));
                         } else {
                             const lastOpt = currentQ.options[currentQ.options.length - 1];
@@ -1763,6 +1772,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             lastOpt.sourceLines?.push(escapeHTML(trimmedLine));
                         }
                     }
+                } else if (leadingPassage || PASSAGE_INTRO_REGEX.test(trimmedLine)) {
+                    // Đoạn văn trước câu đầu, hay sau dòng "Đáp án:" của câu trước ("Read the following passage…"): phần dẫn
+                    // của câu sau (trước đây bị bỏ).
+                    (leadingPassage ||= []).push(escapeHTML(trimmedLine));
                 }
             });
             if (currentQ) parsedQuestions.push(currentQ);
@@ -1936,6 +1949,21 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     }
                 });
             }
+
+            // Đoạn văn dùng chung ("Read the following passage … questions from 2 to 4") chép vào đề bài các câu trong khoảng,
+            // để khi trộn câu mỗi câu vẫn có đoạn văn.
+            let sharedPassage = null;
+            parsedQuestions.forEach(q => {
+                if (!q) return;
+                const range = q.sharedIntro && q.sharedIntro.map(l => (PASSAGE_INTRO_REGEX.test(stripFormattingTags(l)) ? stripFormattingTags(l).match(PASSAGE_RANGE_REGEX) : null)).find(Boolean);
+                if (range) { sharedPassage = { lines: q.sharedIntro, to: parseInt(range[2], 10), part: q.part }; return; }
+                // Câu có phần dẫn riêng, hay đã ra ngoài khoảng câu: hết đoạn văn dùng chung.
+                if (q.sharedIntro || !sharedPassage || q.part !== sharedPassage.part || typeof q.qNum !== 'number' || q.qNum > sharedPassage.to) {
+                    sharedPassage = null;
+                    return;
+                }
+                q.title = [...sharedPassage.lines, q.title].filter(Boolean).join('<br>');
+            });
 
             // Dấu * viết liền cuối phương án ("Hà Nội*") là bằng chứng yếu nhất: chỉ dùng khi câu chưa có đáp án nào khác và
             // đúng một phương án có nó (hai phương án trở lên thường là ký hiệu, như "Node*", "ab*").
@@ -2336,7 +2364,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 finalQuestions.forEach(q => {
                     if (q.type === 'true_false') return;
                     if (q.hasLetterRef) return;
-                    const isAll = o => /^(?:cả\s*(?:\d+|hai|ba|bốn)(?:\s|$)|tất\s*cả\s*(?:đều|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)|đúng|sai|$)|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:trên|đều)|không\s*(?:có\s*)?(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:nào|trên|đúng|sai)|all\s+(?:of\s+)?the\s+above|none\s+(?:of\s+)?the\s+above|all\s+(?:are\s+)?correct|none\s+(?:is|are)\s+correct)/i.test(o.text.trim());
+                    const isAll = o => optionRefersToOthers(stripFormattingTags(String(o.text).replace(/<[^>]*>/g, ' ')));
                     if (q.options.some(isAll)) {
                         q.options = [...shuffle(q.options.filter(o => !isAll(o))), ...q.options.filter(isAll)];
                     } else {
@@ -3509,6 +3537,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         function isPartHeaderLine(plain) {
             return (PART_HEADER_REGEX.test(plain) && !isPartWordInSentence(plain)) || SECTION_TITLE_LINE_REGEX.test(plain);
         }
+        // Dòng mở đầu đoạn văn / ngữ liệu dùng chung cho các câu sau ("Read the following passage…", "Đọc đoạn văn sau…"),
+        // và khoảng câu dùng nó ("questions from 2 to 4", "từ câu 2 đến câu 4", "Questions 31-35").
+        const PASSAGE_INTRO_REGEX = /^(?:read\s+the\s+(?:following\s+)?(?:passage|text|extract|paragraph|article|email|letter|advertisement|notice)|mark\s+the\s+letter\s+a,\s*b,\s*c,?\s*(?:or|and)\s*d\s+.*(?:passage|text)|đọc\s+(?:kĩ\s+|kỹ\s+)?(?:đoạn\s+(?:văn|trích|thơ|tư\s*liệu|thông\s*tin)|văn\s+bản|bài\s+(?:đọc|văn|thơ)|ngữ\s+liệu|thông\s+tin|tư\s+liệu)|dựa\s+vào\s+(?:đoạn|văn\s+bản|thông\s+tin|tư\s+liệu|bảng|biểu\s+đồ|hình))/iu;
+        const PASSAGE_RANGE_REGEX = /(?:questions?|câu)\s*(?:(?:from|từ)\s*)?(\d+)\s*(?:to|-|–|—|đến|tới)\s*(?:câu\s*)?(\d+)/iu;
         // Phần câu đúng/sai (đề THPT 2025): tiêu đề phần "PHẦN II. Câu trắc nghiệm đúng sai." hoặc dòng mô tả ngay sau tiêu đề
         // ("Câu trắc nghiệm đúng sai. Thí sinh trả lời từ câu 1 đến câu 4."). Các câu trong phần là câu đúng/sai.
         const TF_PART_TITLE_REGEX = /đúng\s*(?:[\/\-–—]|hoặc|hay)?\s*sai|true\s*[\/\-–—]?\s*false/iu;
@@ -3609,9 +3641,19 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let current = [];
             let size = 0;
             let start = 0;
+            // Câu đánh số trần "12. …" có phương án ngay sau cũng là chỗ cắt được (trước đây đề "1." dài bị cắt giữa câu).
+            const bareQuestionAt = i => {
+                if (!BARE_NUMBER_REGEX.test(stripFormattingTags(lines[i]).trim())) return false;
+                for (let j = i + 1; j < lines.length && j <= i + 8; j++) {
+                    const p = stripFormattingTags(lines[j]).trim();
+                    if (LOOKS_LIKE_OPTION_REGEX.test(p)) return true;
+                    if (BARE_NUMBER_REGEX.test(p) || STRONG_QUESTION_START_REGEX.test(p)) return false;
+                }
+                return false;
+            };
             lines.forEach((line, i) => {
                 const plain = stripFormattingTags(line).trim();
-                const isQuestionStart = (STRONG_QUESTION_START_REGEX.test(plain) || TF_PREFIX_REGEX.test(plain)) && !ANSWER_ENTRY_REGEX.test(plain);
+                const isQuestionStart = (STRONG_QUESTION_START_REGEX.test(plain) || TF_PREFIX_REGEX.test(plain) || bareQuestionAt(i)) && !ANSWER_ENTRY_REGEX.test(plain);
                 if (current.length > 0 && size + line.length + 1 > maxChars && (isQuestionStart || size + line.length + 1 > maxChars * 1.5)) {
                     chunks.push({ start, lines: current });
                     start = i;
@@ -3661,11 +3703,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let lastWasOption = false;
             let inAnswer = false;
             let tfPart = false;
+            let nextLetter = 'A';
+            let passage = false;
             const plainLines = lines.map(l => stripFormattingTags(l).trim());
             lines.forEach((line, i) => {
                 const plain = stripFormattingTags(line).trim();
                 // Tiêu đề/chân trang chen giữa câu: bỏ qua mà không đóng câu đang đọc.
                 if (PAGE_FURNITURE_REGEX.test(plain)) { labels.push('bo_qua'); return; }
+                const optM = plain.match(OPTION_PREFIX_REGEX);
+                const optL = optM ? (optM[2] || optM[3] || optM[4]).toUpperCase() : null;
+                // "B. Tự luận" ngay sau "A." là phương án kế tiếp, không phải tiêu đề phần "B. TỰ LUẬN".
+                const sectionTitle = SECTION_TITLE_LINE_REGEX.test(plain) && !(inQuestion && optL && optL === nextLetter);
                 const next = stripFormattingTags(lines[i + 1] || '').trim();
                 let label;
                 const isBare = BARE_NUMBER_REGEX.test(plain);
@@ -3674,12 +3722,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const partRest = plain.replace(/^(?:phần|part|section)\s+(?:[ivxlcdm]+|\d+|[a-d])(?![\p{L}\d])\s*[:.\-–—)]?\s*/iu, '');
                 const tableRowAfterPart = partRest !== plain && /\d/.test(partRest) && /^[\s\d.,;:|\/\-–—()A-Fa-fĐđSs]+$/u.test(partRest.replace(/câu|đáp\s*án/giu, ''));
                 if (inTable && (looksLikeTableRow || tableRowAfterPart)) label = 'bang_dap_an';
-                else if ((PART_BOUNDARY_REGEX.test(plain) && !isPartWordInSentence(plain)) || SECTION_TITLE_LINE_REGEX.test(plain)) {
+                // Sau tiêu đề đáp án, "Câu 1: B. Hà Nội là thủ đô." là mục lời giải có đáp án, không phải câu mới.
+                else if (inTable && /^(?:câu|question|bài)\s*\d+\s*[:.)\-–—]\s*[A-Fa-f](?![\p{L}\d])/iu.test(plain)) label = 'bang_dap_an';
+                else if ((PART_BOUNDARY_REGEX.test(plain) && !isPartWordInSentence(plain)) || sectionTitle) {
                     label = 'bo_qua';
                     if (isPartHeaderLine(plain)) tfPart = partTitleSaysTF(plainLines, i);
                 }
                 else if (TF_PREFIX_REGEX.test(plain)) label = 'cau_hoi_dung_sai';
                 else if (ANSWER_ENTRY_REGEX.test(plain)) label = 'bang_dap_an';
+                // Đoạn văn đọc hiểu giữa hai câu (hay trước câu đầu): thuộc các câu sau, không nối vào phương án câu trước.
+                else if (PASSAGE_INTRO_REGEX.test(plain) && !(inQuestion && optionCount === 0)) { label = 'noi_dung_cau_hoi'; passage = true; }
+                else if (passage && !QUESTION_START_REGEX.test(plain) && !ANSWER_TABLE_HEADING_REGEX.test(plain) && !LOOKS_LIKE_OPTION_REGEX.test(plain)) label = 'noi_dung_cau_hoi';
                 else if (QUESTION_START_REGEX.test(plain) && !(isBare && inQuestion && optionCount === 0) && !(isBare && inAnswer && !bareQuestionAfterAnswer(i, plain))) label = 'cau_hoi';
                 else if (inTable) label = 'bang_dap_an';
                 else if (ANSWER_TABLE_HEADING_REGEX.test(plain) && !(inQuestion && /^[a-fA-F][.)]?$/.test(next))) label = 'bang_dap_an';
@@ -3691,8 +3744,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 else label = 'bo_qua';
 
                 if (label === 'cau_hoi' && tfPart) label = 'cau_hoi_dung_sai';
+                if (label !== 'noi_dung_cau_hoi') passage = false;
+                if (label === 'phuong_an' && optL) nextLetter = String.fromCharCode(optL.charCodeAt(0) + 1);
                 if (label === 'cau_hoi' || label === 'cau_hoi_dung_sai') {
-                    inQuestion = true; optionCount = 0; inTable = false;
+                    inQuestion = true; optionCount = 0; inTable = false; nextLetter = 'A';
                     const num = plain.replace(TF_PREFIX_REGEX, '').match(QUESTION_NUMBER_REGEX);
                     if (num && /^\d+$/.test(num[1] || num[2] || '')) lastNum = parseInt(num[1] || num[2], 10);
                 }
@@ -3800,10 +3855,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             lines.forEach((raw, i) => {
                 const plain = stripFormattingTags(raw).trim();
                 if (PAGE_FURNITURE_REGEX.test(plain)) { out[i] = 'bo_qua'; return; }
-                const partHeader = isPartHeaderLine(plain);
                 // Dòng trông rõ là phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi hay phương án.
                 const optMatch = plain.match(OPTION_PREFIX_REGEX);
                 const optLetter = optMatch ? (optMatch[2] || optMatch[3] || optMatch[4]).toUpperCase() : null;
+                // "B. Tự luận" ngay sau "A." là phương án kế tiếp của câu đang đọc, không phải tiêu đề phần "B. TỰ LUẬN".
+                const partHeader = isPartHeaderLine(plain) && !(optLetter && optLetter === expectedLetter && !PART_HEADER_REGEX.test(plain));
                 if (['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_phuong_an', 'dap_an'].includes(out[i]) && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
                 if (ANSWER_TABLE_HEADING_REGEX.test(plain) && ['cau_hoi', 'cau_hoi_dung_sai', 'phuong_an', 'noi_dung_phuong_an'].includes(out[i])) out[i] = 'bang_dap_an';
                 // Tiêu đề "ĐÁP ÁN" gắn là dòng đáp án mà ngay sau là bảng (dòng "Đáp án:" có chữ cái ở dòng sau thì không);
@@ -3812,7 +3868,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (out[i] === 'dap_an' && ANSWER_TABLE_HEADING_REGEX.test(plain) && nextLabelAfter(i) === 'bang_dap_an') out[i] = 'bang_dap_an';
                 // Chỉ hàng lưới nhiều mục: "Câu 1: A" lẻ sau bảng có thể là đầu lời giải từng câu (AI bỏ qua là đúng).
                 if (inTable && ['dap_an', 'bo_qua'].includes(out[i]) && ANSWER_GRID_ROW_REGEX.test(plain)) out[i] = 'bang_dap_an';
-                if (isPartHeaderLine(plain) && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'bo_qua';
+                if (partHeader && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'bo_qua';
                 // Sau các phương án, dòng mở đầu bằng "Đáp án:", "Chọn C", "Lời giải" là dòng đáp án: gắn là dòng nối tiếp thì
                 // phương án cuối mang luôn chữ in đậm/gạch chân của dòng đáp án và bị hiểu nhầm là đáp án.
                 if (out[i] === 'noi_dung_phuong_an' && optionHasLetter && ANSWER_LINE_START_REGEX.test(plain)) out[i] = 'dap_an';
@@ -3826,7 +3882,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const strongRest = strong ? plain.slice(strong[0].length).trim() : '';
                 const answerish = ANSWER_ENTRY_REGEX.test(plain) || ANSWER_LINE_START_REGEX.test(strongRest) || /^[A-Fa-f](?![\p{L}\d])/u.test(strongRest);
                 const misplacedStart = strong && (['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'bo_qua'].includes(out[i])
-                    || (out[i] === 'phuong_an' && !optLetter) || (out[i] === 'dap_an' && !answerish));
+                    || (out[i] === 'phuong_an' && !optLetter) || (['dap_an', 'bang_dap_an'].includes(out[i]) && !answerish && !inTable));
                 // "câu hỏi đúng sai: Câu 1: …" luôn là đầu câu đúng/sai, kể cả khi phần mới đánh số lại từ 1.
                 if (strong && TF_PREFIX_REGEX.test(plain) && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'cau_hoi_dung_sai';
                 // "Câu N:" ngay sau tiêu đề phần ("PHẦN II. …", chỉ có dòng bỏ qua ở giữa) là câu đầu của phần đó, kể cả khi
@@ -3922,6 +3978,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return { lines, cut: false };
         }
 
+        // Phương án nói về các phương án khác ("Tất cả đáp án trên", "Both of the above", "Đáp án khác"): khi trộn phương án
+        // thì giữ ở cuối, không thì câu hỏi vô nghĩa.
+        function optionRefersToOthers(text) {
+            const t = String(text || '').replace(/\s+/g, ' ').trim();
+            if (!t || t.length > 80) return false;
+            return /^(?:cả\s*(?:\d+|hai|ba|bốn)(?:\s|$)|tất\s*cả\s*(?:đều|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)|đúng|sai|$)|các\s*(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:trên|đều)|không\s*(?:có\s*)?(?:đáp\s*án|phương\s*án|lựa\s*chọn|câu|ý)\s*(?:nào|trên|đúng|sai)|all\s+(?:of\s+)?the\s+above|none\s+(?:of\s+)?the\s+above|all\s+(?:are\s+)?correct|none\s+(?:is|are)\s+correct)/iu.test(t)
+                // "Tất cả những ý trên", "Các kết quả trên đều sai", "Tất cả các nhận định trên".
+                || /^(?:tất\s*cả|cả|các|những)(?:\s+[\p{L}\d]+){0,4}?\s+(?:trên|kể\s*trên|nói\s*trên|đã\s*nêu)(?:\s+(?:đều\s+)?(?:đúng|sai))?\.?$/iu.test(t)
+                || /^(?:both|all|none|neither)\s+(?:of\s+)?(?:the\s+)?(?:above|these|them)(?:\s+(?:is|are)\s+(?:correct|true|wrong|false))?\.?$/i.test(t)
+                || /^(?:đáp\s*án|phương\s*án|ý\s*kiến)\s*khác\.?$/iu.test(t);
+        }
+
         function looksLikeNewItem(plain) {
             return QUESTION_START_REGEX.test(plain) || TF_PREFIX_REGEX.test(plain) || LOOKS_LIKE_OPTION_REGEX.test(plain) || ANSWER_LINE_START_REGEX.test(plain);
         }
@@ -3932,6 +4000,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const missing = [];
             let question = null;
             let pendingStem = [];
+            // Đoạn văn dùng chung cho các câu tới số "to" ("questions from 2 to 4"): chép vào đề bài từng câu.
+            let sharedPassage = null;
             let lastNumber = 0;
             let count = 0;
             let withoutOptions = 0;
@@ -3988,11 +4058,24 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     const number = captured ? (/^[ivxlcdm]+$/i.test(captured) ? captured.toUpperCase() : captured) : String(lastNumber + 1);
                     if (m) rest = rest.slice(m[0].length);
                     if (/^\d+/.test(number)) lastNumber = parseInt(number, 10);
-                    const stem = [...pendingStem, ...(rest.trim() ? [rest.trim()] : [])];
+                    const n = /^\d+$/.test(number) ? parseInt(number, 10) : null;
+                    let lead = pendingStem;
+                    if (lead.length > 0) {
+                        const range = lead.map(l => (PASSAGE_INTRO_REGEX.test(l) ? l.match(PASSAGE_RANGE_REGEX) : null)).find(Boolean);
+                        sharedPassage = range ? { lines: [...lead], to: parseInt(range[2], 10) } : null;
+                    } else if (sharedPassage && n !== null && n <= sharedPassage.to) {
+                        lead = sharedPassage.lines;
+                    } else {
+                        sharedPassage = null;
+                    }
+                    const stem = [...lead, ...(rest.trim() ? [rest.trim()] : [])];
                     pendingStem = [];
                     question = { number, explicitNumber: !!m, trueFalse: label === 'cau_hoi_dung_sai', stem, options: [], answers: [] };
                 } else if (label === 'bang_dap_an') {
                     tableLines.push(plain);
+                } else if (label === 'noi_dung_cau_hoi' && (question ? question.options.length > 0 : (pendingStem.length > 0 || PASSAGE_INTRO_REGEX.test(plain)))) {
+                    // Đoạn văn / ngữ liệu sau phương án của câu trước (hay trước câu đầu) là phần dẫn của câu sau.
+                    pendingStem.push(plain);
                 } else if (!question || label === 'bo_qua') {
                     return;
                 } else if (label === 'noi_dung_cau_hoi' || (label === 'noi_dung_phuong_an' && question.options.length === 0)) {
@@ -4144,6 +4227,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
                 const labels = new Array(lines.length);
                 const localParts = [];
+                let localAll = null;
                 for (let i = 0; i < chunks.length; i++) {
                     if (myJobId !== convertJobId) return;
                     UI.convertStatus.innerHTML = `⏳ Đang phân tích phần ${i + 1}/${chunks.length}...`;
@@ -4155,7 +4239,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     } catch (aiErr) {
                         if (myJobId !== convertJobId) return;
                         console.warn('Không gắn nhãn được bằng AI, dùng quy tắc có sẵn:', aiErr);
-                        chunkLabels = labelLinesLocally(chunks[i].lines);
+                        // Gắn nhãn cả tài liệu rồi lấy đúng phần này: phần cắt giữa câu vẫn biết câu đang đọc.
+                        localAll ||= labelLinesLocally(lines);
+                        chunkLabels = localAll.slice(chunks[i].start, chunks[i].start + chunks[i].lines.length);
                         localParts.push(i + 1);
                     }
                     if (myJobId !== convertJobId) return;

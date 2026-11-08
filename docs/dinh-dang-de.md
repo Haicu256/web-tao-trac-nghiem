@@ -1835,6 +1835,109 @@ câu 2: A
 câu 2 tiêu đề: Choose the best response. / - A: "Thank you very much." / - B: "______"
 ```
 
+### Phương án "B. Tự luận", "A. Trắc nghiệm" là phương án, không phải tiêu đề phần
+Tiêu đề phần "B. TỰ LUẬN" chỉ là tiêu đề khi không phải phương án kế tiếp của câu đang đọc.
+```de
+Câu 1: Hình thức kiểm tra nào yêu cầu học sinh tự viết câu trả lời dài?
+A. Vấn đáp
+B. Tự luận
+C. Thực hành
+D. Thuyết trình
+Đáp án: B
+Câu 2: Hình thức nào chấm nhanh nhất?
+A. Trắc nghiệm
+B. Vấn đáp
+Đáp án: A
+```
+```ket-qua
+số câu: 2
+câu 1 số phương án: 4
+câu 1: B
+câu 1 phương án B: Tự luận
+câu 2: A
+câu 2 phương án A: Trắc nghiệm
+```
+
+### Đoạn văn dùng chung cho nhiều câu ("questions from 2 to 3", "từ câu 2 đến câu 3") hiện ở mọi câu đó
+Đề tiếng Anh, đọc hiểu: khi trộn câu, câu 3 vẫn có đoạn văn.
+```de
+Question 1: He ___ to school every day.
+A. go
+*B. goes
+
+Read the following passage and mark the letter A, B, C, or D to indicate the correct answer to each of the questions from 2 to 3.
+Tom lives in a small village near the sea.
+
+Question 2: Where does Tom live?
+A. In a big city
+*B. In a small village
+Question 3: What does Tom collect?
+*A. Shells
+B. Stones
+Question 4: 2 + 2?
+A. 3
+*B. 4
+```
+```ket-qua
+số câu: 4
+câu 1 tiêu đề: He ___ to school every day.
+câu 2 tiêu đề: Read the following passage and mark the letter A, B, C, or D to indicate the correct answer to each of the questions from 2 to 3. / Tom lives in a small village near the sea. / Where does Tom live?
+câu 3 tiêu đề: Read the following passage and mark the letter A, B, C, or D to indicate the correct answer to each of the questions from 2 to 3. / Tom lives in a small village near the sea. / What does Tom collect?
+câu 4 tiêu đề: 2 + 2?
+```
+
+### Đoạn văn trước câu đầu tiên, hay sau dòng "Đáp án:" của câu trước, không bị bỏ
+```de
+Read the following passage and answer the questions from 1 to 2.
+Tom lives in a small village near the sea.
+Question 1: Where does Tom live?
+A. In a big city
+B. In a small village
+Đáp án: B
+Question 2: What does Tom collect?
+A. Shells
+B. Stones
+Đáp án: A
+Đọc đoạn văn sau và trả lời từ câu 3 đến câu 4.
+Mặt trời mọc ở phía đông.
+Question 3: Mặt trời mọc ở đâu?
+A. Phía đông
+B. Phía tây
+Đáp án: A
+Question 4: 2 + 2?
+A. 4
+B. 5
+Đáp án: A
+```
+```ket-qua
+số câu: 4
+câu 1 tiêu đề: Read the following passage and answer the questions from 1 to 2. / Tom lives in a small village near the sea. / Where does Tom live?
+câu 2 tiêu đề: Read the following passage and answer the questions from 1 to 2. / Tom lives in a small village near the sea. / What does Tom collect?
+câu 3 tiêu đề: Đọc đoạn văn sau và trả lời từ câu 3 đến câu 4. / Mặt trời mọc ở phía đông. / Mặt trời mọc ở đâu?
+câu 4 tiêu đề: Đọc đoạn văn sau và trả lời từ câu 3 đến câu 4. / Mặt trời mọc ở phía đông. / 2 + 2?
+câu 3: A
+```
+
+### Đoạn văn "Read the following passage…" ngay sau phương án (không có dòng trống) thuộc câu sau
+```de
+Question 1: He ___ to school every day.
+A. go
+*B. goes
+Read the following passage and answer the questions from 2 to 3.
+Tom lives in a small village near the sea.
+Question 2: Where does Tom live?
+A. In a big city
+*B. In a small village
+Question 3: What does Tom collect?
+*A. Shells
+B. Stones
+```
+```ket-qua
+số câu: 3
+câu 1 phương án B: goes
+câu 3 tiêu đề: Read the following passage and answer the questions from 2 to 3. / Tom lives in a small village near the sea. / What does Tom collect?
+```
+
 ### Dòng đề bài bắt đầu bằng "Phần 1 của…", "Phần vi mô…" không phải tiêu đề phần
 ```de
 Câu 1: Tác phẩm có mấy phần?
@@ -2277,7 +2380,9 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
 - Câu đúng/sai không có tiền tố `câu hỏi đúng sai:`, không nằm trong phần có tiêu đề "đúng sai", mà đáp án chỉ nằm ở
   bảng cuối đề thì câu đó bị bỏ (không đoán). Thêm tiền tố hoặc tiêu đề phần, ghi `Đáp án: a) Đ b) S …` ngay dưới câu,
   hoặc dùng **Chuyển đổi file**.
-- Đoạn văn đứng giữa hai câu chỉ được chuyển xuống câu sau khi có **dòng trống** ngăn với phương án cuối. Không có dòng trống thì nó bị nối vào phương án cuối của câu trước.
+- Đoạn văn đứng giữa hai câu chỉ được chuyển xuống câu sau khi có **dòng trống** ngăn với phương án cuối, hoặc mở đầu
+  bằng câu dẫn như "Read the following passage…", "Đọc đoạn văn sau…". Không có thì nó bị nối vào phương án cuối của
+  câu trước.
 - Câu không đánh số (không có `Câu 1:`, `1.`…) không đọc được; dùng nút **Chuyển đổi file** để AI đánh số.
 
 ## 12. An toàn

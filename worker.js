@@ -192,7 +192,7 @@ async function handleConvert(request, env) {
         const missing = missingAiConfig(env);
         if (missing) return missing;
 
-        const sanitizedText = normalizedText.replace(/[<＜]\s*\/?\s*tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]');
+        const sanitizedText = normalizedText.replace(/[<＜]\s*(?:\/\s*)?tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]');
         const prompt = buildPrompt(sanitizedText, startIndex);
 
         const { geminiRes, usedModel } = await callGeminiWithFallback(env, prompt);
@@ -407,7 +407,7 @@ async function handleLabelLines(rawLines, env) {
 }
 
 function buildLabelPrompt(lines) {
-    const numbered = lines.map((l, i) => `L${i + 1}: ${l.replace(/[<＜]\s*\/?\s*tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]')}`).join('\n');
+    const numbered = lines.map((l, i) => `L${i + 1}: ${l.replace(/[<＜]\s*(?:\/\s*)?tai_lieu(?:\s+[^>＞]*)?[>＞]/gi, '[tai_lieu_tag]')}`).join('\n');
     return `
 Bạn là công cụ phân loại dòng của một tài liệu đề thi trắc nghiệm. Bạn KHÔNG viết lại, KHÔNG sửa, KHÔNG giải đề, KHÔNG đoán đáp án.
 Nhiệm vụ duy nhất: gắn đúng MỘT nhãn cho MỖI dòng L1..L${lines.length}, trả về các đoạn liên tiếp { "tu", "den", "loai" } phủ đủ mọi dòng, không trùng, không sót.
@@ -707,10 +707,11 @@ function tooLargeMessage() {
 
 function looksLikeQuiz(text) {
     if (typeof text !== 'string') return false;
-    const normalized = text.normalize('NFC');
-    const qMatches = (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(câu\s*hỏi|câu|q|bài|question|exercise|problem)\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+\b)|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/gim) || []).length
-        + (normalized.match(/^\s*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\d+(?:\.\d+)?\s*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
-    const optMatches = (normalized.match(/^\s*(?:\*+\s*)?(?:\*{1,3}\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length
+    // Rút gọn dãy dấu cách/tab và dùng [ \t]* ở đầu dòng: "\n" × 60000 hay dấu cách dài từng làm regex chạy bậc hai.
+    const normalized = text.normalize('NFC').replace(/[ \t]{3,}/g, '  ');
+    const qMatches = (normalized.match(/^[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:(câu\s*hỏi|câu|q|bài|question|exercise|problem)\s*(?:\d+(?:\.\d+)?|[ivxlcdm]+\b)|(?:câu\s*hỏi\s*đúng[\s\/\-–—]*sai|true[\s\/\-–—]*false(?:\s*questions?)?)\s*(?:[:.\-–—]|\d+|$))/gim) || []).length
+        + (normalized.match(/^[ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?\d+(?:\.\d+)?[ \t]*\*{0,3}[\.\)\/:]\*{0,3}\s/gm) || []).length;
+    const optMatches = (normalized.match(/^[ \t]*(?:\*+[ \t]*)?(?:\*{1,3}[ \t]*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:]|[a-fA-F]\*(?:\s+|$)|[a-fA-F]\*?\s+)/gim) || []).length
         + (normalized.match(/(?:\t+|[ ]{2,})(?:\*+\s*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*{0,3}[\.\)\-\/:])\s+/gi) || []).length;
 
     if (qMatches < 1 || optMatches < 2) return false;

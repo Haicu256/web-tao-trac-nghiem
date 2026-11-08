@@ -70,6 +70,15 @@ gửi AI sau) là câu mới; dòng có tiền tố "câu hỏi đúng sai:" là
 bỏ qua. Dòng "Câu N:" ngay sau tiêu đề phần cũng là câu mới (phần đánh số lại từ 1), kể cả khi AI gắn là phương án không
 chữ cái hay dòng đáp án mà phần sau không phải đáp án ("Câu 2: B" vẫn là dòng đáp án). Sau tiêu đề bảng đáp án, hàng
 "1.A 2.B" gắn là dòng đáp án hay bỏ qua vẫn thuộc bảng: nếu không, hàng đó đứng trước bảng và làm đảo thứ tự các phần.
+Câu trong phần có tiêu đề "đúng sai" (đề THPT 2025) là câu đúng/sai. "B. Tự luận" ngay sau "A." là phương án, không phải
+tiêu đề phần. Đoạn văn "Read the following passage…" sau phương án của câu trước thuộc câu sau, và được chép vào mọi câu
+trong khoảng "questions from 2 to 4" để khi trộn câu vẫn có đoạn văn.
+
+Khi AI lỗi ở một phần, bộ gắn nhãn dự phòng chạy trên cả tài liệu rồi lấy đúng phần đó, để phần bị cắt giữa câu vẫn biết
+câu đang đọc; `chunkLines` cũng cắt ở câu đánh số trần "12." có phương án ngay sau.
+
+Bảng đáp án nhiều mã đề ("Mã đề 101: 1.A…", bảng cột của Bộ) chỉ dùng phần của mã đề ghi ở đầu đề; `assembleQuizText`
+giữ dòng mã đề đó cho parser, `keepFirstExamCode` giữ bảng đáp án chung ở cuối file khi cắt bỏ mã đề sau.
 
 `npm run fuzz -- labels` thử hàng nghìn dãy nhãn ngẫu nhiên trên đề không có đáp án (không được ra đáp án nào);
 `npm run fuzz -- noise` gắn nhầm 1-2 nhãn kiểu hợp lý trên đề có đáp án (được mất đáp án, không được ra đáp án khác với

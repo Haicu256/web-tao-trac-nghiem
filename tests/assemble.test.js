@@ -630,3 +630,44 @@ test('reconcileLabels: phương án kế tiếp ("C. …" sau "B.") bị gắn l
     const out = fn('assembleQuizText')(lines, fixed);
     assert.deepEqual([...app.parse(out.text).questions].map(answerOf), ['D']);
 });
+
+test('chunkLines: đề đánh số trần "12." dài nhiều phần thì cắt ở đầu câu, không cắt giữa câu', () => {
+    for (const pad of [2, 3, 4, 5]) {
+        const lines = [];
+        for (let n = 1; n <= 100; n++) lines.push(`${n}. ${'Nội dung câu hỏi khá dài. '.repeat(pad)}`, `A. phương án ${n}`, `B. phương án ${n}`, `*C. phương án ${n}`, `D. phương án ${n}`);
+        const chunks = [...fn('chunkLines')(lines, 8000)];
+        assert.ok(chunks.length >= 2);
+        for (const c of chunks.slice(1)) assert.match(c.lines[0], /^\d+\. /, `pad ${pad}`);
+    }
+});
+
+test('reconcileLabels: "Câu N:" đúng số kế tiếp mà AI gắn là bảng đáp án vẫn là câu mới', () => {
+    const lines = ['Câu 1: Thủ đô?', '*A. Hà Nội', 'B. Huế', 'Câu 2: Sông dài nhất?', 'A. Hồng', '*B. Mê Công'];
+    const fixed = [...fn('reconcileLabels')(lines, labels('QOOKOO'))];
+    assert.equal(fixed[3], 'cau_hoi');
+    assert.deepEqual([...app.parse(fn('assembleQuizText')(lines, fixed).text).questions].map(answerOf), ['A', 'B']);
+});
+
+test('Bộ gắn nhãn dự phòng: mục lời giải "Câu 1: B. Hà Nội là thủ đô." sau tiêu đề đáp án là bảng đáp án', () => {
+    const r = convertLocally('Câu 1: Thủ đô của Việt Nam là\nA. Huế\nB. Hà Nội\nCâu 2: 2+2 bằng\nA. 3\nB. 5\nC. 4\n--- HẾT ---\nĐáp án chi tiết\nCâu 1: B. Hà Nội là thủ đô.\nCâu 2: C. 2+2=4.');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'C']);
+});
+
+test('Đoạn văn đọc hiểu giữa hai câu thuộc các câu sau, không nối vào phương án của câu trước (đường chuyển file)', () => {
+    const r = convertLocally('Question 1: He ___ to school every day.\nA. go\n*B. goes\nRead the following passage and mark the letter A, B, C, or D to indicate the correct answer to each of the questions from 2 to 3.\nTom lives in a small village near the sea.\nQuestion 2: Where does Tom live?\nA. In a big city\n*B. In a small village\nQuestion 3: What does Tom collect?\n*A. Shells\nB. Stones');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'B', 'A']);
+    assert.equal(plainText(r.questions[0].options[1].text), 'goes');
+    for (const q of r.questions.slice(1)) assert.ok(plainText(q.title).includes('Tom lives in a small village'), q.title);
+    // Đoạn văn trước câu đầu tiên cũng không bị bỏ.
+    const first = convertLocally('Read the following passage and answer the questions from 1 to 2.\nTom lives in a small village near the sea.\nQuestion 1: Where does Tom live?\nA. In a big city\n*B. In a small village\nQuestion 2: What does Tom collect?\n*A. Shells\nB. Stones');
+    for (const q of first.questions) assert.ok(plainText(q.title).includes('Tom lives in a small village'), q.title);
+});
+
+test('Trộn phương án: "Tất cả đáp án trên", "Both of the above", "Đáp án khác"… luôn ở cuối', () => {
+    const keep = fn('optionRefersToOthers');
+    for (const t of ['Tất cả đáp án trên', 'Tất cả những ý trên', 'Tất cả các trường hợp trên', 'Các kết quả trên đều sai', 'Các phát biểu trên đều đúng',
+        'Tất cả các nhận định trên', 'Both of the above', 'None of these', 'Neither of them', 'Đáp án khác', 'All of the above', 'Tất cả các đáp án trên']) {
+        assert.equal(keep(t), true, t);
+    }
+    for (const t of ['Các nước trên thế giới', 'Tất cả học sinh', 'Hà Nội', 'Trên bàn có sách', 'Both cats and dogs']) assert.equal(keep(t), false, t);
+});

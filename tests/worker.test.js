@@ -365,3 +365,21 @@ test('share: trình duyệt hỏi lại bằng If-None-Match (304) vẫn gia h�
     assert.equal(res.status, 304);
     assert.equal(kv.puts.length, 1);
 });
+
+test('share: chuỗi dài dòng trống hay dấu cách không làm worker chạy lâu (regex bậc hai)', async () => {
+    const kv = { async get() { return null; }, async put() {} };
+    for (const text of ['\n'.repeat(60000) + 'x', ' '.repeat(60000) + 'x\nCâu 1: a\n', '\t'.repeat(60000) + 'A. x']) {
+        const t0 = performance.now();
+        const res = await worker.fetch(post('/api/share', { text }), { SHARES: kv });
+        assert.equal(res.status, 400);
+        assert.ok(performance.now() - t0 < 1500, `${Math.round(performance.now() - t0)}ms`);
+    }
+});
+
+test('gắn nhãn: dòng "<" + nhiều dấu cách không làm worker chạy lâu trước khi gọi AI', async () => {
+    fakeGemini(okReply(JSON.stringify({ doan: [{ tu: 1, den: 1, loai: 'bo_qua' }] })));
+    const t0 = performance.now();
+    const res = await worker.fetch(post('/api/convert', { lines: ['<' + ' '.repeat(45000) + 'x'] }), AI_ENV);
+    assert.equal(res.status, 200);
+    assert.ok(performance.now() - t0 < 1000, `${Math.round(performance.now() - t0)}ms`);
+});
