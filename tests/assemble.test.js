@@ -715,3 +715,19 @@ test('Bộ gắn nhãn dự phòng: dòng khoảng câu "Câu 1 đến câu 4: B
     const q = [1, 2, 3, 4].map(n => `Câu ${n}: Câu ${n}?\nA. 1\nB. 2`).join('\n');
     assert.deepEqual(convertLocally(`${q}\nBẢNG ĐÁP ÁN\nCâu 1 đến câu 4: B A B A`).questions.map(answerOf), ['B', 'A', 'B', 'A']);
 });
+
+test('Đề chép từ PDF: phương án cùng dòng bị ngắt giữa chừng ("C. 4" rồi "kiểu pháp luật D. 5…") không làm mất câu (đường chuyển file)', () => {
+    const r = convertLocally('Câu 28. Cơ quan duy nhất có quyền lập hiến và lập pháp:\nA. Chủ tịch nước B.\nQuốc hội\nC. Chính phủ D. Tòa\nán nhân dân\n7\nCâu 29. Lịch sử xã hội loài người đã trải qua mấy\nkiểu pháp luật:\nA. 2 kiểu pháp luật B. 3 kiểu pháp luật C. 4\nkiểu pháp luật D. 5 kiểu pháp luật\nCâu 30. Mỗi năm Quốc hội họp mấy kỳ:\nA. 1 kỳ B. 2 kỳ C. 3 kỳ D.\nKhông có quy định\nĐÁP ÁN\n28.B 29.C 30.B');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'C', 'B']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4, 4]);
+    assert.equal(plainText(r.questions[1].options[2].text), '4 kiểu pháp luật');
+    assert.equal(plainText(r.questions[2].options[3].text), 'Không có quy định');
+});
+
+test('Đề xuất từ phần mềm trộn đề: phương án "a 3000 b 2000" không có dấu chấm, cặp "c … d …" đứng riêng hay cách dòng chữ chen (đường chuyển file)', () => {
+    const r = convertLocally('1/ Trong mô hình tổng cung tổng cầu, tại điểm cân bằng:\na Thị trường sản phẩm cân bằng.\nb Các xí nghiệp tối đa hóa lợi nhuận.\nc Cả a và b đều sai. d Cả a và b đều đúng.\n2/ Khi tăng thuế và chi tiêu bằng nhau thì:\na Sản lượng không đổi. b Sản lượng giảm.\nTÀI LIỆU ĐƯỢC CHIA SẺ TẠI X\nc Sản lượng tăng d Các câu trên đều đúng.\nĐÁP ÁN\n1d 2a');
+    assert.deepEqual(r.questions.map(answerOf), ['D', 'A']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4]);
+    assert.equal(plainText(r.questions[0].options[3].text), 'Cả a và b đều đúng.');
+    assert.equal(plainText(r.questions[1].options[2].text), 'Sản lượng tăng');
+});

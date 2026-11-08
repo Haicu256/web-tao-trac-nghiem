@@ -1,4 +1,5 @@
-// Đo độ chính xác đọc đề trên bộ đề mẫu (test_exams/) và đề thật (test_exams/private/).
+// Đo độ chính xác đọc đề trên bộ đề mẫu (test_exams/), đề thật (test_exams/private/) và đề lấy trên mạng
+// (test_exams/web/, chỉ có trên máy).
 //   npm run eval                 chạy hết; docx đi qua AI thật trên web (có cache)
 //   npm run eval -- --no-ai      chỉ chạy file .txt
 //   npm run eval -- --fresh      bỏ cache, gọi AI lại
@@ -34,7 +35,12 @@ const mammothLikeBrowser = {
     convertToHtml: (input, options) => nodeMammoth.convertToHtml(input.arrayBuffer ? { buffer: Buffer.from(input.arrayBuffer) } : input, options),
 };
 
+// pdf.js cùng bản với web (3.11.174, bản legacy chạy được trên Node).
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+
 const app = loadApp({
+    pdfjsLib,
     JSZip: require('jszip'),
     mammoth: mammothLikeBrowser,
     DOMParser,
@@ -44,7 +50,7 @@ const app = loadApp({
 
 function loadExpectations() {
     const sets = [];
-    for (const dir of [ROOT, path.join(ROOT, 'private')]) {
+    for (const dir of [ROOT, path.join(ROOT, 'private'), path.join(ROOT, 'web')]) {
         const file = path.join(dir, 'expected.json');
         if (!fs.existsSync(file)) continue;
         const { files } = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -164,7 +170,6 @@ async function evaluate({ rel, abs, expected }) {
         return { raw, ...app.parse(raw), via: 'parser' };
     }
     if (!useAI) return { skipped: 'bỏ qua (--no-ai)' };
-    if (ext === '.pdf') return { skipped: 'script chưa đọc được PDF' };
     const buf = fs.readFileSync(abs);
     const raw = await app.fn('extractTextFromFile')(new File([buf], path.basename(abs)));
     if (expected.questions === undefined && !expected.rejected) return { raw, ok: false, questions: [], via: 'trích chữ' };

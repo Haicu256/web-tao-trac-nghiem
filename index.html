@@ -498,8 +498,48 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return (str || '').replace(FORMAT_TAGS_REGEX, '');
         }
 
+        // "a 3000 b 2000 c 1000 d …" (đề xuất từ phần mềm trộn đề): chữ cái phương án không có dấu chấm thì thêm vào, và
+        // mỗi phương án xuống dòng riêng. Chỉ khi trong một câu có đủ a, b, c theo thứ tự và "a" đứng đầu dòng, để không đụng
+        // chữ "a" trong câu tiếng Anh.
+        function markBareOptionLetters(text) {
+            const lines = text.split('\n');
+            const isQuestionStart = l => /^\s*(?:⟦[^⟧]+⟧\s*)*(?:(?:câu|question|bài)\s*)?\d+\s*[\/.:)]/iu.test(l);
+            let marks = [];
+            let next = null;
+            const commit = () => {
+                // Cùng kiểu chữ với "a" ("a … b … C … d": chữ C hoa gõ nhầm).
+                const upper = marks.length && lines[marks[0].i][marks[0].pos - 1] === 'A';
+                if (marks.length >= 3) for (const { i, pos, mid } of marks.reverse()) {
+                    const letter = upper ? lines[i][pos - 1].toUpperCase() : lines[i][pos - 1].toLowerCase();
+                    lines[i] = (mid ? lines[i].slice(0, pos - 1).trimEnd() + '\n' : lines[i].slice(0, pos - 1)) + letter + '.' + lines[i].slice(pos);
+                }
+                marks = [];
+                next = null;
+            };
+            lines.forEach((line, i) => {
+                if (isQuestionStart(line)) { commit(); return; }
+                const start = line.match(/^(\s*(?:⟦[^⟧]+⟧\s*)*)([aA])[ \t]+(?=\S)/u);
+                if (start) { marks = [{ i, pos: start[0].trimEnd().length }]; next = 'b'; }
+                else if (!next) return;
+                const re = /[ \t]([a-fA-F])[ \t]+(?=\S)/gu;
+                re.lastIndex = start ? start[0].length : 0;
+                if (!start) {
+                    const lead = line.match(/^(\s*(?:⟦[^⟧]+⟧\s*)*)([a-fA-F])[ \t]+(?=\S)/u);
+                    if (lead && lead[2].toLowerCase() === next) { marks.push({ i, pos: lead[0].trimEnd().length }); next = String.fromCharCode(next.charCodeAt(0) + 1); re.lastIndex = lead[0].length; }
+                }
+                let m;
+                while ((m = re.exec(line)) !== null) {
+                    if (m[1].toLowerCase() !== next) continue;
+                    marks.push({ i, pos: m.index + 2, mid: true });
+                    next = String.fromCharCode(next.charCodeAt(0) + 1);
+                }
+            });
+            commit();
+            return lines.join('\n');
+        }
+
         function cleanInputText(str) {
-            return (str || '')
+            return markBareOptionLetters((str || '')
                 .normalize('NFC')
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 .replace(/\r\n/g, '\n')
@@ -534,7 +574,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/^[ \t|]*(?:câu[ \t]*)?(\d+)[ \t|]+(a\)[ \t|]*(?:đúng|sai|đ|s)(?:[ \t|]*\n[ \t|]*[b-f]\)[ \t|]*(?:đúng|sai|đ|s))+)[ \t|]*$/gimu,
                     (m, n, rows) => `Câu ${n}: ${rows.replace(/[\s|]+/g, ' ').trim()}`)
                 .replace(/^[ \t|]*câu(?:[ \t|]+[a-f])+[ \t|]*((?:\n[ \t|]*\d+(?:[ \t|]+(?:đúng|sai|đ|s))+[ \t|]*)+)$/gimu,
-                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n'));
+                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n')));
         }
 
         function escapeHTML(str) {
@@ -813,7 +853,15 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         function splitInlineOptions(text) {
             if (!text || typeof text !== 'string') return '';
-            text = text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ');
+            text = text.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ')
+                // "A. x B. y" rồi "C. z D. w" (hai phương án mỗi dòng, cách đúng một dấu cách, chép từ PDF, có khi cách một
+                // dòng trống): nối hai dòng để
+                // tách như "A. x B. y C. z D. w" ở dưới.
+                .replace(/^([ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Aa][.)][ \t]+\S.*?\S[ ](?:⟦[^⟧]+⟧)*\*?[Bb][.)][ \t]+\S.*)\n(?:[ \t]*\n)*(?=[ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Cc][.)][ \t]+\S.*?\S[ ](?:⟦[^⟧]+⟧)*\*?[Dd][.)][ \t]+\S)/gmu, '$1 ')
+                // Chỉ một cặp cùng dòng: "C. x D. y" ngay sau dòng "B.", hay "A. x B. y" ngay trước dòng "C." thì tách cặp đó
+                // (dòng bên cạnh xác nhận thứ tự, nên "B. Vitamin B. …" không bị tách).
+                .replace(/^([ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Bb][.)][ \t]+\S.*\n(?:[ \t]*\n)*[ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Cc][.)][ \t]+\S.*?\S)[ ](?=(?:⟦[^⟧]+⟧)*\*?[Dd][.)][ \t]+\S)/gmu, '$1\n')
+                .replace(/^([ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Aa][.)][ \t]+\S.*?\S)[ ](?=(?:⟦[^⟧]+⟧)*\*?[Bb][.)][ \t]+\S.*\n(?:[ \t]*\n)*[ \t]*(?:⟦[^⟧]+⟧\s*)*\*?[ \t]*[Cc][.)][ \t]+\S)/gmu, '$1\n');
             const lines = text.split('\n');
             const result = [];
             for (let line of lines) {
@@ -4112,6 +4160,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (!question) return;
                 const q = question;
                 question = null;
+                // "A. 2 kiểu B. 3 kiểu C. 4" rồi "kiểu pháp luật D. 5 kiểu" (PDF ngắt dòng giữa các phương án cùng dòng): chỉ
+                // tách được sau khi nối dòng; không tách thì câu bị bỏ vì chỉ có một phương án.
+                if (q.options.length === 1) {
+                    const parts = splitInlineOptions(q.options[0].raw).split('\n').map(raw => ({ raw, plain: stripFormattingTags(raw).trim() }));
+                    if (parts.length >= 2 && parts.every(p => OPTION_PREFIX_REGEX.test(p.plain))) {
+                        q.options = parts.map(({ raw, plain }) => {
+                            const m = plain.match(OPTION_PREFIX_REGEX);
+                            const rawLetter = m[2] || m[3] || m[4];
+                            return { raw, firstRaw: raw, text: plain.slice(m[0].length), letter: rawLetter.toUpperCase(), rawLetter, lines: [plain], prefixStar: /^\*(?!\*)/.test(plain) };
+                        });
+                    }
+                }
                 if (q.options.length < 2) {
                     // Khối không có phương án và không có số câu (ví dụ "Đọc đoạn văn sau...") là phần dẫn của câu sau.
                     if ((!q.explicitNumber || PASSAGE_INTRO_REGEX.test(q.stem[0] || '')) && q.stem.length > 0) pendingStem = [...pendingStem, ...q.stem];

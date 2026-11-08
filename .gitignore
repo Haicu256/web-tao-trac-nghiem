@@ -14,3 +14,5 @@ node_modules/
 # Đề thật của người dùng và cache khi đo độ chính xác
 test_exams/private/
 test_exams/.cache/
+# Đề thật lấy trên mạng để thử (có thể có bản quyền, chỉ dùng trên máy)
+test_exams/web/

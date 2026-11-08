@@ -361,6 +361,85 @@ câu 1: B
 câu 1 phương án B: Hà Nội
 ```
 
+### Hai phương án mỗi dòng, cách một dấu cách ("A. x B. y" rồi "C. z D. w", chép từ PDF)
+```de
+Câu 1: Thủ tướng Chính phủ do ai bầu?
+A. Do nhân dân bầu B. Do Quốc hội bầu
+C. Do Chủ tịch nước chỉ định D. Do Chính phủ bầu
+Đáp án: B
+Câu 2: Văn bản có hiệu lực cao nhất?
+a. Luật b. Hiến pháp
+
+c. Nghị quyết d. Pháp lệnh
+Đáp án: b
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án B: Do Quốc hội bầu
+câu 1 phương án C: Do Chủ tịch nước chỉ định
+câu 2: B
+câu 2 phương án B: Hiến pháp
+câu 2 phương án D: Pháp lệnh
+```
+
+Chỉ một cặp cùng dòng, các phương án khác mỗi cái một dòng: tách khi dòng trên hay dòng dưới đúng thứ tự.
+```de
+Câu 1: Hiến pháp xuất hiện:
+A. Từ nhà nước chủ nô B. Từ nhà nước phong kiến
+C. Từ nhà nước tư sản
+D. Từ nhà nước XHCN
+Đáp án: C
+Câu 2: Thủ tướng do ai bầu?
+A. Do nhân dân bầu
+B. Do Quốc hội bầu
+C. Do Chủ tịch nước giới thiệu D. Do Chính phủ bầu
+Đáp án: D
+Câu 3: Loại vitamin nào tan trong nước?
+A. Vitamin A
+B. Vitamin B. Vitamin C cũng vậy
+C. Vitamin D
+D. Vitamin E
+Đáp án: B
+```
+```ket-qua
+số câu: 3
+câu 1: C
+câu 1 phương án B: Từ nhà nước phong kiến
+câu 2: D
+câu 2 phương án C: Do Chủ tịch nước giới thiệu
+câu 2 phương án D: Do Chính phủ bầu
+câu 3: B
+câu 3 phương án B: Vitamin B. Vitamin C cũng vậy
+```
+
+### Phương án không có dấu chấm sau chữ cái ("a 3000 b 2000 c 1000 d …", đề xuất từ phần mềm trộn đề)
+Chỉ hiểu là phương án khi trong một câu có đủ a, b, c theo thứ tự và "a" đứng đầu dòng.
+```de
+1/ Lượng tiền cung ứng là:
+a 3000 b 2000 c 1000 d Các câu trên đều sai.
+2/ Tổng cầu không bao gồm bộ phận nào:
+a Chi cho tiêu dùng. b Chi cho đầu tư của chính phủ.
+C Chi cho đầu tư của tư nhân. d Chi cho trợ cấp khó khăn.
+3/ Tìm câu sai:
+a Trong ngắn hạn có sự đánh đổi.
+b Khi suy thoái thì thắt chặt tiền tệ.
+c Lạm phát làm giá tăng.
+d Xuất khẩu là hằng số.
+ĐÁP ÁN
+1a 2b 3b
+```
+```ket-qua
+số câu: 3
+câu 1: A
+câu 1 phương án D: Các câu trên đều sai.
+câu 2: B
+câu 2 phương án B: Chi cho đầu tư của chính phủ.
+câu 2 phương án C: Chi cho đầu tư của tư nhân.
+câu 3: B
+câu 3 phương án B: Khi suy thoái thì thắt chặt tiền tệ.
+```
+
 ### Dấu tích ✅ cạnh phương án đúng (chép từ chatbot)
 Dấu tích ở cuối dòng phương án (hay sau phương án cuối của dòng) giống `(*)`; ở đầu dòng giống `*B.`. Dấu tích nằm giữa
 hai phương án cùng dòng thì không đoán.
@@ -3056,6 +3135,15 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   bằng câu dẫn như "Read the following passage…", "Đọc đoạn văn sau…". Không có thì nó bị nối vào phương án cuối của
   câu trước.
 - Câu không đánh số (không có `Câu 1:`, `1.`…) không đọc được; dùng nút **Chuyển đổi file** để AI đánh số.
+- Đề thật lấy trên mạng (lứa 1, 8/11/2026), mỗi kiểu mới gặp ở một file nên chưa sửa:
+  - Đáp án ghi `=> B. giải thích` ngay sau phương án (ghi chép ôn thi) chưa đọc; ghi `Đáp án: B`.
+  - Bảng đúng/sai đánh dấu `X` vào cột ĐÚNG hay SAI (`STT | CÂU HỎI | ĐÚNG | SAI`) chưa đọc.
+  - Chữ màu chỉ phủ một phần phương án (chữ cái không tô, sau đáp án có ghi chú không tô) thì không coi là đáp án.
+  - Dòng quảng cáo dính trước tiêu đề (`TÀI LIỆU ĐƯỢC CHIA SẺ TẠI … ĐÁP ÁN`): bộ gắn nhãn dự phòng không thấy bảng
+    đáp án (AI thì thấy).
+- PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font cũ TCVN3 (`C©u 1`), VNI (`ñuùng`) không
+  đọc được; dùng file Word gốc bằng Unicode.
+- Đáp án để ở file riêng: dán bảng đáp án vào cuối đề rồi mới tạo đề.
 
 ## 12. An toàn
 
