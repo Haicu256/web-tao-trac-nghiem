@@ -440,6 +440,58 @@ câu 3: B
 câu 3 phương án B: Khi suy thoái thì thắt chặt tiền tệ.
 ```
 
+### Chữ font cũ TCVN3 (.VnTime: "C©u 1", "t−ëng"), chữ "đ" bị đổi thành "ñ", "ð"
+Chép từ file Word, PDF đời cũ. Cả văn bản rõ là TCVN3 (nhiều ký tự chỉ TCVN3 dùng, không có chữ Việt Unicode) thì đổi
+sang Unicode; dòng đã có chữ Việt Unicode thì giữ nguyên. Văn bản Unicode không có chữ "đ" nào mà có "ñ", "ð" thì đó là
+"đ", "Đ" (văn bản có "đ" thật như "El Niño" thì giữ).
+```de
+C©u 1. Th©n phô Hå ChÝ Minh lμ NguyÔn Sinh S¾c. ¤ng sinh n¨m nμo?
+a. 1860
+b. 1862
+c. 1863
+d. 1883
+§¸p ¸n: b
+C©u 2. HuyÖn B×nh Khª lμ n¬i Cô NguyÔn Sinh S¾c lμm g×?
+a. Tri huyÖn
+b. Gi¸o thô
+c. Th­êng d©n
+d. Thî may
+§¸p ¸n: a
+```
+```ket-qua
+số câu: 2
+câu 1 tiêu đề: Thân phụ Hồ Chí Minh là Nguyễn Sinh Sắc. Ông sinh năm nào?
+câu 1: B
+câu 2 tiêu đề: Huyện Bình Khê là nơi Cụ Nguyễn Sinh Sắc làm gì?
+câu 2: A
+câu 2 phương án B: Giáo thụ
+```
+
+```de
+ðỀ THI MÔN PHÁP LUẬT ðẠI CƯƠNG
+Câu 1: Nhận ñịnh nào ñúng về Quốc hội?
+a. Là cơ quan ñại diện cao nhất của nhân dân
+b. Là cơ quan tư pháp
+ðáp án: a
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Nhận định nào đúng về Quốc hội?
+câu 1: A
+câu 1 phương án A: Là cơ quan đại diện cao nhất của nhân dân
+```
+
+```de
+Câu 1: Hiện tượng El Niño làm nhiệt độ mặt nước biển thế nào? (Niño, La Niña: ñ giữ nguyên)
+A. Tăng
+B. Giảm
+Đáp án: A
+```
+```ket-qua
+câu 1 tiêu đề: Hiện tượng El Niño làm nhiệt độ mặt nước biển thế nào? (Niño, La Niña: ñ giữ nguyên)
+câu 1: A
+```
+
 ### Dấu tích ✅ cạnh phương án đúng (chép từ chatbot)
 Dấu tích ở cuối dòng phương án (hay sau phương án cuối của dòng) giống `(*)`; ở đầu dòng giống `*B.`. Dấu tích nằm giữa
 hai phương án cùng dòng thì không đoán.
@@ -3141,8 +3193,8 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   - Chữ màu chỉ phủ một phần phương án (chữ cái không tô, sau đáp án có ghi chú không tô) thì không coi là đáp án.
   - Dòng quảng cáo dính trước tiêu đề (`TÀI LIỆU ĐƯỢC CHIA SẺ TẠI … ĐÁP ÁN`): bộ gắn nhãn dự phòng không thấy bảng
     đáp án (AI thì thấy).
-- PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font cũ TCVN3 (`C©u 1`), VNI (`ñuùng`) không
-  đọc được; dùng file Word gốc bằng Unicode.
+- PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font VNI viết đủ dấu (`xeùt xöû`) không đọc
+  được; dùng file Word gốc bằng Unicode. Font TCVN3 (`C©u 1`) và chữ `ñ`, `ð` thay cho đ, Đ thì đã đổi được.
 - Đáp án để ở file riêng: dán bảng đáp án vào cuối đề rồi mới tạo đề.
 
 ## 12. An toàn

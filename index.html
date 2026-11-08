@@ -538,9 +538,30 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return lines.join('\n');
         }
 
+        // Font cũ TCVN3 (.VnTime, chép từ Word/PDF đời cũ): mỗi chữ Việt là một ký tự Latin-1 ("C©u" = "Câu", "t−ëng" =
+        // "tưởng"; chữ hoa dùng font khác nên chép ra thành chữ thường).
+        const TCVN3_MAP = Object.fromEntries([...'¡¢£¤¥¦§¨©ª«¬\u00AD\u2212®µμ¶·¸¹»¼½¾ÆÇÈÉÊËÌÎÏÐÑÒÓÔÕÖ×ØÜÝÞßáâãäåæçèéêëìíîïñòóôõö÷øùúûüýþ']
+            .map((c, i) => [c, [...'ĂÂÊÔƠƯĐăâêôơưưđààảãáạằẳẵắặầẩẫấậèẻẽéẹềểễếệìỉĩíịòỏõóọồổỗốộờởỡớợùủũúụừửữứựỳỷỹýỵ'][i]]));
+        // Ký tự chỉ TCVN3 mới dùng (không có trong chữ Việt Unicode, cũng ít gặp trong đề tiếng Anh, Toán: bỏ × ÷ · © ® µ).
+        const TCVN3_ONLY_REGEX = /[¡¢£¤¥¦§¨ª«¬¶¸¹»¼½¾ÆÇËÎÏÑÖØÜÞßåæçëîïñöøûüþ]/g;
+        const VIET_UNICODE_REGEX = /[ăđơưĩũạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/giu;
+        function fixLegacyVietnamese(text) {
+            const legacy = (text.match(TCVN3_ONLY_REGEX) || []).length;
+            const viet = (text.match(VIET_UNICODE_REGEX) || []).length;
+            // Cả văn bản rõ là TCVN3 thì đổi; dòng đã có chữ Việt Unicode (tiêu đề gõ sau bằng Unicode) giữ nguyên.
+            if (legacy >= 5 && legacy > 3 * viet) {
+                return text.split('\n').map(line => (/[ăđơưĩũạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/iu.test(line) ? line
+                    : line.replace(/[^\x00-\x7f]/gu, c => TCVN3_MAP[c] || c))).join('\n');
+            }
+            // Font VNI đổi sai riêng chữ đ ("ñúng", "ðỀ THI"): văn bản Unicode không có "đ" thật nào. Có "đ" thật thì "ñ" là
+            // chữ nước ngoài ("El Niño").
+            if (viet >= 10 && !/[đĐ]/.test(text) && (text.match(/[ñð]/g) || []).length >= 3) return text.replace(/ñ/g, 'đ').replace(/ð/g, 'Đ');
+            return text;
+        }
+
         function cleanInputText(str) {
-            return markBareOptionLetters((str || '')
-                .normalize('NFC')
+            return markBareOptionLetters(fixLegacyVietnamese((str || '')
+                .normalize('NFC'))
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 .replace(/\r\n/g, '\n')
                 .replace(/\r/g, '\n')
