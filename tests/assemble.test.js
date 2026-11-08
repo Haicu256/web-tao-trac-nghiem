@@ -609,3 +609,16 @@ test('reconcileLabels: "Câu 2" gắn là phương án (không có chữ cái) h
     const keep = [...fn('reconcileLabels')(['Câu 1: Một?', 'A. x', 'B. y', 'Câu 2: B'], labels('QOOD'))];
     assert.equal(keep[3], 'dap_an');
 });
+
+test('Bảng đáp án nhiều mã đề ở cuối file: chỉ dùng phần của mã đề đầu (đường chuyển file)', () => {
+    const q = 'Câu 1: Một?\nA. a1\nB. b1\nC. c1\nD. d1\nCâu 2: Hai?\nA. a2\nB. b2\nC. c2\nD. d2';
+    const inline = convertLocally(`Mã đề 102\n${q}\nĐÁP ÁN\nMã đề 101: 1.A 2.B\nMã đề 102: 1.B 2.C`);
+    assert.deepEqual(inline.questions.map(answerOf), ['B', 'C']);
+    const columns = convertLocally(`Mã đề 103\n${q}\nĐÁP ÁN\nCâu\t101\t102\t103\t104\n1\tA\tB\tC\tD\n2\tB\tC\tD\tA`);
+    assert.deepEqual(columns.questions.map(answerOf), ['C', 'D']);
+    // Hai mã đề trong một file rồi bảng đáp án chung: giữ mã đề đầu và bảng đáp án của nó.
+    const two = convertLocally(`Mã đề 101\n${q}\nMã đề 102\n${q.replace(/Một/, 'Ba').replace(/Hai/, 'Bốn')}\nĐÁP ÁN\nMã đề 101: 1.D 2.A\nMã đề 102: 1.B 2.C`);
+    assert.equal(two.cut, true);
+    assert.deepEqual(two.questions.map(q => plainText(q.title)), ['Một?', 'Hai?']);
+    assert.deepEqual(two.questions.map(answerOf), ['D', 'A']);
+});

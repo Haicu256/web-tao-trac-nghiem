@@ -826,6 +826,247 @@ câu 3 loại: đúng sai
 câu 3: ĐSĐS
 ```
 
+### Bảng đáp án Phần II ghi "a-Đ, b-S", "a. Đ", "a: Đ" không thành đáp án "A" của câu trắc nghiệm
+```de
+PHẦN I. TRẮC NGHIỆM
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+Câu 2: Thành phố lớn nhất miền Nam?
+A. Cần Thơ
+B. Huế
+C. TP. Hồ Chí Minh
+D. Vũng Tàu
+PHẦN II. ĐÚNG SAI
+câu hỏi đúng sai: Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+câu hỏi đúng sai: Câu 2: Về sắt
+a) Sắt là kim loại.
+b) Sắt là phi kim.
+c) Sắt bị nam châm hút.
+d) Sắt tan trong nước.
+ĐÁP ÁN
+PHẦN I
+1.B 2.C
+PHẦN II
+Câu 1: a-Đ, b-S, c-Đ, d-S
+Câu 2: a. Đ b. S c. Đ d. S
+```
+```ket-qua
+số câu: 4
+câu 1: B
+câu 2: C
+câu 3: ĐSĐS
+câu 4: ĐSĐS
+```
+
+### Phần có tiêu đề "đúng sai" (đề THPT 2025): câu không có tiền tố vẫn là câu đúng/sai
+Tiêu đề phần như "PHẦN II. Câu trắc nghiệm đúng sai." (cùng dòng hoặc dòng ngay sau) cho biết các câu trong phần là
+câu đúng/sai, tới tiêu đề phần sau.
+```de
+PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn.
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+PHẦN II.
+Câu trắc nghiệm đúng sai. Thí sinh trả lời từ câu 1 đến câu 2.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là kim loại.
+b) Sắt là phi kim.
+c) Sắt bị nam châm hút.
+d) Sắt tan trong nước.
+Đáp án:
+a) Đúng
+b) Sai
+c) Đúng
+d) Sai
+BẢNG ĐÁP ÁN
+PHẦN I
+1.B
+PHẦN II
+Câu 1: a-Đ, b-S, c-Đ, d-S
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2 loại: đúng sai
+câu 2: ĐSĐS
+câu 3 loại: đúng sai
+câu 3: ĐSĐS
+câu 3 phương án D: Sắt tan trong nước.
+```
+
+### "Đáp án:" rồi dòng "a) Đúng" ở câu trắc nghiệm không phải "chọn A"
+```de
+Câu 1: 2 + 2 = ?
+A. 3
+B. 4
+Đáp án:
+a) Đúng
+```
+```ket-qua
+không đọc được
+```
+
+### Bảng đáp án theo khoảng câu ("Câu 1 - 3: C B D")
+Số đáp án phải bằng số câu trong khoảng; không bằng thì dòng đó không dùng (không đoán câu nào nhận chữ nào).
+```de
+Câu 1: Câu số 1?
+A. a1
+B. b1
+C. c1
+D. d1
+Câu 2: Câu số 2?
+A. a2
+B. b2
+C. c2
+D. d2
+Câu 3: Câu số 3?
+A. a3
+B. b3
+C. c3
+D. d3
+Câu 4: Câu số 4?
+A. a4
+B. b4
+C. c4
+D. d4
+Câu 5: Câu số 5?
+A. a5
+B. b5
+C. c5
+D. d5
+Câu 6: Câu số 6?
+A. a6
+B. b6
+C. c6
+D. d6
+Câu 7: Câu số 7?
+A. a7
+B. b7
+C. c7
+D. d7
+ĐÁP ÁN
+Câu 1 - 3: C B D
+4–6: A, B, D
+Câu 7 - 9: A B
+```
+```ket-qua
+số câu: 6
+câu 1: C
+câu 2: B
+câu 3: D
+câu 4: A
+câu 5: B
+câu 6: D
+```
+
+### Bảng đáp án nhiều mã đề: chỉ dùng phần của mã đề ghi ở đầu đề
+```de
+Mã đề 102
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+D. d1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+D. d2
+ĐÁP ÁN
+Mã đề 101: 1.A 2.B
+Mã đề 102: 1.B 2.C
+Mã đề 103: 1.C 2.D
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: C
+```
+
+### Bảng đáp án nhiều mã đề, mỗi mã đề một khối
+```de
+Mã đề 103
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+D. d1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+D. d2
+BẢNG ĐÁP ÁN
+Mã đề 101
+1.A 2.B
+Mã đề 103
+1.D 2.A
+```
+```ket-qua
+số câu: 2
+câu 1: D
+câu 2: A
+```
+
+### Bảng đáp án kiểu của Bộ: mỗi cột một mã đề
+```de
+Mã đề 103
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+D. d1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+D. d2
+ĐÁP ÁN
+Câu	101	102	103	104
+1	A	B	C	D
+2	B	C	D	A
+```
+```ket-qua
+số câu: 2
+câu 1: C
+câu 2: D
+```
+
+### Không biết mã đề của đề thì không dùng bảng đáp án nhiều mã đề
+Dùng nhầm cột là sai cả đề, nên web báo và không đoán.
+```de
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+D. d1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+D. d2
+ĐÁP ÁN
+Mã đề 101: 1.A 2.B
+Mã đề 102: 1.B 2.C
+```
+```ket-qua
+không đọc được
+```
+
 ### Hai phần cùng đánh số lại từ Câu 1, bảng đáp án chia theo phần
 Bảng đáp án chỉ tra theo số câu thì phần sau sẽ nhận nhầm đáp án của phần đầu. Phần thứ hai của bảng (sau dòng
 "Phần B", hoặc khi số câu trong bảng bắt đầu lại từ 1) áp cho phần thứ hai của đề.
@@ -1725,6 +1966,28 @@ câu 3 loại: đúng sai
 câu 3: ĐSĐS
 ```
 
+### Chân trang viết liền "Mã đề 132-Trang 1/4" cùng mã đề, không cắt đề
+```de
+Mã đề 132
+Câu 1: Thủ đô của Việt Nam là
+*A. Hà Nội
+B. Huế
+Mã đề 132-Trang 1/4
+Câu 2: Sông dài nhất Việt Nam là
+A. Hồng
+*B. Mê Công
+Mã đề 132-Trang 2/4
+Câu 3: Núi cao nhất Việt Nam là
+*A. Phan-xi-păng
+B. Ngọc Linh
+```
+```ket-qua
+số câu: 3
+câu 1 số phương án: 2
+câu 2: B
+câu 3: A
+```
+
 ### Tiêu đề trang có mã đề nằm giữa phần đã đánh số lại không cắt đề (đề không ghi mã ở đầu)
 ```de
 PHẦN I. TRẮC NGHIỆM
@@ -1885,8 +2148,9 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   phương án nào nên câu bị bỏ. Viết liền `*` vào phương án (`y*` hay `*C.`), hoặc dùng tab, nhiều dấu cách.
 - Đường dán `.txt` chưa đọc `**(A) …**` (in đậm Markdown với chữ cái trong ngoặc); dùng `**A. …**` hoặc dấu `*`.
 - Đề chỉ có **một** câu kèm bảng đáp án (`Đáp án: 1D`) không đọc được; ghi `Đáp án: D` ngay dưới câu.
-- Phần II đúng/sai không có tiền tố `câu hỏi đúng sai:` mà đáp án chỉ nằm ở bảng cuối đề thì câu đó bị bỏ (không đoán).
-  Thêm tiền tố, hoặc ghi `Đáp án: a) Đ b) S …` ngay dưới câu, hoặc dùng **Chuyển đổi file**.
+- Câu đúng/sai không có tiền tố `câu hỏi đúng sai:`, không nằm trong phần có tiêu đề "đúng sai", mà đáp án chỉ nằm ở
+  bảng cuối đề thì câu đó bị bỏ (không đoán). Thêm tiền tố hoặc tiêu đề phần, ghi `Đáp án: a) Đ b) S …` ngay dưới câu,
+  hoặc dùng **Chuyển đổi file**.
 - Đoạn văn đứng giữa hai câu chỉ được chuyển xuống câu sau khi có **dòng trống** ngăn với phương án cuối. Không có dòng trống thì nó bị nối vào phương án cuối của câu trước.
 - Câu không đánh số (không có `Câu 1:`, `1.`…) không đọc được; dùng nút **Chuyển đổi file** để AI đánh số.
 
