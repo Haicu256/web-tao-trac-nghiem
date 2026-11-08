@@ -191,6 +191,58 @@ câu 2: B
 câu 3: A
 ```
 
+### Câu phát âm, trọng âm cả câu trên một dòng ("Question 1: A. hour B. our C. tour D. four")
+Câu không có đề bài thì dòng hướng dẫn "Mark the letter A, B, C, or D…" ngay trên nhóm câu là đề bài. Dòng hướng dẫn không
+bị nối vào phương án của câu trước.
+```de
+Mark the letter A, B, C, or D on your answer sheet to indicate the word whose underlined part differs from the other three in pronunciation in each of the following questions.
+Question 1: A. hour B. our C. tour D. four
+Question 2. A. played B. stayed C. wanted D. cleaned
+Mark the letter A, B, C, or D on your answer sheet to indicate the correct answer to each of the following questions.
+Question 3: She ___ to school every day.
+A. go
+B. goes
+C. going
+D. gone
+ĐÁP ÁN
+1.D 2.C 3.B
+```
+```ket-qua
+số câu: 3
+câu 1 tiêu đề: Mark the letter A, B, C, or D on your answer sheet to indicate the word whose underlined part differs from the other three in pronunciation in each of the following questions.
+câu 1 số phương án: 4
+câu 1: D
+câu 2 tiêu đề: Mark the letter A, B, C, or D on your answer sheet to indicate the word whose underlined part differs from the other three in pronunciation in each of the following questions.
+câu 2 phương án D: cleaned
+câu 2: C
+câu 3 tiêu đề: She ___ to school every day.
+câu 3: B
+```
+
+### Đoạn văn điền từ (cloze): câu chỉ có phương án nhận đoạn văn làm đề bài
+"numbered blanks from 1 to 3" là khoảng câu dùng đoạn văn. Không ghi khoảng thì câu không có đề bài vẫn nhận đoạn văn gần
+nhất.
+```de
+Read the following passage and mark the letter A, B, C, or D on your answer sheet to indicate the correct word or phrase that best fits each of the numbered blanks from 1 to 3.
+My village is (1) ___ the sea. People (2) ___ fish every day. Tourists (3) ___ in summer.
+Question 1: A. on B. near C. at D. of
+Question 2: A. catch B. catches C. catching D. caught
+Read the following passage and choose the best option for each blank.
+Tom (4) ___ a doctor.
+Question 4: A. is B. are C. am D. be
+Question 5: A. x B. y C. z D. t
+ĐÁP ÁN
+1.B 2.A 4.A 5.D
+```
+```ket-qua
+số câu: 4
+câu 1 tiêu đề: Read the following passage and mark the letter A, B, C, or D on your answer sheet to indicate the correct word or phrase that best fits each of the numbered blanks from 1 to 3. / My village is (1) ___ the sea. People (2) ___ fish every day. Tourists (3) ___ in summer.
+câu 2 tiêu đề: Read the following passage and mark the letter A, B, C, or D on your answer sheet to indicate the correct word or phrase that best fits each of the numbered blanks from 1 to 3. / My village is (1) ___ the sea. People (2) ___ fish every day. Tourists (3) ___ in summer.
+câu 3 tiêu đề: Read the following passage and choose the best option for each blank. / Tom (4) ___ a doctor.
+câu 4 tiêu đề: Read the following passage and choose the best option for each blank. / Tom (4) ___ a doctor.
+câu 4: D
+```
+
 ### Nhiều phương án trên một dòng, cách nhau bằng tab hoặc từ 2 dấu cách
 ```de
 Câu 1: 2 + 2 = ?
@@ -845,6 +897,103 @@ số câu: 2
 câu 1: B
 câu 2: C
 câu 2 phương án C: Rome
+```
+
+### Bảng đáp án kiểu Markdown của chatbot (có hàng "|---|---|")
+```de
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+Câu 3: Ba?
+A. a3
+B. b3
+C. c3
+ĐÁP ÁN
+| Câu | 1 | 2 | 3 |
+|---|---|---|---|
+| Đáp án | B | C | A |
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3: A
+```
+
+### "Đáp án đúng: 1B, 2C, 3A", "**Bảng đáp án:** 1-B; 2-C; 3-A" viết cùng dòng
+```de
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+Câu 3: Ba?
+A. a3
+B. b3
+C. c3
+Đáp án đúng: 1B, 2C, 3A
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3: A
+```
+
+```de
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+Câu 3: Ba?
+A. a3
+B. b3
+C. c3
+**Bảng đáp án:** 1-B; 2-C; 3-A
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3: A
+```
+
+### Tiêu đề "### Đáp án" rồi đáp án in đậm "1. **B**" (chép từ chatbot)
+```de
+Câu 1: Một?
+A. a1
+B. b1
+C. c1
+Câu 2: Hai?
+A. a2
+B. b2
+C. c2
+Câu 3: Ba?
+A. a3
+B. b3
+C. c3
+### Đáp án
+1. **B**
+2. **C**
+3. **A**
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3: A
 ```
 
 ### "Đáp án: 1-B, 2-C" có gạch nối và dấu phẩy

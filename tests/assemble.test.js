@@ -671,3 +671,28 @@ test('Trộn phương án: "Tất cả đáp án trên", "Both of the above", "�
     }
     for (const t of ['Các nước trên thế giới', 'Tất cả học sinh', 'Hà Nội', 'Trên bàn có sách', 'Both cats and dogs']) assert.equal(keep(t), false, t);
 });
+
+test('Bảng đáp án kiểu chatbot (Markdown, "Đáp án đúng: 1B, 2C", "**Bảng đáp án:** 1-B; 2-C", "1. **B**") ở đường chuyển file', () => {
+    const q = 'Câu 1: Một?\nA. a1\nB. b1\nC. c1\nCâu 2: Hai?\nA. a2\nB. b2\nC. c2\nCâu 3: Ba?\nA. a3\nB. b3\nC. c3\n';
+    for (const key of ['ĐÁP ÁN\n| Câu | 1 | 2 | 3 |\n|---|---|---|---|\n| Đáp án | B | C | A |', 'Đáp án đúng: 1B, 2C, 3A', '**Bảng đáp án:** 1-B; 2-C; 3-A', '### Đáp án\n1. **B**\n2. **C**\n3. **A**']) {
+        assert.deepEqual(convertLocally(q + key).questions.map(answerOf), ['B', 'C', 'A'], key);
+    }
+});
+
+test('Câu phát âm cả câu trên một dòng và dòng hướng dẫn "Mark the letter…" (đường chuyển file)', () => {
+    const ins = 'Mark the letter A, B, C, or D on your answer sheet to indicate the word whose underlined part differs from the other three in pronunciation in each of the following questions.';
+    const r = convertLocally(`${ins}\nQuestion 1: A. hour B. our C. tour D. four\nQuestion 2. A. played B. stayed C. wanted D. cleaned\nMark the letter A, B, C, or D on your answer sheet to indicate the correct answer to each of the following questions.\nQuestion 3: She ___ to school every day.\nA. go\nB. goes\nC. going\nD. gone\nĐÁP ÁN\n1.D 2.C 3.B`);
+    assert.deepEqual(r.questions.map(answerOf), ['D', 'C', 'B']);
+    assert.deepEqual(r.questions.map(q => q.options.length), [4, 4, 4]);
+    assert.equal(plainText(r.questions[0].title), ins);
+    assert.equal(plainText(r.questions[1].options[3].text), 'cleaned');
+    assert.equal(plainText(r.questions[2].title), 'She ___ to school every day.');
+});
+
+test('Đoạn văn điền từ: câu chỉ có phương án nhận đoạn văn làm đề bài (đường chuyển file)', () => {
+    const r = convertLocally('Read the following passage and mark the letter A, B, C, or D to indicate the correct word that best fits each of the numbered blanks from 1 to 2.\nMy village is (1) ___ the sea. People (2) ___ fish.\nQuestion 1: A. on B. near C. at D. of\nQuestion 2: A. catch B. catches C. catching D. caught\nRead the following passage and choose the best option for each blank.\nTom (3) ___ a doctor.\nQuestion 3: A. is B. are C. am D. be\nQuestion 4: A. x B. y C. z D. t\nĐÁP ÁN\n1.B 2.A 3.A 4.D');
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'A', 'A', 'D']);
+    for (const q of r.questions.slice(0, 2)) assert.ok(plainText(q.title).includes('My village is (1)'), q.title);
+    for (const q of r.questions.slice(2)) assert.ok(plainText(q.title).includes('Tom (3) ___ a doctor.'), q.title);
+    assert.ok(!plainText(r.questions[2].title).includes('My village'), r.questions[2].title);
+});

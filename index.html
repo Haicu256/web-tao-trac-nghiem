@@ -516,7 +516,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?)(?:Đ[ \t]*A|[Đđ][ \t]*[\/.][ \t]*[Aa])(?=[ \t]*[:.\-–—])/gmu, '$1Đáp án')
                 // Ghi chú điểm / mức độ ngay sau số câu: "Câu 1 (0,25 điểm):", "Câu 2 [NB]:" → "Câu 1:".
                 .replace(/^([ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:câu|bài|question)[ \t]*\d+)[ \t]*[(\[][^()\[\]\n]{1,30}[)\]][ \t]*(?=[:.])/gimu, '$1')
-                .replace(/^([ \t]*đáp\s*án\s*[:.\-–—])[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$)/gimu, '$1\n');
+                // Bảng đáp án kiểu chatbot: bỏ hàng kẻ "|---|---|" của bảng Markdown, dấu tiêu đề "### Đáp án", chữ in đậm
+                // "1. **B**"; "Đáp án đúng: 1B, 2C", "**Bảng đáp án:** 1-B; 2-C" tách thành tiêu đề và các đáp án.
+                .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*(?:\n|$)/gm, '')
+                .replace(/^[ \t]*#{1,6}[ \t]+(?=(?:\*{1,3}[ \t]*)?(?:bảng\s*)?(?:đáp\s*án|lời\s*giải|hướng\s*dẫn|answer\s*key))/gimu, '')
+                .replace(/^([ \t]*\d+\s*[.:)\-–—]?\s*)\*{1,3}([A-Fa-f])\*{1,3}[ \t]*$/gmu, '$1$2')
+                .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?(?:bảng\s*)?đáp\s*án(?:\s*(?:đúng|chi\s*tiết|tham\s*khảo|trắc\s*nghiệm))?\s*[:.\-–—](?:[ \t]*\*{1,3})?)[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$)/gimu, 'Đáp án:\n');
         }
 
         function escapeHTML(str) {
@@ -805,6 +810,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     result.push(...splitInlineOptions(trailingAnswer[1]).split('\n'), trailingAnswer[2]);
                     continue;
                 }
+                // "Question 1: A. hour B. our C. tour D. four": câu không có đề bài (phát âm, trọng âm), phương án viết ngay sau
+                // số câu, cách một dấu cách. Tách số câu ra rồi tách các phương án như dòng bắt đầu bằng "A.".
+                const headOnly = line.match(/^(\s*(?:⟦[^⟧]+⟧\s*)*(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:câu|question|bài)\s*\d+\s*(?:\*{1,3}|⟦\/?[^⟧]+⟧)*\s*[:.)]\s*(?:\*{1,3}|⟦\/[^⟧]+⟧)*\s*)(?=(?:⟦[^⟧]+⟧\s*)*(?:\*\s*)?\(?[Aa]\s*[.)]\s*\S)/iu);
+                if (headOnly) {
+                    const restLines = splitInlineOptions(line.slice(headOnly[0].length)).split('\n');
+                    if (restLines.length > 1) {
+                        result.push(headOnly[0].trim(), ...restLines);
+                        continue;
+                    }
+                }
                 const trimmed = line.trim();
                 const plainTrimmed = stripFormattingTags(trimmed);
                 const startOptMatch = plainTrimmed.match(/^(\*+\s*)?(\*{2,3}\s*)?(?:(?:\(([a-fA-F])\)|\[([a-fA-F])\]|([a-fA-F])\s*([.:)\/\-–—]))(?:\s+|(?=\p{Lu}))|([a-fA-F])\.(?=[\d√(+\-−]))/u);
@@ -1024,6 +1039,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let lastNumInPart = 0;
             let partIsTF = false;
             let leadingPassage = null;
+            let groupInstruction = null;
+            // Đoạn văn gần nhất (điền từ): đề bài của câu chỉ có phương án.
+            let lastPassage = null;
             const trimmedLines = lines.map(l => (l || '').trim());
 
             // Chia bảng đáp án theo phần: dòng "Phần II", "PHẦN 2: …" hoặc số câu bắt đầu lại ("1.A 2.B" rồi "1.C 2.D").
@@ -1423,7 +1441,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         partHasQuestions = false;
                         lastNumInPart = 0;
                     }
-                    if (isSectionHeader) partIsTF = partTitleSaysTF(trimmedLines, lineIndex);
+                    if (isSectionHeader) { partIsTF = partTitleSaysTF(trimmedLines, lineIndex); groupInstruction = null; lastPassage = null; }
                     inExplanationSection = false;
                     lastExplanationQ = null;
                     return;
@@ -1556,6 +1574,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     return;
                 }
 
+                // Dòng hướng dẫn nhóm câu sau phương án của câu trước (hay trước câu đầu): không nối vào phương án, mà làm đề
+                // bài cho các câu không có đề bài phía sau.
+                if (isGroupInstruction(trimmedLine) && (!currentQ || currentQ.options.length > 0)) {
+                    groupInstruction = escapeHTML(trimmedLine);
+                    lastPassage = null;
+                    if (currentQ) { parsedQuestions.push(currentQ); currentQ = null; }
+                    inExplanationSection = false;
+                    lastExplanationQ = null;
+                    return;
+                }
                 const isTrueFalse = TRUE_FALSE_KEYWORD.test(trimmedLine);
                 const isExplicitQuestion = QUESTION_KEYWORD_REGEX.test(trimmedLine) || isTrueFalse;
                 if (isExplicitQuestion) {
@@ -1607,6 +1635,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     lastExplanationQ = null;
                     const carriedStem = (currentQ?.pendingTail?.length ? currentQ.pendingTail : null) || leadingPassage || [];
                     leadingPassage = null;
+                    if (carriedStem.some(l => PASSAGE_INTRO_REGEX.test(stripFormattingTags(l)))) lastPassage = carriedStem;
                     if (currentQ) {
                         currentQ.pendingTail = [];
                         parsedQuestions.push(currentQ);
@@ -1649,7 +1678,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         qNum,
                         numbered: !!rawNum,
                         part: partIndex,
-                        title: [...carriedStem, escapeHTML(clean.trim())].filter(Boolean).join('<br>'),
+                        title: [...carriedStem, escapeHTML(clean.trim())].filter(Boolean).join('<br>') || (lastPassage || []).join('<br>') || groupInstruction || '',
                         sharedIntro: carriedStem.length > 0 ? carriedStem : null,
                         options: [],
                         type: isTrueFalse || partIsTF ? 'true_false' : 'multiple_choice'
@@ -1962,7 +1991,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     sharedPassage = null;
                     return;
                 }
-                q.title = [...sharedPassage.lines, q.title].filter(Boolean).join('<br>');
+                const lead = sharedPassage.lines.join('<br>');
+                if (!q.title.startsWith(lead)) q.title = [lead, q.title].filter(Boolean).join('<br>');
             });
 
             // Dấu * viết liền cuối phương án ("Hà Nội*") là bằng chứng yếu nhất: chỉ dùng khi câu chưa có đáp án nào khác và
@@ -3540,7 +3570,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         // Dòng mở đầu đoạn văn / ngữ liệu dùng chung cho các câu sau ("Read the following passage…", "Đọc đoạn văn sau…"),
         // và khoảng câu dùng nó ("questions from 2 to 4", "từ câu 2 đến câu 4", "Questions 31-35").
         const PASSAGE_INTRO_REGEX = /^(?:read\s+the\s+(?:following\s+)?(?:passage|text|extract|paragraph|article|email|letter|advertisement|notice)|mark\s+the\s+letter\s+a,\s*b,\s*c,?\s*(?:or|and)\s*d\s+.*(?:passage|text)|đọc\s+(?:kĩ\s+|kỹ\s+)?(?:đoạn\s+(?:văn|trích|thơ|tư\s*liệu|thông\s*tin)|văn\s+bản|bài\s+(?:đọc|văn|thơ)|ngữ\s+liệu|thông\s+tin|tư\s+liệu)|dựa\s+vào\s+(?:đoạn|văn\s+bản|thông\s+tin|tư\s+liệu|bảng|biểu\s+đồ|hình))/iu;
-        const PASSAGE_RANGE_REGEX = /(?:questions?|câu)\s*(?:(?:from|từ)\s*)?(\d+)\s*(?:to|-|–|—|đến|tới)\s*(?:câu\s*)?(\d+)/iu;
+        // Dòng hướng dẫn một nhóm câu: "Mark the letter A, B, C, or D on your answer sheet to indicate … each of the following
+        // questions", "Chọn phương án A, B, C hoặc D …". Là đề bài của các câu không có đề bài (phát âm, trọng âm) phía sau.
+        const GROUP_INSTRUCTION_REGEX = /^(?:(?:mark|choose|circle|select)\s+the\s+(?:letter|word|best|correct|most)[^\n]*?\ba,?\s*b,?\s*c,?\s*(?:or|and)\s*d\b|(?:chọn|khoanh(?:\s+tròn)?)\s+(?:vào\s+)?(?:chữ\s+cái|phương\s+án|đáp\s+án)[^\n]*?\ba,?\s*b,?\s*c,?\s*(?:hoặc|hay|và)\s*d\b)/iu;
+        const isGroupInstruction = plain => GROUP_INSTRUCTION_REGEX.test(plain) && !PASSAGE_INTRO_REGEX.test(plain);
+        const PASSAGE_RANGE_REGEX = /(?:questions?|câu|blanks?|(?:chỗ|ô)\s*trống)\s*(?:(?:from|từ)\s*)?(\d+)\s*(?:to|-|–|—|đến|tới)\s*(?:câu\s*)?(\d+)/iu;
         // Phần câu đúng/sai (đề THPT 2025): tiêu đề phần "PHẦN II. Câu trắc nghiệm đúng sai." hoặc dòng mô tả ngay sau tiêu đề
         // ("Câu trắc nghiệm đúng sai. Thí sinh trả lời từ câu 1 đến câu 4."). Các câu trong phần là câu đúng/sai.
         const TF_PART_TITLE_REGEX = /đúng\s*(?:[\/\-–—]|hoặc|hay)?\s*sai|true\s*[\/\-–—]?\s*false/iu;
@@ -3730,6 +3764,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
                 else if (TF_PREFIX_REGEX.test(plain)) label = 'cau_hoi_dung_sai';
                 else if (ANSWER_ENTRY_REGEX.test(plain)) label = 'bang_dap_an';
+                else if (isGroupInstruction(plain)) label = 'bo_qua';
                 // Đoạn văn đọc hiểu giữa hai câu (hay trước câu đầu): thuộc các câu sau, không nối vào phương án câu trước.
                 else if (PASSAGE_INTRO_REGEX.test(plain) && !(inQuestion && optionCount === 0)) { label = 'noi_dung_cau_hoi'; passage = true; }
                 else if (passage && !QUESTION_START_REGEX.test(plain) && !ANSWER_TABLE_HEADING_REGEX.test(plain) && !LOOKS_LIKE_OPTION_REGEX.test(plain)) label = 'noi_dung_cau_hoi';
@@ -4002,6 +4037,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let pendingStem = [];
             // Đoạn văn dùng chung cho các câu tới số "to" ("questions from 2 to 4"): chép vào đề bài từng câu.
             let sharedPassage = null;
+            // Dòng hướng dẫn nhóm câu gần nhất: đề bài của câu không có đề bài.
+            let groupInstruction = null;
+            let lastPassageLead = null;
             let lastNumber = 0;
             let count = 0;
             let withoutOptions = 0;
@@ -4050,6 +4088,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             lines.forEach((raw, i) => {
                 const label = labels[i];
                 const plain = stripFormattingTags(raw).trim();
+                if (label !== 'cau_hoi' && label !== 'cau_hoi_dung_sai' && label !== 'phuong_an' && label !== 'bang_dap_an' && isGroupInstruction(plain)) {
+                    groupInstruction = plain;
+                    lastPassageLead = null;
+                    return;
+                }
+                if (label === 'bo_qua' && isPartHeaderLine(plain)) { groupInstruction = null; lastPassageLead = null; }
                 if (label === 'cau_hoi' || label === 'cau_hoi_dung_sai') {
                     finish();
                     let rest = plain.replace(TF_PREFIX_REGEX, '');
@@ -4063,12 +4107,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     if (lead.length > 0) {
                         const range = lead.map(l => (PASSAGE_INTRO_REGEX.test(l) ? l.match(PASSAGE_RANGE_REGEX) : null)).find(Boolean);
                         sharedPassage = range ? { lines: [...lead], to: parseInt(range[2], 10) } : null;
+                        if (lead.some(l => PASSAGE_INTRO_REGEX.test(l))) lastPassageLead = [...lead];
                     } else if (sharedPassage && n !== null && n <= sharedPassage.to) {
                         lead = sharedPassage.lines;
                     } else {
                         sharedPassage = null;
                     }
-                    const stem = [...lead, ...(rest.trim() ? [rest.trim()] : [])];
+                    let stem = [...lead, ...(rest.trim() ? [rest.trim()] : [])];
+                    if (stem.length === 0) stem = lastPassageLead ? [...lastPassageLead] : (groupInstruction ? [groupInstruction] : []);
                     pendingStem = [];
                     question = { number, explicitNumber: !!m, trueFalse: label === 'cau_hoi_dung_sai', stem, options: [], answers: [] };
                 } else if (label === 'bang_dap_an') {
