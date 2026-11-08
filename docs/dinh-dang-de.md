@@ -312,6 +312,53 @@ câu 1 phương án C: int *
 câu 1 phương án D: *int
 ```
 
+### Mọi phương án đều có "* " đầu dòng (gạch đầu dòng chép từ chatbot) thì không phải đánh dấu đáp án
+```de
+Câu 1: Thủ đô của Việt Nam là gì?
+*   A. Huế
+*   B. Hà Nội
+*   C. Đà Nẵng
+*   D. Cần Thơ
+**Đáp án: B**
+Câu 2: 2 + 2 bằng?
+* A. 3
+* B. 4
+* C. 5
+Câu 3: Thủ đô Pháp?
+A. Berlin
+*B. Paris
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2 tiêu đề: Thủ đô Pháp?
+câu 2: B
+```
+
+### Dấu * trong nội dung phương án (con trỏ C) mà dòng "Đáp án:" nói khác thì dòng đáp án thắng
+Dấu * khi đó là nội dung nên được giữ lại. Dòng đáp án nói cùng phương án mà bỏ * làm hai phương án giống hệt nhau thì
+cũng giữ *.
+```de
+Câu 1: Cho int *p; Phát biểu đúng là
+A. p là biến nguyên
+B. *p là địa chỉ
+C. p lưu địa chỉ biến int
+D. &p là giá trị
+Đáp án: C
+Câu 2: Cho int a = 5; int *p = &a; Biểu thức nào cho giá trị 5?
+A. p
+B. &p
+C. *p
+D. &a
+Đáp án: C
+```
+```ket-qua
+câu 1: C
+câu 1 phương án B: *p là địa chỉ
+câu 2: C
+câu 2 phương án C: *p
+```
+
 ## 5. Đáp án ghi ngay sau câu hỏi
 
 ### Dòng "Đáp án: B"
@@ -527,6 +574,85 @@ B. Menđen
 số câu: 1
 câu 1: B
 câu 1 tiêu đề: Ai đề xuất thuyết chọn lọc tự nhiên? / Đa-uyn: nhà tự nhiên học người Anh.
+```
+
+### Dòng đáp án có gạch đầu dòng, dấu trích dẫn hay biểu tượng ("- **Đáp án:** B", "> Đáp án: B", "✅ Đáp án: B")
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội
+- **Đáp án:** B
+Câu 2: Thủ đô Pháp?
+A. Berlin
+B. Paris
+> **Đáp án: B**
+Câu 3: Thủ đô Ý?
+A. Rome
+B. Paris
+✅ **Đáp án: A**
+Câu 4: Thủ đô Anh?
+A. London
+B. Paris
+👉 Đáp án: A
+```
+```ket-qua
+số câu: 4
+câu 1: B
+câu 1 phương án B: Hà Nội
+câu 2: B
+câu 3: A
+câu 4: A
+```
+
+### Lời giải nhắc phương án sai ("Đáp án A chưa đúng", "Nếu chọn A thì…"), điểm "A(0;0;0)" không phải đáp án
+```de
+Câu 1: Một?
+A. a
+B. b
+C. c
+D. d
+Lời giải
+Đáp án A chưa đúng vì thiếu điều kiện.
+Đáp án B không phải là đáp án đúng.
+Nếu chọn đáp án D thì mâu thuẫn.
+Vậy chọn C.
+Câu 2: Tính góc giữa AC và BD.
+A. 30°
+B. 60°
+C. 90°
+D. 45°
+Lời giải
+Gắn hệ trục. Chọn A(0;0;0), B(1;0;0), D(0;1;0).
+Ta có AC.BD = 0. Vậy chọn C.
+Câu 3: Hai?
+A. a
+B. b
+C. c
+D. d
+Lời giải
+Gọi M là trung điểm. Chọn C làm gốc tọa độ.
+Suy ra khẳng định B đúng.
+Chọn B
+```
+```ket-qua
+số câu: 3
+câu 1: C
+câu 2: C
+câu 3: B
+```
+
+### Hai dòng lời giải khẳng định hai đáp án khác nhau thì không đoán
+```de
+Câu 1: Một?
+A. a
+B. b
+C. c
+Lời giải
+Chọn A vì a đúng.
+Vậy chọn C.
+```
+```ket-qua
+không đọc được
 ```
 
 ### Lời giải có câu "Chọn B" thì dùng để lấy đáp án, không hiện ra

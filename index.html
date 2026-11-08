@@ -509,9 +509,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Dấu đầu dòng của danh sách Word trước chữ cái phương án: "• A. Huế", "- B. Hà Nội". Không bỏ trước "A:"
                 // vì "- A: …", "- B: …" là hội thoại trong đề tiếng Anh.
                 .replace(/^([ \t]*)[•◦▪●○■□➢➤►\-–—][ \t]+(?=(?:\*+[ \t]*)?(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*?[ \t]*[.)\/])[ \t])/gmu, '$1')
-                // "→ Đáp án B", "=> Chọn C": bỏ mũi tên; "ĐA: B", "Đ/A: B" là "Đáp án: B" (chỉ khi viết hoa hay có dấu
-                // "/", ".", vì dòng đề bài có thể bắt đầu bằng "Đa-uyn:").
-                .replace(/^([ \t]*)(?:→|=>|⇒|➔|->)[ \t]*(?=(?:đáp\s*án|chọn|đ[ \t]*[\/.]?[ \t]*a[ \t]*[:.\-–—]))/gimu, '$1')
+                // "→ Đáp án B", "=> Chọn C", "- **Đáp án:** B", "> Đáp án: B", "✅ Đáp án: B" (chép từ chatbot): bỏ mũi tên,
+                // gạch đầu dòng, biểu tượng; "ĐA: B", "Đ/A: B" là "Đáp án: B" (chỉ khi viết hoa hay có dấu "/", ".", vì dòng
+                // đề bài có thể bắt đầu bằng "Đa-uyn:").
+                .replace(/^([ \t]*)(?:→|=>|⇒|➔|->|➡\uFE0F?|👉|✅|✔\uFE0F?|☑\uFE0F?|[-–—•◦▪●>])[ \t]*(?=(?:\*{1,3}[ \t]*)?(?:đáp\s*án|chọn|lời\s*giải|đ[ \t]*[\/.]?[ \t]*a[ \t]*[:.\-–—]))/gimu, '$1')
                 .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?)(?:Đ[ \t]*A|[Đđ][ \t]*[\/.][ \t]*[Aa])(?=[ \t]*[:.\-–—])/gmu, '$1Đáp án')
                 // Ghi chú điểm / mức độ ngay sau số câu: "Câu 1 (0,25 điểm):", "Câu 2 [NB]:" → "Câu 1:".
                 .replace(/^([ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:câu|bài|question)[ \t]*\d+)[ \t]*[(\[][^()\[\]\n]{1,30}[)\]][ \t]*(?=[:.])/gimu, '$1')
@@ -937,8 +938,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const before = text.slice(Math.max(0, start - 20), start);
             const after = text.slice(end);
             return /(?:không|chưa|loại|bỏ|trừ)(?:\s+(?:thể|được|nên|phải|bỏ))?\s*$/iu.test(before)
+                // "Nếu chọn đáp án A thì mâu thuẫn", "Thử đáp án A: không thỏa", "Giả sử chọn B…".
+                || /(?:nếu|thử|giả\s*sử)(?:\s+(?:ta|em|học\s*sinh))?(?:\s+chọn)?\s*$/iu.test(before)
                 || /^\s*(?:,|;|\/|và|hoặc|hay)\s*[A-Fa-f](?![\p{L}\d])/iu.test(after)
-                || /^\s*[:.\-–—]?\s*(?:là\s*|đều\s*|cũng\s*|thì\s*|bị\s*)?(?:sai|không\s*(?:đúng|phù\s*hợp|chính\s*xác|thỏa\s*mãn|thoả\s*mãn)|loại)(?![\p{L}\d])/iu.test(after);
+                || /^\s*[:.\-–—]?\s*(?:là\s*|đều\s*|cũng\s*|thì\s*|bị\s*|hoàn\s*toàn\s*)?(?:sai|(?:không|chưa)\s*(?:phải|đúng|phù\s*hợp|chính\s*xác|thỏa\s*mãn|thoả\s*mãn)|loại|(?:đáp|phương)\s*án\s*sai|\(\s*sai\s*\))(?![\p{L}\d])/iu.test(after)
+                // "Chọn A(0;0;0)", "Chọn C làm gốc tọa độ": A, C là điểm trong lời giải hình học.
+                || /^\s*\(\s*(?:[-+−]?\d|[\p{L}\d]+\s*[;,])/u.test(after)
+                || /^\s+làm\s+(?!đáp\s*án)/iu.test(after);
         }
 
         // "a) Đúng", "b đúng": chữ cái thường hoặc có ngoặc rồi tới Đúng/Sai là một ý của câu đúng/sai, không phải chọn.
@@ -1203,6 +1209,22 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const seen = new Set();
                 return q.options.some((o, i) => { const k = letterIndexOf(o, i); if (seen.has(k)) return true; seen.add(k); return false; });
             }
+            // Đáp án lấy từ lời giải ("Vậy chọn C"). Hai dòng lời giải khẳng định hai chữ khác nhau ("Chọn A vì …" rồi "Vậy
+            // chọn C") thì không biết đáp án nào: bỏ đáp án đó, không đoán.
+            function applyExplanationAnswer(q, letter) {
+                if (q.explanationConflict) return;
+                if (q.explanationLetter && q.explanationLetter !== letter) {
+                    q.options.forEach(o => { if (o.fromExplanation) { o.isCorrect = false; o.isExplicitAnswer = false; o.fromExplanation = false; } });
+                    q.explanationConflict = true;
+                    return;
+                }
+                const optIdx = optionIndexOf(q, letter);
+                if (optIdx < 0 || optIdx >= q.options.length) return;
+                q.explanationLetter = letter;
+                q.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
+                q.options[optIdx].isExplicitAnswer = true;
+                q.options[optIdx].fromExplanation = true;
+            }
             function tfLetterCount(q) {
                 return q.options.reduce((m, o, i) => Math.max(m, letterIndexOf(o, i) + 1), q.options.length);
             }
@@ -1428,6 +1450,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             const letter = answerLineLetter(trimmedLine, ansMatch);
                             const optIdx = letter ? optionIndexOf(currentQ, letter) : -1;
                             if (optIdx >= 0 && optIdx < currentQ.options.length) {
+                                currentQ.answerLineIdx = optIdx;
                                 if (!currentQ.options.some(o => o.isStarCorrect)) {
                                     currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
                                     currentQ.options[optIdx].isExplicitAnswer = true;
@@ -1475,6 +1498,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         if (nextLetter && currentQ.type !== 'true_false') {
                             const optIdx = optionIndexOf(currentQ, nextLetter);
                             if (optIdx >= 0 && optIdx < currentQ.options.length) {
+                                currentQ.answerLineIdx = optIdx;
                                 if (!currentQ.options.some(o => o.isStarCorrect)) {
                                     currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
                                     currentQ.options[optIdx].isExplicitAnswer = true;
@@ -1492,16 +1516,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         inExplanationSection = true;
                         if (currentQ.type !== 'true_false') {
                             const inlineAns = findExplanationAnswer(trimmedLine);
-                            if (inlineAns) {
-                                const letter = inlineAns[1].toUpperCase();
-                                const optIdx = optionIndexOf(currentQ, letter);
-                                if (optIdx >= 0 && optIdx < currentQ.options.length) {
-                                    if (!currentQ.options.some(o => o.isStarCorrect)) {
-                                        currentQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
-                                        currentQ.options[optIdx].isExplicitAnswer = true;
-                                    }
-                                }
-                            }
+                            if (inlineAns && !currentQ.options.some(o => o.isStarCorrect)) applyExplanationAnswer(currentQ, inlineAns[1].toUpperCase());
                         }
                         lastExplanationQ = currentQ;
                         parsedQuestions.push(currentQ);
@@ -1568,17 +1583,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             }
                         }
                     }
-                    const needsAns = lastExplanationQ.type !== 'true_false' && (!lastExplanationQ.options.some(o => o.isCorrect) ||
-                        (lastExplanationQ.options.every(o => o.isBoldOption) && !lastExplanationQ.options.some(o => o.isStarCorrect || o.isExplicitAnswer)));
+                    // Câu chỉ có đáp án từ lời giải thì các dòng lời giải sau vẫn được đọc để thấy mâu thuẫn.
+                    const needsAns = lastExplanationQ.type !== 'true_false' && !lastExplanationQ.explanationConflict && (!!lastExplanationQ.explanationLetter
+                        || !lastExplanationQ.options.some(o => o.isCorrect)
+                        || (lastExplanationQ.options.every(o => o.isBoldOption) && !lastExplanationQ.options.some(o => o.isStarCorrect || o.isExplicitAnswer)));
                     if (needsAns) {
                         const followAns = findExplanationAnswer(trimmedLine);
                         if (followAns) {
-                            const letter = followAns[1].toUpperCase();
-                            const optIdx = optionIndexOf(lastExplanationQ, letter);
-                            if (optIdx >= 0 && optIdx < lastExplanationQ.options.length) {
-                                lastExplanationQ.options.forEach((o, i) => { o.isCorrect = (i === optIdx); });
-                                lastExplanationQ.options[optIdx].isExplicitAnswer = true;
-                            }
+                            applyExplanationAnswer(lastExplanationQ, followAns[1].toUpperCase());
                             return;
                         }
                     }
@@ -1765,6 +1777,31 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     delete q.blankAfterOptions;
                 }
                 if (!q || !q.options || q.options.length < 2) return;
+                if (q.type !== 'true_false') {
+                    const useAnswerLine = () => {
+                        if (q.answerLineIdx == null) return;
+                        q.options.forEach((o, i) => { o.isCorrect = i === q.answerLineIdx; });
+                        q.options[q.answerLineIdx].isExplicitAnswer = true;
+                    };
+                    // "* A. Huế", "* B. Hà Nội"…: mọi phương án đều có * đầu dòng là gạch đầu dòng (chép từ chatbot), không phải
+                    // đánh dấu đáp án (trước đây mọi phương án đều đúng).
+                    if (q.options.every(o => o.isPrefixStar)) {
+                        q.options.forEach(o => { o.isPrefixStar = false; o.isStarCorrect = false; o.isCorrect = false; });
+                        useAnswerLine();
+                    }
+                    // Dấu * trong nội dung phương án ("*p", "int *", đề lập trình C) mà dòng "Đáp án: C" nói khác: dấu * là nội
+                    // dung, dòng đáp án thắng. Nói cùng phương án mà bỏ * làm hai phương án giống hệt nhau thì giữ *.
+                    const textStars = q.options.filter(o => o.isStarCorrect && o.isTextStar);
+                    if (textStars.length > 0 && !q.options.some(o => o.isStarCorrect && o.isPrefixStar) && q.answerLineIdx != null) {
+                        const agrees = textStars.length === 1 && textStars[0] === q.options[q.answerLineIdx];
+                        if (!agrees) {
+                            textStars.forEach(o => { o.isStarCorrect = false; o.isCorrect = false; o.text = o.textWithStar; });
+                            useAnswerLine();
+                        } else if (q.options.some(o => o !== textStars[0] && o.text === textStars[0].text)) {
+                            textStars[0].text = textStars[0].textWithStar;
+                        }
+                    }
+                }
                 if (q.options.some(o => o.isPrefixStar)) {
                     q.options.forEach(o => {
                         if (o.isTextStar) {
@@ -3742,7 +3779,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Dòng trông rõ là phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi hay phương án.
                 const optMatch = plain.match(OPTION_PREFIX_REGEX);
                 const optLetter = optMatch ? (optMatch[2] || optMatch[3] || optMatch[4]).toUpperCase() : null;
-                if (['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_phuong_an'].includes(out[i]) && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
+                if (['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_phuong_an', 'dap_an'].includes(out[i]) && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
                 if (ANSWER_TABLE_HEADING_REGEX.test(plain) && ['cau_hoi', 'cau_hoi_dung_sai', 'phuong_an', 'noi_dung_phuong_an'].includes(out[i])) out[i] = 'bang_dap_an';
                 // Tiêu đề "ĐÁP ÁN" gắn là dòng đáp án mà ngay sau là bảng (dòng "Đáp án:" có chữ cái ở dòng sau thì không);
                 // trong bảng, hàng "1.A 2.B" gắn là dòng đáp án / bỏ qua vẫn là hàng của bảng. Không vậy thì hàng đó bị ghép

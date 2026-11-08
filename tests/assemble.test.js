@@ -622,3 +622,11 @@ test('Bảng đáp án nhiều mã đề ở cuối file: chỉ dùng phần c�
     assert.deepEqual(two.questions.map(q => plainText(q.title)), ['Một?', 'Hai?']);
     assert.deepEqual(two.questions.map(answerOf), ['D', 'A']);
 });
+
+test('reconcileLabels: phương án kế tiếp ("C. …" sau "B.") bị gắn là dòng đáp án vẫn là phương án', () => {
+    const lines = ['Câu 1: Một?', 'A. x', 'B. y', 'C. z', '⟦B⟧D. t⟦/B⟧'];
+    const fixed = [...fn('reconcileLabels')(lines, labels('QOODC'))];
+    assert.deepEqual(fixed.slice(3), ['phuong_an', 'phuong_an']);
+    const out = fn('assembleQuizText')(lines, fixed);
+    assert.deepEqual([...app.parse(out.text).questions].map(answerOf), ['D']);
+});
