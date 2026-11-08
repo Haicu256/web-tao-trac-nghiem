@@ -517,6 +517,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // đề bài có thể bắt đầu bằng "Đa-uyn:").
                 .replace(/^([ \t]*)(?:→|=>|⇒|➔|->|➡\uFE0F?|👉|✅|✔\uFE0F?|☑\uFE0F?|[-–—•◦▪●>])[ \t]*(?=(?:\*{1,3}[ \t]*)?(?:đáp\s*án|chọn|lời\s*giải|đ[ \t]*[\/.]?[ \t]*a[ \t]*[:.\-–—]))/gimu, '$1')
                 .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?)(?:Đ[ \t]*A|[Đđ][ \t]*[\/.][ \t]*[Aa])(?=[ \t]*[:.\-–—])/gmu, '$1Đáp án')
+                // "B. Hà Nội ✅", "✅ A. Paris" (chép từ chatbot): dấu tích là đánh dấu đáp án như "(*)", "*A.". Dấu tích giữa
+                // hai phương án cùng dòng thì không đoán (như "B. y * C. z").
+                .replace(/^([ \t]*)(?:✅|✔\uFE0F?|✓|☑\uFE0F?)[ \t]*(?=\(?[A-Fa-f]\)?[ \t]*[.)])/gmu, '$1*')
+                .replace(/^([ \t]*\*{0,3}\(?[A-Fa-f]\)?[ \t]*[.)].*?)[ \t]*(?:✅|✔\uFE0F?|✓|☑\uFE0F?)[ \t]*$/gmu, '$1 (*)')
                 // Ghi chú điểm / mức độ ngay sau số câu: "Câu 1 (0,25 điểm):", "Câu 2 [NB]:" → "Câu 1:".
                 .replace(/^([ \t]*(?:#{1,6}[ \t]*)?(?:\*{1,3}[ \t]*)?(?:câu|bài|question)[ \t]*\d+)[ \t]*[(\[][^()\[\]\n]{1,30}[)\]][ \t]*(?=[:.])/gimu, '$1')
                 // Bảng đáp án kiểu chatbot: bỏ hàng kẻ "|---|---|" của bảng Markdown, dấu tiêu đề "### Đáp án", chữ in đậm
@@ -524,7 +528,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*(?:\n|$)/gm, '')
                 .replace(/^[ \t]*#{1,6}[ \t]+(?=(?:\*{1,3}[ \t]*)?(?:bảng\s*)?(?:đáp\s*án|lời\s*giải|hướng\s*dẫn|answer\s*key))/gimu, '')
                 .replace(/^([ \t]*\d+\s*[.:)\-–—]?\s*)\*{1,3}([A-Fa-f])\*{1,3}[ \t]*$/gmu, '$1$2')
-                .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?(?:bảng\s*)?đáp\s*án(?:\s*(?:đúng|chi\s*tiết|tham\s*khảo|trắc\s*nghiệm))?\s*[:.\-–—](?:[ \t]*\*{1,3})?)[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$|(?:câu|question)[ \t]*\d+[ \t]*[:.)\-–—][ \t]*(?:[A-Fa-f](?![\p{L}\d])|[ĐSđs]{2,6}(?![\p{L}\d])|[a-d][ \t]*[).:\-–—][ \t]*[ĐSđs]))/gimu, 'Đáp án:\n');
+                .replace(/^([ \t]*(?:\*{1,3}[ \t]*)?(?:(?:bảng\s*)?đáp\s*án(?:\s*(?:đúng|chi\s*tiết|tham\s*khảo|trắc\s*nghiệm))?|answers?(?:\s*key)?|key)\s*[:.\-–—](?:[ \t]*\*{1,3})?)[ \t]*(?=(?:\d+\s*[.:\-)]?\s*[A-F](?![\p{L}\d])[ \t,;]*){2,}$|(?:câu|question)[ \t]*\d+[ \t]*[:.)\-–—][ \t]*(?:[A-Fa-f](?![\p{L}\d])|[ĐSđs]{2,6}(?![\p{L}\d])|[a-d][ \t]*[).:\-–—][ \t]*[ĐSđs]))/gimu, 'Đáp án:\n')
+                // Bảng đáp án đúng/sai chép từ Word: mẫu của Bộ "1  a)  Đ" rồi "   b)  S"… (mỗi ý một hàng) và bảng
+                // "Câu | a | b | c | d" rồi "1 | Đ | S | Đ | S": viết lại thành "Câu 1: a) Đ b) S …", "Câu 1: ĐSĐS".
+                .replace(/^[ \t|]*(?:câu[ \t]*)?(\d+)[ \t|]+(a\)[ \t|]*(?:đúng|sai|đ|s)(?:[ \t|]*\n[ \t|]*[b-f]\)[ \t|]*(?:đúng|sai|đ|s))+)[ \t|]*$/gimu,
+                    (m, n, rows) => `Câu ${n}: ${rows.replace(/[\s|]+/g, ' ').trim()}`)
+                .replace(/^[ \t|]*câu(?:[ \t|]+[a-f])+[ \t|]*((?:\n[ \t|]*\d+(?:[ \t|]+(?:đúng|sai|đ|s))+[ \t|]*)+)$/gimu,
+                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n'));
         }
 
         function escapeHTML(str) {
@@ -1303,6 +1313,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 return false;
             }
 
+            // "1  a)  Đ", "Câu 1: a) Đ…" bắt đầu bằng số của câu khác: là hàng của bảng đáp án, không phải đáp án của câu q.
+            const isOtherQuestionRow = (l, q) => { const m = l.match(/^(?:(?:câu|bài|question)\s*)?(\d+)(?![\d.,]\d)/iu); return !!m && Number(m[1]) !== q.qNum; };
+
             function hasAnswerTableFollowup(startIdx) {
                 let countKeys = 0;
                 const compact = /(?:^|[\s,;|\-–—])(\d+)\.?([a-fA-F])\.?(?=[\s,;|\-–—]|$)(?!\p{L})/giu;
@@ -1329,7 +1342,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         }
                     }
                     if (!foundInLine) {
-                        if (/^(?:câu\s*hỏi|câu|bài|question|exercise|problem)\s*(?:\d+|[ivxlcdm]+)/i.test(l)) return false;
+                        if (/^(?:câu\s*hỏi|câu|bài|question|exercise|problem)\s*(?:\d+|[ivxlcdm]+(?![\p{L}\d]))/iu.test(l)) return false;
                         // "Đáp án:" rồi "B", "a) Đúng", "ĐSĐS" ở dòng sau là đáp án của câu ngay trên, không phải tiêu đề bảng
                         // (bảng đáp án thật ở cuối đề không được tính cho dòng này).
                         if (/^[a-fA-F][.)]?$/.test(l) || readSingleTFVerdict(l, 6) || readTFVerdicts(l, 6)) return false;
@@ -1455,6 +1468,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     return;
                 }
 
+                // "Câu 1: B", "Câu 1: a) Đ, b) S…" ngay sau câu cuối, không có tiêu đề "Đáp án": số câu chạy lại và dòng chỉ có
+                // đáp án nên là đầu bảng đáp án, không phải câu mới hay đáp án
+                // của câu đang đọc.
+                if (ANSWER_ENTRY_REGEX.test(trimmedLine) && parseInt(trimmedLine.match(/\d+/)[0], 10) <= lastNumInPart
+                    && (parsedQuestions.length > 0 || currentQ?.options.length > 0) && hasAnswerTableFollowup(lineIndex - 1)) {
+                    isEndOfQuiz = true;
+                    if (currentQ) { parsedQuestions.push(currentQ); currentQ = null; }
+                    answerTableLines.push(trimmedLine);
+                    return;
+                }
+
                 if (currentQ && currentQ.options.length >= 2) {
                     // Phần II đề THPT: câu không có tiền tố "câu hỏi đúng sai:" mà dòng đáp án ghi từng ý Đúng/Sai
                     // ("Đáp án: a) Đúng b) Sai …", "Đáp án: ĐSSĐ") là câu đúng/sai, không phải "chọn A".
@@ -1462,7 +1486,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         const tfLike = readTFVerdicts(trimmedLine, tfLetterCount(currentQ));
                         if (tfLike && tfLike.kind !== 'letters' && tfLike.pure && tfLike.verdicts.every(v => v !== null)) currentQ.type = 'true_false';
                     }
-                    if (currentQ.type === 'true_false') {
+                    if (currentQ.type === 'true_false' && !isOtherQuestionRow(trimmedLine, currentQ)) {
                         const full = readTFVerdicts(trimmedLine, tfLetterCount(currentQ));
                         // "a) Đúng. Vì ..." nói về một ý đã có (không phải ý mới tiếp theo) là lời giải từng ý.
                         const tfRead = full && (full.assigned >= 2 || /^(?:đáp\s*án|answer|key)/i.test(trimmedLine)) ? full : readSingleTFVerdict(trimmedLine, tfLetterCount(currentQ));
@@ -1502,6 +1526,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             for (let j = lineIndex + 1; j < lines.length; j++) {
                                 const nextL = lines[j].trim();
                                 if (!nextL) continue;
+                                if (isOtherQuestionRow(nextL, currentQ)) break;
                                 // Cả dòng "a) Đ b) S c) Đ d) S" hay từng ý một dòng ("a) Đúng" rồi "b) Sai"…, gộp ở các dòng sau).
                                 nextTf = readTFVerdicts(nextL, tfLetterCount(currentQ)) || readSingleTFVerdict(nextL, tfLetterCount(currentQ));
                                 break;
@@ -1558,7 +1583,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
 
                 const isHeaderEndOfQuiz = END_OF_QUIZ_REGEX.test(trimmedLine);
-                const isStandaloneAnswerHeader = /^(?:đáp\s*án)\s*[:.\-–—]?\s*$/i.test(trimmedLine) && hasAnswerTableFollowup(lineIndex);
+                // "ĐÁP ÁN PHẦN II": phần còn lại ("PHẦN II") vào bảng để chia bảng theo phần.
+                const isStandaloneAnswerHeader = /^(?:bảng\s*)?đáp\s*án(?:\s+phần\s+(?:[ivxlcdm]+|\d+)(?![\p{L}\d]))?\s*[:.\-–—]?\s*$/iu.test(trimmedLine) && hasAnswerTableFollowup(lineIndex);
 
                 if (isHeaderEndOfQuiz || isStandaloneAnswerHeader) {
                     const hasStartedQuiz = parsedQuestions.length > 0 || (currentQ && currentQ.options.length > 0);
@@ -1925,7 +1951,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             for (const e of many) { const arr = parseTFAnswerLine(e[2]); if (arr) { tf.set(parseInt(e[1], 10), arr); tf.set(e[1].replace(/^0+(?=\d)/, ''), arr); } }
                             continue;
                         }
-                        const tfLineMatch = tLine.trim().match(/^(?:câu|bài|question|q)?\s*(\d+(?:\.\d+)?)\s*[:.)\-–—]\s*(.+)$/i);
+                        // "Câu 1\ta) Đ\tb) S" (cách bằng tab, chép từ bảng Word) cũng là một mục.
+                        const tfLineMatch = tLine.trim().match(/^(?:câu|bài|question|q)?\s*(\d+(?:\.\d+)?)(?:\s*[:.)\-–—]\s*|\s+)(.+)$/i);
                         if (tfLineMatch) {
                             const rawKey = tfLineMatch[1];
                             const qKey = rawKey.includes('.') ? rawKey : parseInt(rawKey, 10);

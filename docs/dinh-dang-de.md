@@ -361,6 +361,33 @@ câu 1: B
 câu 1 phương án B: Hà Nội
 ```
 
+### Dấu tích ✅ cạnh phương án đúng (chép từ chatbot)
+Dấu tích ở cuối dòng phương án (hay sau phương án cuối của dòng) giống `(*)`; ở đầu dòng giống `*B.`. Dấu tích nằm giữa
+hai phương án cùng dòng thì không đoán.
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội ✅
+C. Vinh
+Câu 2: Thủ đô Pháp?
+✅ A. Paris
+B. Rome
+C. Berlin
+Câu 3: Thủ đô Ý?
+A. Paris    B. Berlin    C. Rome ✔
+Câu 4: Thủ đô Anh?
+A. Paris ✓ B. London C. Rome
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 1 phương án B: Hà Nội
+câu 2: A
+câu 2 phương án A: Paris
+câu 3: C
+câu 3 phương án C: Rome
+```
+
 ### Chỉ một phương án in đậm kiểu Markdown
 ```de
 Câu 1: Thủ đô?
@@ -1005,6 +1032,33 @@ số câu: 3
 câu 1: B
 câu 2: C
 câu 3: A
+```
+
+### "Answers: 1C 2B", "Key: 1. C 2. B" (đề tiếng Anh)
+```de
+Question 1. She ___ to school every day.
+A. go    B. goes    C. going    D. gone
+Question 2. Choose the odd one out.
+A. cat    B. dog    C. car    D. cow
+Answers: 1B 2C
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: C
+```
+
+```de
+Question 1. She ___ to school every day.
+A. go    B. goes    C. going    D. gone
+Question 2. Choose the odd one out.
+A. cat    B. dog    C. car    D. cow
+Key: 1. B   2. C
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: C
 ```
 
 ### Tiêu đề "### Đáp án" rồi đáp án in đậm "1. **B**" (chép từ chatbot)
@@ -2085,6 +2139,205 @@ Câu 1) ĐSĐS
 ```
 ```ket-qua
 câu 1: ĐSĐS
+```
+
+### Đề chỉ có phần đúng/sai, bảng đáp án "Câu 1: a) Đ, b) S…" ngay sau "ĐÁP ÁN"
+Dòng "Câu 1: …" sau "ĐÁP ÁN" là mục của bảng, không phải đáp án của câu đang đọc (câu 2).
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+ĐÁP ÁN
+Câu 1: a) Đ, b) S, c) Đ, d) S
+Câu 2: a) S, b) Đ, c) S, d) Đ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### Bảng "Câu 1: B", "Câu 2: C" ngay sau câu cuối, không có tiêu đề "Đáp án"
+Số câu chạy lại từ đầu và dòng chỉ có đáp án nên đó là bảng đáp án, không phải câu mới.
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội
+C. Vinh
+Câu 2: Thủ đô Pháp?
+A. Berlin
+B. Rome
+C. Paris
+Câu 1: B
+Câu 2: C
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 2: C
+```
+
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+Câu 1: a) Đ, b) S, c) Đ, d) S
+Câu 2: SĐSĐ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### Bảng đáp án đúng/sai mẫu của Bộ (cột "Câu | Lệnh hỏi | Đáp án", chép từ Word)
+Mỗi ý một hàng, số câu chỉ ghi ở hàng đầu. Hàng "1  a)  Đ" là của câu 1, không phải đáp án của câu đang đọc.
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+ĐÁP ÁN
+Câu	Lệnh hỏi	Đáp án (Đ/S)
+1	a)	Đ
+	b)	S
+	c)	Đ
+	d)	S
+2	a)	Sai
+	b)	Đúng
+	c)	Sai
+	d)	Đúng
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### Bảng đáp án đúng/sai "Câu | a | b | c | d" (mỗi câu một hàng)
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+ĐÁP ÁN
+Câu	a	b	c	d
+1	Đ	S	Đ	S
+2	S	Đ	S	Đ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+**Đáp án:**
+| Câu | a | b | c | d |
+|---|---|---|---|---|
+| 1 | Đ | S | Đ | S |
+| 2 | S | Đ | S | Đ |
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### "Câu 1  a) Đ  b) S…" cách bằng tab, không có dấu ":" sau số câu
+```de
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+Câu 2: Về sắt
+a) Sắt là phi kim.
+b) Sắt là kim loại.
+c) Sắt tan trong nước.
+d) Sắt bị nam châm hút.
+ĐÁP ÁN
+Câu 1	a) Đ	b) S	c) Đ	d) S
+Câu 2	a) S	b) Đ	c) S	d) Đ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### Tiêu đề "ĐÁP ÁN PHẦN I", "ĐÁP ÁN PHẦN II" chia bảng đáp án theo phần
+```de
+PHẦN I. Câu trắc nghiệm nhiều phương án lựa chọn.
+Câu 1: Thủ đô của Việt Nam?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+Câu 2: Thành phố lớn nhất miền Nam?
+A. Cần Thơ
+B. Huế
+C. TP. Hồ Chí Minh
+D. Vũng Tàu
+PHẦN II. Câu trắc nghiệm đúng sai.
+Câu 1: Về nước
+a) Nước sôi ở 100 độ C.
+b) Nước đóng băng ở 10 độ C.
+c) Nước là hợp chất.
+d) Nước tinh khiết dẫn điện tốt.
+ĐÁP ÁN PHẦN I
+1.B 2.C
+ĐÁP ÁN PHẦN II
+Câu 1: ĐSĐS
+```
+```ket-qua
+số câu: 3
+câu 1: B
+câu 2: C
+câu 3 loại: đúng sai
+câu 3: ĐSĐS
 ```
 
 ### "ĐÁP ÁN: Câu 1: ĐSĐS" (tiêu đề và mục đầu của bảng cùng dòng)
