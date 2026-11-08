@@ -67,11 +67,14 @@ gửi AI sau) là câu mới; dòng có tiền tố "câu hỏi đúng sai:" là
 ("B." sau "A.") là phương án, dù AI gắn là đầu câu hay dòng nối tiếp; sau các phương án, dòng "Đáp án: …", "Chọn …",
 "Lời giải" là dòng đáp án; dòng "đầu câu" không số ngay sau câu có số chưa có phương án là phần tiếp của đề bài; tiêu đề
 "ĐÁP ÁN" không thể là câu hỏi hay phương án; "PHẦN II…" và tiêu đề/chân trang trang PDF ("Trang 2/4 - Mã đề 101") luôn
-bỏ qua.
+bỏ qua. Dòng "Câu N:" ngay sau tiêu đề phần cũng là câu mới (phần đánh số lại từ 1), kể cả khi AI gắn là phương án không
+chữ cái hay dòng đáp án mà phần sau không phải đáp án ("Câu 2: B" vẫn là dòng đáp án). Sau tiêu đề bảng đáp án, hàng
+"1.A 2.B" gắn là dòng đáp án hay bỏ qua vẫn thuộc bảng: nếu không, hàng đó đứng trước bảng và làm đảo thứ tự các phần.
 
 `npm run fuzz -- labels` thử hàng nghìn dãy nhãn ngẫu nhiên trên đề không có đáp án (không được ra đáp án nào);
 `npm run fuzz -- noise` gắn nhầm 1-2 nhãn kiểu hợp lý trên đề có đáp án (được mất đáp án, không được ra đáp án khác với
 file). Đo ngày 7/11/2026: trước khi thêm các quy tắc trên và gán theo chữ cái, 88/7500 lượt ra đáp án sai; sau đó 6/30000.
+Ngày 8/11/2026, sau các quy tắc "Câu N" sau tiêu đề phần và hàng bảng đáp án: 0/120000 (8 seed); trước đó 32/60000.
 
 ## Không đổi
 

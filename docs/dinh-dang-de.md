@@ -1220,6 +1220,37 @@ câu 2 loại: đúng sai
 câu 2: ĐSĐS
 ```
 
+### Câu bị gộp có hai ý cùng chữ cái thì không nhận đáp án đúng/sai
+Thường do mất dòng "Câu N" nên hai câu dính vào nhau (A–D rồi a–d). Không biết "SĐĐS" nói về ý nào nên câu không có
+đáp án và bị bỏ, không đoán.
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội
+C. Vinh
+D. Đà Nẵng
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+Đáp án: SĐĐS
+câu hỏi đúng sai: Câu 2: Cho hàm số.
+a) Ý một
+b) Ý hai
+c) Ý ba
+d) Ý bốn
+A. Thêm
+Đáp án: ĐSĐS
+Câu 3: Thủ đô Pháp?
+A. Berlin
+*B. Paris
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Thủ đô Pháp?
+câu 1: B
+```
+
 ## 8. Nội dung nhiều dòng
 
 ### Câu hỏi nhiều dòng

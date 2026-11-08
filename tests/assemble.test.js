@@ -570,3 +570,42 @@ test('Hội thoại "A: …", "B: …" trước phương án "A." là đề bài
     assert.ok(plainText(r.questions[0].title).includes('B: "______"'), r.questions[0].title);
     assert.ok(plainText(r.questions[1].title).includes('Đa-uyn: nhà tự nhiên học.'), r.questions[1].title);
 });
+
+test('reconcileLabels: dòng "câu hỏi đúng sai: Câu 1" bị gắn là dòng nối tiếp vẫn là đầu câu đúng/sai (phần đánh số lại)', () => {
+    const lines = ['Phần I: trắc nghiệm', 'Câu 1: Thủ đô?', 'A. Huế', 'B. Hà Nội', 'C. Vinh', 'D. Đà Nẵng', 'PHẦN II. ĐÚNG SAI', 'câu hỏi đúng sai: Câu 1: Cho hàm số.', 'a) Ý một', 'b) Ý hai', 'c) Ý ba', 'd) Ý bốn', 'Đáp án: SĐĐS', 'BẢNG ĐÁP ÁN', '1.B'];
+    const given = labels('XQOOOOXCOOOODKK');
+    const fixed = [...fn('reconcileLabels')(lines, given)];
+    assert.equal(fixed[7], 'cau_hoi_dung_sai');
+    const out = fn('assembleQuizText')(lines, fixed);
+    const parsed = app.parse(out.text);
+    assert.deepEqual([...parsed.questions].map(answerOf), ['B', 'SĐĐS']);
+});
+
+test('reconcileLabels: "Câu 1" ngay sau tiêu đề "PHẦN II" bị gắn là dòng nối tiếp vẫn là đầu câu', () => {
+    const lines = ['Phần I: trắc nghiệm', 'Câu 1: Một?', 'A. x', 'B. y', 'Câu 2: Hai?', 'A. x', 'B. y', 'PHẦN II. TRẮC NGHIỆM', 'Câu 1: Ba?', 'A. x', 'B. y', 'BẢNG ĐÁP ÁN', 'Phần I', '1.A 2.B', 'Phần II', '1.B'];
+    const fixed = [...fn('reconcileLabels')(lines, labels('XQOOQOOXSOOKXXXK'))];
+    assert.equal(fixed[8], 'cau_hoi');
+    assert.equal(fixed[13], 'bang_dap_an');
+    const out = fn('assembleQuizText')(lines, fixed);
+    assert.deepEqual([...app.parse(out.text).questions].map(answerOf), ['A', 'B', 'B']);
+});
+
+test('reconcileLabels: tiêu đề "ĐÁP ÁN" và dòng "1.C 2.B" của bảng bị gắn là dòng đáp án vẫn thuộc bảng đáp án', () => {
+    const lines = ['Phần I: trắc nghiệm', 'Câu 1: Một?', 'A. x', 'B. y', 'C. z', 'Câu 2: Hai?', 'A. x', 'B. y', 'C. z', 'PHẦN II. TRẮC NGHIỆM', 'Câu 1: Ba?', 'A. x', 'B. y', 'C. z', 'Câu 2: Bốn?', 'A. x', 'B. y', 'C. z', 'ĐÁP ÁN', '1.A 2.A', 'Phần II (3 điểm)', '1.C 2.B'];
+    const fixed = [...fn('reconcileLabels')(lines, labels('XQOOOQOOOXQOOOQOOODKXD'))];
+    assert.equal(fixed[18], 'bang_dap_an');
+    assert.equal(fixed[21], 'bang_dap_an');
+    const out = fn('assembleQuizText')(lines, fixed);
+    assert.deepEqual([...app.parse(out.text).questions].map(answerOf), ['A', 'A', 'C', 'B']);
+});
+
+test('reconcileLabels: "Câu 2" gắn là phương án (không có chữ cái) hay dòng đáp án, "Đáp án: A" gắn là phương án', () => {
+    const lines = ['Câu 1: Một?', 'A. x', 'B. y', '⟦B⟧Đáp án: B⟦/B⟧', 'Câu 2: Hai?', '*A. x', 'B. y', 'Câu 3: Ba?', 'A. x', 'B. y', 'Đáp án: B đúng vì A sai.', 'Câu 4: Bốn?', '⟦B⟧A. x⟦/B⟧', 'B. y', 'Câu 5: Năm?', 'A. x', 'B. y', '⟦B⟧Đáp án: A⟦/B⟧'];
+    const fixed = [...fn('reconcileLabels')(lines, labels('QOODOOOQOODDOOQOOO'))];
+    assert.deepEqual([fixed[4], fixed[11], fixed[17]], ['cau_hoi', 'cau_hoi', 'dap_an']);
+    const out = fn('assembleQuizText')(lines, fixed);
+    assert.deepEqual([...app.parse(out.text).questions].map(answerOf), ['B', 'A', 'B', 'A', 'A']);
+    // Dòng "Câu 2: B" trong phần đáp án vẫn là dòng đáp án.
+    const keep = [...fn('reconcileLabels')(['Câu 1: Một?', 'A. x', 'B. y', 'Câu 2: B'], labels('QOOD'))];
+    assert.equal(keep[3], 'dap_an');
+});

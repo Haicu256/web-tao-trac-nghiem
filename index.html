@@ -1177,6 +1177,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Hai phương án cùng chữ cái (câu bị gộp: A–D rồi A–D) thì không biết là phương án nào.
                 return found.length === 1 ? found[0] : -1;
             }
+            // Hai phương án / hai ý cùng chữ cái (câu bị gộp: A–D rồi a–d) thì đáp án theo chữ cái không biết là ý nào.
+            function hasDuplicateLetters(q) {
+                const seen = new Set();
+                return q.options.some((o, i) => { const k = letterIndexOf(o, i); if (seen.has(k)) return true; seen.add(k); return false; });
+            }
             function tfLetterCount(q) {
                 return q.options.reduce((m, o, i) => Math.max(m, letterIndexOf(o, i) + 1), q.options.length);
             }
@@ -1192,7 +1197,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Ý nào nhận đáp án theo chữ cái của ý. Chưa đủ mọi ý thì chưa đánh dấu ý nào (bộ lọc cuối coi câu đúng/sai
                 // có một ý Đúng là đã có đáp án).
                 const verdictOf = (o, i) => q.tfVerdicts[letterIndexOf(o, i)];
-                const complete = q.options.every((o, i) => verdictOf(o, i) === true || verdictOf(o, i) === false);
+                const complete = !hasDuplicateLetters(q) && q.options.every((o, i) => verdictOf(o, i) === true || verdictOf(o, i) === false);
                 if (complete) q.hasExplicitTFAnswer = true;
                 q.options.forEach((o, i) => { o.isCorrect = complete && verdictOf(o, i) === true; o.isExplicitAnswer = o.isCorrect; });
             }
@@ -1830,7 +1835,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         }
                     } else if (q.type === 'true_false' && !q.hasExplicitTFAnswer && !q.options.some(o => o.isCorrect)) {
                         const tfAns = lookup(map);
-                        if (tfAns) {
+                        // Bảng phải nói đủ mọi ý của câu; ý không được nhắc tới không tự coi là Sai.
+                        if (tfAns && !hasDuplicateLetters(q) && q.options.every((opt, oIdx) => letterIndexOf(opt, oIdx) < tfAns.length)) {
                             q.options.forEach((opt, oIdx) => {
                                 const k = letterIndexOf(opt, oIdx);
                                 if (k < tfAns.length) opt.isCorrect = tfAns[k];
@@ -3385,6 +3391,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         }
         // Tiêu đề / chân trang lặp lại ở mỗi trang (chép chữ từ PDF): "Trang 2/4 - Mã đề 101", "Mã đề thi 101 Trang 3/3".
         // Một mục của bảng đáp án viết như câu hỏi: "Câu 35: D", "Câu 2: ĐSĐS", "Câu 1: a) Đ b) S c) Đ d) S".
+        // Một hàng của bảng đáp án dạng lưới: "1.A 2.B 3.C", "1A 2B", "Câu 1.A 2.B".
+        const ANSWER_GRID_ROW_REGEX = /^(?:(?:câu|question|bài)\s*)?(?:\d+\s*[.:\-–—)]?\s*[A-F](?![\p{L}\d])[\s,;|]*){2,}$/iu;
         const ANSWER_ENTRY_REGEX = /^(?:câu|question|bài)\s*\d+\s*[:.\-–—)]\s*(?:[A-Fa-f]|[ĐSđs]{2,6}|(?:[a-dA-D]\s*[).:\-–—]\s*(?:đúng|sai|đ|s)(?![\p{L}\d])\s*[,;.]?\s*){2,})\s*[.;,]?$/iu;
         const PAGE_FURNITURE_REGEX = /^[-–—\s]*(?:(?:trang|page)\s*\d+(?:\s*(?:\/|trên|of)\s*\d+)?(?:\s*[-–—|:,]?\s*(?:mã\s*đề(?:\s*thi)?|đề\s*số)\s*[:.]?\s*[\p{L}\p{N}_\-]+)?|(?:mã\s*đề(?:\s*thi)?|exam\s*code|test\s*code)\s*[:.]?\s*[\p{L}\p{N}_\-]+(?:\s*[-–—|:,]?\s*(?:trang|page)\s*\d+(?:\s*(?:\/|trên|of)\s*\d+)?)?)[-–—\s]*$/iu;
         const EXPLICIT_ANSWER_REGEX = /(?:chọn|đáp\s*án|phương\s*án|answer|key)(?:\s*(?:đáp|phương)\s*án)?(?:\s*(?:đúng|là|cần\s*chọn|chính\s*xác))*\s*[:.\-–—]?\s*[A-F](?![\p{L}\d])|(?:^|[\s,;])[a-dA-D]\s*[).:\-–—]?\s*(?:Đ|S|đúng|sai)(?![\p{L}])|^(?:đáp\s*án\s*[:.]?\s*)?[ĐS]{2,6}$/iu;
@@ -3581,14 +3589,24 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             let optionHasLetter = false;
             let pendingNumberedStem = false;
             let expectedLetter = null;
+            let afterPartHeader = false;
+            let inTable = false;
+            const nextLabelAfter = i => { for (let j = i + 1; j < lines.length; j++) if (out[j] !== 'bo_qua') return out[j]; return null; };
             lines.forEach((raw, i) => {
                 const plain = stripFormattingTags(raw).trim();
                 if (PAGE_FURNITURE_REGEX.test(plain)) { out[i] = 'bo_qua'; return; }
+                const partHeader = isPartHeaderLine(plain);
                 // Dòng trông rõ là phương án ("B. 2") không thể là đầu câu; tiêu đề "ĐÁP ÁN" không thể là câu hỏi hay phương án.
                 const optMatch = plain.match(OPTION_PREFIX_REGEX);
                 const optLetter = optMatch ? (optMatch[2] || optMatch[3] || optMatch[4]).toUpperCase() : null;
                 if (['cau_hoi', 'cau_hoi_dung_sai', 'noi_dung_phuong_an'].includes(out[i]) && optLetter && optLetter === expectedLetter && LOOKS_LIKE_OPTION_REGEX.test(plain) && !STRONG_QUESTION_START_REGEX.test(plain)) out[i] = 'phuong_an';
                 if (ANSWER_TABLE_HEADING_REGEX.test(plain) && ['cau_hoi', 'cau_hoi_dung_sai', 'phuong_an', 'noi_dung_phuong_an'].includes(out[i])) out[i] = 'bang_dap_an';
+                // Tiêu đề "ĐÁP ÁN" gắn là dòng đáp án mà ngay sau là bảng (dòng "Đáp án:" có chữ cái ở dòng sau thì không);
+                // trong bảng, hàng "1.A 2.B" gắn là dòng đáp án / bỏ qua vẫn là hàng của bảng. Không vậy thì hàng đó bị ghép
+                // vào câu cuối và đứng trước bảng, làm đảo thứ tự các phần của bảng (Phần I nhận đáp án Phần II).
+                if (out[i] === 'dap_an' && ANSWER_TABLE_HEADING_REGEX.test(plain) && nextLabelAfter(i) === 'bang_dap_an') out[i] = 'bang_dap_an';
+                // Chỉ hàng lưới nhiều mục: "Câu 1: A" lẻ sau bảng có thể là đầu lời giải từng câu (AI bỏ qua là đúng).
+                if (inTable && ['dap_an', 'bo_qua'].includes(out[i]) && ANSWER_GRID_ROW_REGEX.test(plain)) out[i] = 'bang_dap_an';
                 if (isPartHeaderLine(plain) && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'bo_qua';
                 // Sau các phương án, dòng mở đầu bằng "Đáp án:", "Chọn C", "Lời giải" là dòng đáp án: gắn là dòng nối tiếp thì
                 // phương án cuối mang luôn chữ in đậm/gạch chân của dòng đáp án và bị hiểu nhầm là đáp án.
@@ -3596,7 +3614,20 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // Tiền tố "câu hỏi đúng sai:" ghi rõ trong dòng thì đây là câu đúng/sai dù AI gắn là câu trắc nghiệm.
                 if (out[i] === 'cau_hoi' && TF_PREFIX_REGEX.test(plain)) out[i] = 'cau_hoi_dung_sai';
                 const strong = plain.match(STRONG_QUESTION_START_REGEX);
-                if (strong && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'bo_qua'].includes(out[i]) && lastNumber !== null && parseInt(strong[1], 10) === lastNumber + 1) {
+                // Dòng "Câu N: …" gắn là dòng nối tiếp, bỏ qua, phương án không có chữ cái, hay dòng đáp án mà phần sau
+                // không phải đáp án ("Câu 2: B", "Câu 2: Chọn B" là dòng đáp án thật) thì có thể là đầu câu bị gắn nhầm.
+                const strongRest = strong ? plain.slice(strong[0].length).trim() : '';
+                const answerish = ANSWER_ENTRY_REGEX.test(plain) || ANSWER_LINE_START_REGEX.test(strongRest) || /^[A-Fa-f](?![\p{L}\d])/u.test(strongRest);
+                const misplacedStart = strong && (['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'bo_qua'].includes(out[i])
+                    || (out[i] === 'phuong_an' && !optLetter) || (out[i] === 'dap_an' && !answerish));
+                // "câu hỏi đúng sai: Câu 1: …" luôn là đầu câu đúng/sai, kể cả khi phần mới đánh số lại từ 1.
+                if (strong && TF_PREFIX_REGEX.test(plain) && ['noi_dung_cau_hoi', 'noi_dung_phuong_an', 'phuong_an', 'dap_an'].includes(out[i])) out[i] = 'cau_hoi_dung_sai';
+                // "Câu N:" ngay sau tiêu đề phần ("PHẦN II. …", chỉ có dòng bỏ qua ở giữa) là câu đầu của phần đó, kể cả khi
+                // phần mới đánh số lại từ 1 (quy tắc "số câu kế tiếp" bên dưới không bắt được).
+                if (misplacedStart && afterPartHeader && !inTable && !answerish) {
+                    out[i] = TF_PREFIX_REGEX.test(plain) ? 'cau_hoi_dung_sai' : 'cau_hoi';
+                }
+                if (misplacedStart && lastNumber !== null && parseInt(strong[1], 10) === lastNumber + 1) {
                     out[i] = TF_PREFIX_REGEX.test(plain) ? 'cau_hoi_dung_sai' : 'cau_hoi';
                 }
                 // Dòng "đầu câu" không có số câu, ngay sau một câu có số chưa có phương án nào (câu hỏi chính sau bảng số
@@ -3611,10 +3642,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 } else if (out[i] === 'phuong_an') {
                     pendingNumberedStem = false;
                     const hasLetter = OPTION_PREFIX_REGEX.test(plain);
-                    if (!hasLetter && optionHasLetter) out[i] = 'noi_dung_phuong_an';
+                    // Phương án không có chữ cái sau các phương án có chữ cái là dòng nối tiếp; nếu mở đầu bằng "Đáp án:",
+                    // "Chọn C" thì là dòng đáp án (ghép vào phương án cuối thì chữ in đậm của nó thành đáp án).
+                    if (!hasLetter && optionHasLetter) out[i] = ANSWER_LINE_START_REGEX.test(plain) ? 'dap_an' : 'noi_dung_phuong_an';
                     else if (hasLetter) optionHasLetter = true;
                     if (hasLetter && optLetter) expectedLetter = String.fromCharCode(optLetter.charCodeAt(0) + 1);
                 }
+                if (out[i] === 'bang_dap_an') inTable = true;
+                else if (out[i] === 'cau_hoi' || out[i] === 'cau_hoi_dung_sai') inTable = false;
+                if (partHeader) afterPartHeader = true;
+                else if (out[i] !== 'bo_qua') afterPartHeader = false;
             });
             return out;
         }
