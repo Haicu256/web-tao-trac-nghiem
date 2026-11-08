@@ -912,7 +912,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             for (let i = 0; i < seqMatches.length; i++) {
                                 const start = seqMatches[i];
                                 const end = (i < seqMatches.length - 1) ? seqMatches[i + 1] : line.length;
-                                rawParts.push(line.slice(start, end).trim());
+                                // "B. y * C. z": dấu * cách cả hai bên, không biết của B (viết sau) hay của C (viết trước) nên
+                                // bỏ, không đoán. Viết liền ("y*" hay "*C.") thì rõ.
+                                const part = line.slice(start, end).trim();
+                                rawParts.push(i > 0 ? part.replace(/^\*+\s+(?=\S)/, '') : part);
                             }
                             const filtered = rawParts.filter(p => p.length > 0);
                             if (filtered.length > 1 && !isTFAnswerRow(filtered)) {
@@ -1102,7 +1105,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const numberedCompact = clean.match(/^\d+\s*[.:)\-–—]\s*([ĐSDFTF]{2,6})$/i);
                 if (numberedCompact) clean = numberedCompact[1];
 
-                const clauseRegex = /(?:(?:các\s*ý|các\s*câu|ý|câu)?\s*([a-dA-D1-4](?:\s*[,;\s+vàand]+\s*[a-dA-D1-4])*)\s*[:.\)\-–—\s\]]+\s*(đúng|sai|đ|s|true|false|t|f)(?![a-zA-Z\p{L}]))/giu;
+                const clauseRegex = /(?:(?:các\s*ý|các\s*câu|ý|câu)?\s*([a-fA-F1-6](?:\s*[,;\s+vàand]+\s*[a-fA-F1-6])*)\s*[:.\)\-–—\s\]]+\s*(đúng|sai|đ|s|true|false|t|f)(?![a-zA-Z\p{L}]))/giu;
                 const verdicts = new Array(count).fill(null);
                 let assigned = 0;
                 let clauses = 0;
@@ -1110,9 +1113,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 for (const m of clean.matchAll(clauseRegex)) {
                     clauses++;
                     // "a, c đúng": một mệnh đề liệt kê nhiều ý Đúng (quy ước: các ý còn lại là Sai).
-                    if ((m[1].match(/[a-dA-D1-4]/g) || []).length >= 2 && /^(?:đ|đúng|true|t|d)$/i.test(m[2])) listedTrue = true;
+                    if ((m[1].match(/[a-fA-F1-6]/g) || []).length >= 2 && /^(?:đ|đúng|true|t|d)$/i.test(m[2])) listedTrue = true;
                     const isVal = /^(?:đ|đúng|true|t|d)$/i.test(m[2]);
-                    for (const l of m[1].match(/[a-dA-D1-4]/g) || []) {
+                    for (const l of m[1].match(/[a-fA-F1-6]/g) || []) {
                         const up = l.toUpperCase();
                         const idx = up >= 'A' && up <= 'Z' ? up.charCodeAt(0) - 65 : parseInt(up, 10) - 1;
                         if (idx >= 0 && idx < count) { verdicts[idx] = isVal; assigned++; }
@@ -1123,15 +1126,21 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     if (hasKeyword || leftover === '') return { verdicts, assigned, kind: 'clauses', listedTrue: listedTrue && clauses === 1, pure: leftover === '' };
                 }
 
-                // Các kiểu gọn nói tới mọi ý: "ĐSĐS", "Đ S Đ S", "Đúng, Sai, ...", hoặc liệt kê ý đúng "a, c".
-                const all = (bools, kind) => { while (bools.length < count) bools.push(false); return { verdicts: bools.slice(0, count), assigned: count, kind, pure: true }; };
+                // Các kiểu gọn nói lần lượt từng ý: "ĐSĐS", "Đ S Đ S", "Đúng, Sai, ...". Ngắn hơn số ý thì các ý sau chưa có
+                // đáp án (không tự coi là Sai); dài hơn số ý thì không biết ý nào bị thiếu nên không dùng.
+                const all = (bools, kind) => {
+                    if (bools.length > count) return null;
+                    const verdicts = [...bools];
+                    while (verdicts.length < count) verdicts.push(null);
+                    return { verdicts, assigned: bools.length, kind, pure: true };
+                };
                 if (/^[ĐSDFTF]{2,6}$/i.test(clean)) {
                     return all(clean.split('').map(c => { const low = c.toLowerCase(); return low === 'đ' || low === 't' || low === 'd'; }), 'compact');
                 }
 
                 const tokens = clean.split(/[\s,\-–—\/\.;|]+/).filter(Boolean);
                 // "D. S" là ý D có nội dung "S", không phải "Đúng, Sai" (chữ D không dấu cũng được hiểu là Đúng).
-                if (tokens.length >= 2 && tokens.length <= count && !/^[a-dA-D]\s*[.):]/.test(clean)) {
+                if (tokens.length >= 2 && tokens.length <= count && !/^[a-fA-F]\s*[.):]/.test(clean)) {
                     const bools = [];
                     let allBool = true;
                     for (const t of tokens) {
@@ -1143,9 +1152,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     if (allBool && bools.length >= 2) return all(bools, 'tokens');
                 }
 
-                if (/^[a-dA-D](?:\s*(?:,|;|và|and|\+)\s*[a-dA-D])+$/i.test(clean)) {
+                if (/^[a-fA-F](?:\s*(?:,|;|và|and|\+)\s*[a-fA-F])+$/i.test(clean)) {
                     const result = new Array(count).fill(false);
-                    for (const l of clean.match(/[a-dA-D]/gi) || []) {
+                    for (const l of clean.match(/[a-fA-F]/gi) || []) {
                         const idx = l.toUpperCase().charCodeAt(0) - 65;
                         if (idx >= 0 && idx < count) result[idx] = true;
                     }
@@ -1157,7 +1166,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
             // Lời giải từng ý ở đầu dòng: "a) Đúng. Vì f(-x) = f(x)." chỉ nói về ý a. Ý phải là ý đã có (không phải ý mới).
             function readSingleTFVerdict(text, count = 4) {
-                const m = String(text).trim().match(/^(?:ý\s*)?\(?([a-dA-D])\s*[).:\-–—]\s*(đúng|sai|đ|s|true|false)(?![\p{L}\d])/iu);
+                const m = String(text).trim().match(/^(?:ý\s*)?\(?([a-fA-F])\s*[).:\-–—]\s*(đúng|sai|đ|s|true|false)(?![\p{L}\d])/iu);
                 if (!m) return null;
                 const idx = m[1].toUpperCase().charCodeAt(0) - 65;
                 if (idx >= count) return null;
@@ -1202,12 +1211,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 q.options.forEach((o, i) => { o.isCorrect = complete && verdictOf(o, i) === true; o.isExplicitAnswer = o.isCorrect; });
             }
 
-            // Dạng dùng cho bảng đáp án: chỉ nhận khi dòng nói đủ mọi ý (hoặc liệt kê các ý Đúng).
-            function parseTFAnswerLine(text, count = 4) {
+            // Dạng dùng cho bảng đáp án (chưa biết câu có mấy ý, nên đọc tới 6 ý): trả về đáp án các ý a, b, … liền nhau từ
+            // đầu; ý bị bỏ giữa chừng ("a) Đ c) S") thì không dùng. Khi gán, bảng phải nói đủ mọi ý của câu.
+            function parseTFAnswerLine(text, count = 6) {
                 const read = readTFVerdicts(text, count);
                 if (!read || read.assigned < 2) return null;
-                if (read.kind === 'clauses' && !read.listedTrue && read.verdicts.some(v => v === null)) return null;
-                return read.verdicts.map(v => v === true);
+                if (read.kind === 'letters' || read.listedTrue) return read.verdicts.map(v => v === true);
+                const verdicts = [...read.verdicts];
+                while (verdicts.length > 0 && verdicts[verdicts.length - 1] === null) verdicts.pop();
+                if (verdicts.some(v => v === null)) return null;
+                return verdicts;
             }
 
             function hasOptionFollowup(startIdx) {
@@ -1242,6 +1255,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     while ((m = compact.exec(l)) !== null) { countKeys++; foundInLine = true; }
                     mc.lastIndex = 0;
                     while ((m = mc.exec(l)) !== null) { countKeys++; foundInLine = true; }
+                    // Mục đúng/sai của bảng: "Câu 1: ĐSĐS", "2. Đ S Đ S".
+                    const tfEntry = !foundInLine && l.match(/^(?:câu|bài|question|q)?\s*\d+\s*[:.\-–—)]\s*(.+)$/iu);
+                    if (tfEntry && parseTFAnswerLine(tfEntry[1])) { countKeys++; foundInLine = true; }
                     if (countKeys >= 2) return true;
                     if (j < lines.length - 1) {
                         const nextL = lines[j + 1].trim();
@@ -1425,7 +1441,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         for (let j = lineIndex + 1; j < lines.length; j++) {
                             const nextL = lines[j].trim();
                             if (!nextL) continue;
-                            const letterM = nextL.match(/^([a-fA-F])(?!\p{L})/iu);
+                            // Chữ cái đứng riêng ("B", "B.", "B. Hà Nội"); "C2H5OH", "B2: …" không phải phương án C, B.
+                            const letterM = nextL.match(/^([a-fA-F])(?![\p{L}\d])/iu);
                             if (letterM) nextLetter = letterM[1].toUpperCase();
                             break;
                         }
@@ -1653,7 +1670,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         const textWithStar = rawText;
 
                         const isItalics = /^\*([^*\s]|[^*\s][^*]*[^*\s])\*(?:\s|$)/.test(rawText);
-                        const isMathOrCodeStar = /(?:^|[^\p{L}\d])(?:[A-Z]|int|char|void|float|double|size_t|bool)\*$/i.test(rawText) || /^[A-Za-z0-9]\*$/.test(rawText);
+                        const isMathOrCodeStar = /(?:^|[^\p{L}\d])(?:[A-Z]|int|char|void|float|double|size_t|bool)\*$/iu.test(rawText) || /^[A-Za-z0-9]\*$/.test(rawText);
                         if (!isItalics && /^(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/])(?=\s*\S))/.test(rawText)) {
                             isCorrect = true;
                             isStarCorrect = true;
@@ -1663,6 +1680,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             isStarCorrect = true;
                             rawText = rawText.replace(/\s*(?:\(\*\)|\*)$/, '').trim();
                         }
+
+                        // "Hà Nội*": dấu * viết liền cuối phương án, chỉ ghi nhận ở đây; dùng ở cuối khi câu chưa có đáp án nào khác.
+                        const gluedStar = !isStarCorrect && !isMathOrCodeStar && !isItalics && /[^\s*]\*$/.test(rawText) && !/^\*/.test(rawText);
 
                         if (isWholeLineBold) {
                             const boldCount = (rawText.match(/\*\*/g) || []).length;
@@ -1692,7 +1712,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         }
                         const optionText = escapeHTML(rawText);
                         const isTextStar = isStarCorrect && !isPrefixStar;
-                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar, isPrefixStar, isTextStar, textWithStar: isTextStar ? escapeHTML(textWithStar) : undefined, optLetter, optColon, sourceLines: [escapeHTML(trimmedLine)] });
+                        currentQ.options.push({ text: optionText, isCorrect, isBoldOption, isStarCorrect, isTripleStar, isPrefixStar, isTextStar, textWithStar: isTextStar ? escapeHTML(textWithStar) : undefined, optLetter, optColon, gluedStar, sourceLines: [escapeHTML(trimmedLine)] });
                     } else {
                         if (currentQ.options.length === 0) {
                             currentQ.title = currentQ.title ? (currentQ.title + '<br>' + escapeHTML(trimmedLine)) : escapeHTML(trimmedLine);
@@ -1774,7 +1794,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         if (tfLineMatch) {
                             const rawKey = tfLineMatch[1];
                             const qKey = rawKey.includes('.') ? rawKey : parseInt(rawKey, 10);
-                            const tfArr = parseTFAnswerLine(tfLineMatch[2], 4);
+                            const tfArr = parseTFAnswerLine(tfLineMatch[2]);
                             if (tfArr) {
                                 tf.set(qKey, tfArr);
                                 tf.set(String(qKey), tfArr);
@@ -1846,6 +1866,17 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     }
                 });
             }
+
+            // Dấu * viết liền cuối phương án ("Hà Nội*") là bằng chứng yếu nhất: chỉ dùng khi câu chưa có đáp án nào khác và
+            // đúng một phương án có nó (hai phương án trở lên thường là ký hiệu, như "Node*", "ab*").
+            parsedQuestions.forEach(q => {
+                if (!q || q.type === 'true_false' || q.options.length < 2 || q.options.some(o => o.isCorrect)) return;
+                const glued = q.options.filter(o => o.gluedStar);
+                if (glued.length !== 1 || !/\*$/.test(glued[0].text)) return;
+                glued[0].isCorrect = true;
+                glued[0].isStarCorrect = true;
+                glued[0].text = glued[0].text.replace(/\s*\*$/, '');
+            });
 
             const validQuestions = parsedQuestions.filter(q => q.options.length >= 2);
             const droppedNoOptionCount = parsedQuestions.length - validQuestions.length;
@@ -3743,7 +3774,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // chữ cái đáp án (sau "Đáp án:") hay chuỗi Đ/S thì giữ nguyên để parser đọc.
                 q.answers.forEach(a => out.push(ANSWER_LINE_START_REGEX.test(a) || /^[A-Fa-f][.)]?$|^[ĐSđs\s,;.\-]+$/.test(a) ? a : `Lời giải: ${a}`));
                 const answerLineHasKey = EXPLICIT_ANSWER_REGEX.test(q.answers.join(' '));
-                if (!hasStar && tagged.size === 0 && !answerLineHasKey) missing.push(/^\d+$/.test(q.number) ? parseInt(q.number, 10) : q.number);
+                const gluedStar = q.options.filter(o => /[^\s*]\*$/.test(o.text)).length === 1;
+                if (!hasStar && tagged.size === 0 && !answerLineHasKey && !gluedStar) missing.push(/^\d+$/.test(q.number) ? parseInt(q.number, 10) : q.number);
             };
             const addStem = (plain) => {
                 if (question.stem.length > 0 && looksLikeNewItem(plain)) question.stem[question.stem.length - 1] += ' ' + plain;

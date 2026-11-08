@@ -175,8 +175,11 @@ function runText(n) {
             } else if (!got.ok) problems.push('từ chối');
             else {
                 if (got.questions.length !== want.length) problems.push('số câu');
-                want.forEach((w, k) => {
-                    const g = got.questions[k];
+                // Số câu khác (web bỏ câu không chắc đáp án) thì ghép câu theo đề bài, để câu sau không bị so lệch vị trí.
+                const pairs = got.questions.length === want.length ? want.map((w, k) => [w, got.questions[k]])
+                    : got.questions.map(g => [want.find(w => w.title === norm(g.title)), g]);
+                pairs.forEach(([w, g]) => {
+                    if (!w) { problems.push('câu lạ'); return; }
                     if (!g) return;
                     if (g.type !== w.type) problems.push('loại câu');
                     if (g.answer !== w.answer) problems.push('đáp án');

@@ -220,6 +220,46 @@ câu 1: B
 câu 1 phương án B: Hà Nội
 ```
 
+### Dấu * viết liền cuối phương án ("Hà Nội*")
+Hai phương án trở lên cùng có `*` viết liền (thường là ký hiệu, như `int*`) thì không coi là đánh dấu đáp án.
+```de
+Câu 1: Thủ đô?
+A. Huế
+B. Hà Nội*
+C. Vinh
+Câu 2: Thủ đô Pháp?
+A. Berlin B. Paris* C. Rome D. Madrid
+Câu 3: Chọn từ đúng
+A. Huế*
+B. Vinh*
+C. Hà Nội
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án B: Hà Nội
+câu 2: B
+câu 2 phương án B: Paris
+```
+
+### Dấu * đứng giữa hai phương án cùng dòng ("B. y * C. z") thì không đoán
+Không biết `*` là của B (viết sau) hay của C (viết trước), nên câu bị bỏ. Viết liền vào chữ (`y*` hay `*C.`) thì rõ.
+```de
+Câu 1: Thủ đô?
+A. Huế B. Hà Nội * C. Vinh D. Đà Nẵng
+Câu 2: Thủ đô Pháp?
+A. Berlin B. Madrid *C. Paris D. Rome
+Câu 3: Thủ đô Ý?
+A. Rome* B. Paris C. Huế D. Vinh
+```
+```ket-qua
+số câu: 2
+câu 1 tiêu đề: Thủ đô Pháp?
+câu 1: C
+câu 1 phương án C: Paris
+câu 2: A
+```
+
 ### Dấu (*) sau phương án
 ```de
 Câu 1: Thủ đô?
@@ -621,6 +661,45 @@ số câu: 2
 câu 1: B
 câu 2: C
 câu 2 phương án C: Rome
+```
+
+### Tiêu đề "ĐÁP ÁN:" với bảng chỉ có đáp án đúng/sai
+```de
+câu hỏi đúng sai: Câu 1: Hàm số f(x) liên tục trên R?
+a) f(x) đồng biến trên R
+b) f(x) có cực trị
+c) f(x) nhận giá trị dương
+d) f(x) là hàm chẵn
+
+câu hỏi đúng sai: Câu 2: Phương trình g(x) = 0?
+a) Có nghiệm dương
+b) Có nghiệm âm
+c) Vô nghiệm
+d) Có 2 nghiệm
+
+ĐÁP ÁN:
+Câu 1: ĐSĐS
+Câu 2: SĐSĐ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐS
+câu 2: SĐSĐ
+```
+
+### "Đáp án:" rồi dòng sau ghi nội dung ("C2H5OH") không phải chữ cái thì không đoán
+Dòng sau "Đáp án:" chỉ là đáp án khi là chữ cái đứng riêng ("B", "B.", "B. C2H5OH"); "C2H5OH" không phải phương án C.
+```de
+Câu 1: Chất nào là ancol?
+A. CH4
+B. C2H5OH
+C. CH3COOH
+D. HCHO
+Đáp án:
+C2H5OH
+```
+```ket-qua
+không đọc được
 ```
 
 ### "Đáp án: 1B 2C" viết cùng dòng
@@ -1126,6 +1205,66 @@ D. 5 là số chẵn
 số câu: 1
 câu 1 tiêu đề: Xét các số
 câu 1: ĐSĐS
+```
+
+### Chuỗi Đ/S ngắn hơn số ý ("ĐS" cho câu 4 ý) cũng không tự coi các ý còn lại là Sai
+```de
+câu hỏi đúng sai: Câu 1: Cho các mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+Đáp án: ĐS
+câu hỏi đúng sai: Câu 2: Cho các mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+Đáp án: Đúng, Sai
+câu hỏi đúng sai: Câu 3: Cho các mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+Đáp án: ĐSĐSĐ
+Câu 4: Thủ đô?
+A. Huế
+*B. Hà Nội
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Thủ đô?
+```
+
+### Câu đúng/sai có 5 ý (a–e): đáp án ghi từng ý hay bảng đáp án
+```de
+câu hỏi đúng sai: Câu 1: Cho 5 mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+e) Mệnh đề 5
+Đáp án: a đúng, b sai, c đúng, d sai, e đúng
+câu hỏi đúng sai: Câu 2: Cho 5 mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+e) Mệnh đề 5
+câu hỏi đúng sai: Câu 3: Cho 4 mệnh đề sau:
+a) Mệnh đề 1
+b) Mệnh đề 2
+c) Mệnh đề 3
+d) Mệnh đề 4
+
+BẢNG ĐÁP ÁN
+Câu 2: ĐSĐSĐ
+Câu 3: SSĐ
+```
+```ket-qua
+số câu: 2
+câu 1: ĐSĐSĐ
+câu 2: ĐSĐSĐ
 ```
 
 ### Ý có nội dung chỉ là một chữ ("D. S") vẫn là ý, không phải dòng đáp án
@@ -1742,8 +1881,8 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
 ## 11. Giới hạn đã biết
 
 - Ở câu đúng/sai, một ý chỉ gồm chuỗi Đ/S (ví dụ `ĐS`) bị hiểu là dòng đáp án. Phát biểu thật luôn dài hơn nên hiếm gặp.
-- Phương án cách nhau đúng **một** dấu cách mà có `*` ở cuối (`B. y * C. z`) thì `*` được hiểu là của phương án sau. Dùng
-  tab, nhiều dấu cách, hoặc đặt `*` ngay trước chữ cái.
+- Phương án cách nhau đúng **một** dấu cách mà `*` đứng riêng giữa hai phương án (`B. y * C. z`) thì không biết là của
+  phương án nào nên câu bị bỏ. Viết liền `*` vào phương án (`y*` hay `*C.`), hoặc dùng tab, nhiều dấu cách.
 - Đường dán `.txt` chưa đọc `**(A) …**` (in đậm Markdown với chữ cái trong ngoặc); dùng `**A. …**` hoặc dấu `*`.
 - Đề chỉ có **một** câu kèm bảng đáp án (`Đáp án: 1D`) không đọc được; ghi `Đáp án: D` ngay dưới câu.
 - Phần II đúng/sai không có tiền tố `câu hỏi đúng sai:` mà đáp án chỉ nằm ở bảng cuối đề thì câu đó bị bỏ (không đoán).

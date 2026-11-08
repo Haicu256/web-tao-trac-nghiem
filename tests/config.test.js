@@ -54,3 +54,11 @@ test('index.html không dùng lookbehind trong regex (Safari dưới 16.4 báo l
     const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
     assert.equal((scripts.match(/\(\?<[=!]/g) || []).length, 0);
 });
+
+test('regex có \\p{L} trong index.html đều có cờ u (thiếu cờ u thì \\p{L} chỉ là chữ "p{L}", "Nội*" từng bị coi là biến "i*")', () => {
+    const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+    const literal = /(^|[=(,:!&|?;{}[\s])\/((?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+)\/([dgimsuvy]*)/gm;
+    const missing = [...scripts.matchAll(literal)].filter(m => /\\[pP]\{/.test(m[2]) && !/[uv]/.test(m[3])).map(m => m[0].trim());
+    assert.deepEqual(missing, []);
+});
