@@ -1008,7 +1008,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const DIVIDER_REGEX = /^[-=_*~#]{3,}\s*$/;
             const SECTION_END_REGEX = /^(?:[-=_*~#]{2,}\s*)?hết\s+phần(?:\s|$)[^\n]{0,50}$/iu;
             const SECTION_HEADER_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:phần|chương|mục|tiết|section|part)\s+(?:(?:[ivxlcdm\d]+|[a-f]\b|thứ\s+[\p{L}\d]+)(?:\s*[:.\-–—]|\*+\s*[:.\-–—]?|[:.\-–—]?\s*\*+|\s+|$)|(?:trắc\s*nghiệm|tự\s*luận|đúng[\s\/\-–—]*sai|trả\s*lời\s*ngắn|nhiều\s*lựa\s*chọn)(?:\s*[:.\-–—]|\*+\s*[:.\-–—]?|[:.\-–—]?\s*\*+|\s+|$)|[:.\-–—])/iu;
-            const EXPLANATION_LINE_REGEX = /^(?:lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:giải|chấm)(?:\s*chi\s*tiết)?|giải\s*thích(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*:|đáp\s*án\s*chi\s*tiết)\s*[:.\-–—]?/i;
+            const EXPLANATION_LINE_REGEX = /^(?:lời\s*giải(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*(?:giải|chấm)(?:\s*chi\s*tiết)?|giải\s*thích(?:\s*chi\s*tiết)?|hướng\s*dẫn\s*:|đáp\s*án\s*chi\s*tiết|(?:bài\s*)?giải(?:\s*chi\s*tiết)?\s*[:.]|nhận\s*xét\s*[:.])\s*[:.\-–—]?/i;
             const ANSWER_LINE_REGEX = /^(?:(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp\s*án|phương\s*án))?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|answer|key)(?:\s*của\s*(?:câu(?:\s*(?:hỏi|\d+)?|\s*này)?|đề(?:\s*thi)?|sách|bài(?:\s*\d+)?))?(?:\s*là)?)|(?:(?:chọn|suy\s*ra\s*chọn|do\s*đó\s*chọn|ta\s*chọn|vậy\s*chọn|suy\s*ra|do\s*đó|vậy)\s*(?:chọn)?(?:\s*(?:đáp\s*án|phương\s*án))?(?:\s*là)?))\s*[:.\-–—]?\s*(?:(?:phương|đáp)\s*án\s*)?([a-fA-F])(?!\p{L})/iu;
             const EXAM_CODE_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?\[?\s*(?:mã\s*đề(?:\s*thi)?|đề\s*(?:thi\s*)?số|exam\s*code|test\s*code|paper\s*code)\s*[:.\-–—]?\s*([a-zA-Z0-9_]+(?:-(?!\s*(?:trang|page)(?![\p{L}]))[a-zA-Z0-9_]+)*)\b/iu;
             let isEndOfQuiz = false;
@@ -2911,7 +2911,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             }
                         }
                     }
-                    if (/^(?:câu\s*hỏi|câu|bài|question|exercise|problem)\s*(?:\d+|[ivxlcdm]+)/i.test(pText.trim())) {
+                    if (/^(?:câu\s*hỏi|câu|bài|question|exercise|problem)\s*(?:\d+|[ivxlcdm]+)(?![\p{L}\d])/iu.test(pText.trim())) {
                         for (const key of Object.keys(listCounters)) {
                             delete listCounters[key];
                         }
@@ -2955,6 +2955,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         val = String.fromCharCode(97 + (currentCount - 1) % 26);
                     } else if (fmt === 'bullet') {
                         val = '';
+                    } else if (fmt === 'upperRoman' || fmt === 'lowerRoman') {
+                        // "(I)", "(II)": đề bài hay liệt kê phát biểu bằng số La Mã rồi phương án ghi "(I) và (II)".
+                        let n = currentCount;
+                        let roman = '';
+                        for (const [v, r] of [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]) {
+                            while (n >= v) { roman += r; n -= v; }
+                        }
+                        val = fmt === 'lowerRoman' ? roman.toLowerCase() : roman;
                     } else {
                         val = String(currentCount);
                     }
@@ -3181,7 +3189,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 's': 'ₛ', 't': 'ₜ', 'i': 'ᵢ', 'j': 'ⱼ'
             };
 
-            function convertWithScriptMap(text, map) {
+            // Chữ trên/dưới có ký tự không có trong bảng ("√2", "r", "b") thì viết "^(√2)", "_(b)": đổi một phần sang Unicode
+            // làm mất nghĩa ("2^√2" thành "2√²", "log_b x" thành "logbx").
+            function convertWithScriptMap(text, map, mark) {
+                const visible = text.replace(/⟦[^⟧]*⟧/g, '');
+                if ([...visible].some(ch => !map[ch] && !/\s/.test(ch))) return `${mark}(${text})`;
                 let out = '';
                 let inMarker = false;
                 for (let i = 0; i < text.length; i++) {
@@ -3209,6 +3221,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
                 const tag = node.tagName.toLowerCase();
                 if (tag === 'script' || tag === 'style' || tag === 'img') return '';
+                // Chú thích cuối trang/cuối bài của Word (mammoth đưa xuống cuối thành danh sách đánh số, kèm dấu [1] trong
+                // chữ): không phải phương án hay câu hỏi.
+                if (/^(?:footnote|endnote)-(?:ref-)?\d+$/.test((node.getAttribute && node.getAttribute('id')) || '')) return '';
 
                 if (tag === 'ol' || tag === 'ul') {
                     let listOut = '';
@@ -3302,8 +3317,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
 
                 let res = inner;
-                if (isSup) res = convertWithScriptMap(res, SUPERSCRIPT_MAP);
-                if (isSub) res = convertWithScriptMap(res, SUBSCRIPT_MAP);
+                if (isSup) res = convertWithScriptMap(res, SUPERSCRIPT_MAP, '^');
+                if (isSub) res = convertWithScriptMap(res, SUBSCRIPT_MAP, '_');
                 if (isColor) res = wrapInlineTag(res, 'CLR');
                 if (isMark) res = wrapInlineTag(res, 'HL');
                 if (isUnderline) res = wrapInlineTag(res, 'U');
@@ -3571,7 +3586,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         const OPTION_PREFIX_REGEX = /^(\*+\s*)?(?:\(\*?([a-fA-F])\*?\)|\[\*?([a-fA-F])\*?\]|([a-fA-F])\*?\s*[.):\/\-–—])\s*/;
         const LOOKS_LIKE_OPTION_REGEX = /^\*?\s*(?:(?:\(\*?[a-fA-F]\*?\)|\[\*?[a-fA-F]\*?\]|[a-fA-F]\*?\s*[.):\/\-–—])(?:\s|(?=\p{Lu}))|[a-fA-F]\*?\.(?=[\d√(+\-−]))/u;
         const BARE_NUMBER_REGEX = /^\d+(?:\.\d+)?\s*[.)\/:]\s/;
-        const ANSWER_LINE_START_REGEX = /^(?:đáp\s*án|chọn(?:\s*(?:đáp|phương)\s*án)?\s*[:.]?\s*[a-fA-F](?![\p{L}])|lời\s*giải|hướng\s*dẫn\s*(?:giải|chấm)|giải\s*thích|answer|key)/iu;
+        const ANSWER_LINE_START_REGEX = /^(?:đáp\s*án|chọn(?:\s*(?:đáp|phương)\s*án)?\s*[:.]?\s*[a-fA-F](?![\p{L}])|lời\s*giải|hướng\s*dẫn\s*(?:giải|chấm)|giải\s*thích|(?:bài\s*)?giải(?:\s*chi\s*tiết)?\s*[:.]|hướng\s*dẫn\s*[:.]|nhận\s*xét\s*[:.]|answer|key)/iu;
         const ANSWER_TABLE_HEADING_REGEX = /^(?:[-=_*~#]{2,}\s*)?(?:bảng\s*)?(?:đáp\s*án|answer\s*key)(?:\s*(?:trắc\s*nghiệm|chi\s*tiết|tham\s*khảo|phần\s*[ivx\d]+))?\s*[:.]?\s*(?:[-=_*~#]{2,})?\s*$/iu;
         const FORMAT_TAG_TOKEN_REGEX = /⟦(\/?)(B|U|HL|CLR)⟧/g;
         const PART_BOUNDARY_REGEX = /^(?:#{1,6}\s*)?(?:\*{1,3}\s*)?(?:(?:phần|part|section)\s+(?:[ivxlcdm]+|\d+|[a-d])(?![\p{L}\d])|(?:hết\s+phần|tự\s*luận|trả\s*lời\s*ngắn)(?![\p{L}\d])|[-=_*~#]{2,}\s*hết(?![\p{L}\d])|hết\s*[.!]?$)/iu;
@@ -3725,12 +3740,15 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 return tag;
             });
             consume(rawLine.slice(last));
-            const has = (t) => {
-                const covered = total > 0 && counts[t] / total >= 0.6;
-                return t === 'B' ? covered : (covered || !!(letterTags && letterTags.has(t)));
-            };
+            const covered = (t) => total > 0 && counts[t] / total >= 0.6;
+            const has = (t) => (t === 'B' ? covered(t) : (covered(t) || !!(letterTags && letterTags.has(t))));
             const meaningful = content.length > 0 && !/^(?:[A-Fa-f][.)]?)+$/.test(content);
-            return { U: has('U'), HL: has('HL'), CLR: has('CLR'), B: meaningful && has('B') };
+            return {
+                U: has('U'), HL: has('HL'), CLR: has('CLR'), B: meaningful && has('B'),
+                // Nội dung phương án được bọc ≥ 60%, và có bọc một phần nào không (gạch chân âm cần phát âm trong mỗi từ).
+                content: { U: covered('U'), HL: covered('HL'), CLR: covered('CLR') },
+                partial: { U: counts.U > 0, HL: counts.HL > 0, CLR: counts.CLR > 0 },
+            };
         }
 
         // Câu đúng/sai: mỗi ý được đánh dấu là một ý Đúng (có thể cả 4 ý). Câu một lựa chọn: chỉ chấp nhận khi đúng
@@ -3741,7 +3759,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const coverage = rawOptionLines.map(optionFormatCoverage);
             const indexesWith = (tag) => coverage.map((c, i) => (c[tag] ? i : -1)).filter(i => i >= 0);
             if (trueFalse) {
-                const strong = new Set(['U', 'HL', 'CLR'].flatMap(indexesWith));
+                // Chữ cái a) b) c) d) của mọi ý cùng tô màu / gạch chân (còn nội dung thì không) là trang trí.
+                const strong = new Set(['U', 'HL', 'CLR'].flatMap(tag => {
+                    const idx = indexesWith(tag);
+                    return idx.length === n && coverage.every(c => !c.content[tag]) ? [] : idx;
+                }));
                 if (strong.size > 0) return strong;
                 const bold = indexesWith('B');
                 return new Set(bold.length > 0 && bold.length < n ? bold : []);
@@ -3750,6 +3772,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             for (const tag of ['U', 'HL', 'CLR']) {
                 const idx = indexesWith(tag);
                 if (idx.length === 0 || idx.length === n) continue;
+                // Mọi phương án đều có một phần gạch chân / tô màu (câu phát âm, trọng âm: "h<u>ou</u>r", "<u>ou</u>r"): đó là
+                // đề bài, không phải dấu đáp án, dù một phương án có tỷ lệ phần gạch chân cao hơn.
+                if (coverage.every(c => c.partial[tag])) continue;
                 if (idx.length > 1) return new Set();
                 candidates.add(idx[0]);
             }
@@ -3924,7 +3949,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 count++;
                 q.options.forEach(o => { o.hasStar = o.prefixStar || /(?:\s\*|\(\*\))\s*$/.test(o.text) || /^\(\*\)/.test(o.text); });
                 const hasStar = q.options.some(o => o.hasStar);
-                const tagged = hasStar ? new Set() : decideTagAnswers(q.options.map(o => o.raw), q.trueFalse);
+                // Chỉ tính định dạng của dòng đầu phương án khi dòng đó đã có nội dung: dòng nối tiếp có thể là lời giải tô màu
+                // bị gắn nhầm ("Giải: Ta có…" chữ đỏ làm phương án D thành đáp án).
+                const formatRaw = o => (stripFormattingTags(o.firstRaw || o.raw).replace(OPTION_PREFIX_REGEX, '').trim() ? (o.firstRaw || o.raw) : o.raw);
+                const tagged = hasStar ? new Set() : decideTagAnswers(q.options.map(formatRaw), q.trueFalse);
                 out.push(`${q.trueFalse ? 'câu hỏi đúng sai: ' : ''}Câu ${q.number}:${q.stem[0] ? ' ' + q.stem[0] : ''}`);
                 out.push(...q.stem.slice(1));
                 q.options.forEach((o, i) => {
@@ -3983,7 +4011,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         question.options = [];
                     }
                     const starNextToLetter = !!m && /\*/.test(m[0].replace(/^\*+\s*/, ''));
-                    question.options.push({ raw, text, letter: rawLetter.toUpperCase(), rawLetter, colon, lines: [plain], prefixStar: /^\*(?!\*)/.test(plain) || starNextToLetter });
+                    question.options.push({ raw, firstRaw: raw, text, letter: rawLetter.toUpperCase(), rawLetter, colon, lines: [plain], prefixStar: /^\*(?!\*)/.test(plain) || starNextToLetter });
                 } else if (label === 'noi_dung_phuong_an') {
                     const last = question.options[question.options.length - 1];
                     last.text += ' ' + plain;
