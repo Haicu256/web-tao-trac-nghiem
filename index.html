@@ -231,7 +231,8 @@
         }
         .tf-statement:hover { background: var(--hover-bg); }
         .tf-prefix { font-weight: bold; color: var(--title-color); min-width: 24px; }
-        .tf-text { flex: 1; overflow-wrap: break-word; word-break: break-word; }
+        /* Độ rộng gốc 200px (không phải 0): màn hình hẹp thì ô Đúng/Sai xuống dòng dưới, chữ không bị ép thành cột hẹp. */
+        .tf-text { flex: 1 1 200px; overflow-wrap: break-word; word-break: break-word; }
         .tf-checkbox-group {
             display: flex;
             gap: 12px;
@@ -486,6 +487,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         let convertedContent = '';
         let sourceText = '';
         let sourceTitle = '';
+        // Bài đang làm được lưu vào sessionStorage (không phải localStorage: máy phòng thực hành dùng chung thì bài dở của
+        // người trước không hiện ra cho người sau) để tải lại trang giữa chừng không mất bài.
+        const PROGRESS_KEY = 'quizProgress';
+        let quizMode = 'immediate';
+        let quizSubmitted = false;
+        let restoringQuiz = false;
         let convertedTitle = '';
 
         const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
@@ -705,10 +712,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
         function scrollToGuide() { UI.usageGuide.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
-        function goHome() {
+        function isQuizInProgress() {
             const hasActualAnswer = Object.values(selectedAnswers).some(v => typeof v === 'number' || (v && typeof v === 'object' && Object.values(v).some(s => s && (s.dung || s.sai))));
-            const isInProgress = finalQuestions.length > 0 && hasActualAnswer && UI.resultBox.style.display !== 'block';
-            if (isInProgress) {
+            return finalQuestions.length > 0 && hasActualAnswer && UI.resultBox.style.display !== 'block';
+        }
+
+        function goHome() {
+            if (isQuizInProgress()) {
                 showModal({
                     icon: '🏠',
                     title: 'Về trang chủ?',
@@ -737,6 +747,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.fileInput.value = '';
             closeConvertResult();
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = {};
+            quizSubmitted = false;
+            clearQuizProgress();
             window._loadedQuestions = [];
             sourceText = '';
             sourceTitle = '';
@@ -2332,6 +2344,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                                 const resultEl = document.getElementById(`tf-result-${qIndex}-${optIndex}`);
                                 resultEl.innerHTML = '';
                             }
+                            saveQuizProgress();
                         };
 
                         cbDung.addEventListener('change', handleCheck);
@@ -2426,6 +2439,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 clickedBtn.classList.add('selected');
                 selectedAnswers[qIndex] = oIndex;
             }
+            saveQuizProgress();
         }
 
         function getTFPoints(correctCount, totalCount = 4) {
@@ -2493,13 +2507,20 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             }
         }
 
-        function startQuizNow() {
+        // Màn hình làm bài (dùng chung cho bắt đầu mới và khôi phục sau khi tải lại trang): dùng finalQuestions và quizMode.
+        function showQuiz() {
             clearTimeout(immediateResultTimer);
             UI.footer.style.display = 'none';
             UI.freeMessage.style.display = 'none';
             UI.usageGuide.style.display = 'none';
             showMusicButton();
+            UI.configSection.style.display = 'none';
+            selectedAnswers = {};
+            answeredCount = {};
+            renderQuiz(quizMode);
+        }
 
+        function startQuizNow() {
             const viewMode = document.querySelector('input[name="viewMode"]:checked')?.value || 'immediate';
             const isShuffleQ = document.getElementById('shuffleQuestions')?.checked ?? true;
             const isShuffleO = document.getElementById('shuffleOptions')?.checked ?? true;
@@ -2524,11 +2545,76 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 });
             }
 
-            UI.configSection.style.display = 'none';
-            selectedAnswers = {};
-            answeredCount = {};
-            renderQuiz(viewMode);
+            quizMode = viewMode;
+            quizSubmitted = false;
+            showQuiz();
             scrollToTop();
+            saveQuizProgress();
+        }
+
+        function saveQuizProgress() {
+            if (restoringQuiz || finalQuestions.length === 0) return;
+            try {
+                sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ at: location.pathname + location.search, text: sourceText, title: sourceTitle, mode: quizMode, submitted: quizSubmitted, finalQuestions, selectedAnswers }));
+            } catch (e) { /* hết chỗ hoặc bị chặn: chỉ mất khả năng khôi phục, bài vẫn làm bình thường */ }
+        }
+
+        function clearQuizProgress() {
+            try { sessionStorage.removeItem(PROGRESS_KEY); } catch (e) { }
+        }
+
+        // Bài đã lưu chỉ dùng khi đủ dạng và đúng địa chỉ trang (mở link chia sẻ khác thì không dùng bài của đề khác).
+        function readQuizProgress(raw, at) {
+            let s;
+            try { s = JSON.parse(raw); } catch (e) { return null; }
+            if (!s || s.at !== at || typeof s.text !== 'string' || !s.selectedAnswers || typeof s.selectedAnswers !== 'object'
+                || !Array.isArray(s.finalQuestions) || s.finalQuestions.length === 0
+                || !s.finalQuestions.every(q => q && Array.isArray(q.options))) return null;
+            return s;
+        }
+
+        async function restoreQuizProgress() {
+            let raw = null;
+            try { raw = sessionStorage.getItem(PROGRESS_KEY); } catch (e) { }
+            const s = readQuizProgress(raw, location.pathname + location.search);
+            if (!s) return false;
+            const id = (new URLSearchParams(location.search).get('s') || '').trim();
+            // Dựng lại đề từ văn bản gốc như khi mở link chia sẻ; thứ tự câu và phương án đã trộn lấy từ bản đã lưu.
+            if (!parseQuizData(s.text, SHARE_ID_REGEX.test(id) ? id : null, s.title || '') || originalQuestions.length !== s.finalQuestions.length) {
+                clearQuizProgress();
+                return false;
+            }
+            restoringQuiz = true;
+            try {
+                if (questionsHaveMath(originalQuestions)) {
+                    try { await ensureKatex(); } catch (e) { }
+                }
+                finalQuestions = s.finalQuestions;
+                quizMode = s.mode === 'end' ? 'end' : 'immediate';
+                document.getElementById(quizMode === 'end' ? 'viewModeEnd' : 'viewModeImmediate').checked = true;
+                showQuiz();
+                // Chọn lại từng đáp án bằng chính đường xử lý khi bấm, nên màu đúng/sai và khoá câu đã trả lời hiện lại như cũ.
+                finalQuestions.forEach((q, qIndex) => {
+                    const chosen = s.selectedAnswers[qIndex];
+                    if (chosen === undefined || chosen === null) return;
+                    if (q.type === 'true_false') {
+                        for (const [optIndex, state] of Object.entries(chosen)) {
+                            for (const type of ['dung', 'sai']) {
+                                const cb = state && state[type] ? document.getElementById(`tf-${qIndex}-${optIndex}-${type}`) : null;
+                                if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+                            }
+                        }
+                    } else {
+                        const btn = UI.quizContainer.querySelectorAll(`#qbox-${qIndex} .option-btn`)[chosen];
+                        if (btn) handleSelection(btn, btn.parentElement, qIndex, chosen, quizMode);
+                    }
+                });
+                if (s.submitted) forceSubmit();
+            } finally {
+                restoringQuiz = false;
+            }
+            saveQuizProgress();
+            return true;
         }
 
         function submitQuiz() {
@@ -2624,6 +2710,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.resultBox.style.display = 'block';
             UI.actionSection.style.display = 'none';
             UI.retryBtn.style.display = 'inline-block';
+            quizSubmitted = true;
+            saveQuizProgress();
             scrollToTop();
         }
 
@@ -2636,6 +2724,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.configSection.style.display = 'block';
             UI.quizContainer.innerHTML = '';
             UI.actionSection.style.display = 'none';
+            quizSubmitted = false;
+            clearQuizProgress();
             finalQuestions = [];
             selectedAnswers = {};
             answeredCount = {};
@@ -4671,7 +4761,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 showToast('Không mở được đề: ' + err.message, 6000);
             }
         }
-        loadSharedQuiz();
+        // Đang làm dở mà đóng tab hay rời trang thì trình duyệt hỏi lại (tải lại trang thì bài vẫn được khôi phục).
+        window.addEventListener('beforeunload', e => {
+            if (isQuizInProgress()) { e.preventDefault(); e.returnValue = ''; }
+        });
+        restoreQuizProgress()
+            .catch(err => { console.error(err); restoringQuiz = false; return false; })
+            .then(restored => { if (!restored) loadSharedQuiz(); });
     </script>
 </body>
 </html>

@@ -58,6 +58,7 @@ function makeBrowser() {
         body: fakeElement('body'),
     };
     const storage = new Map();
+    const sessionStore = new Map();
     const browser = {
         document,
         console,
@@ -74,11 +75,14 @@ function makeBrowser() {
         history: { replaceState() {} },
         navigator: {},
         localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)) },
+        sessionStorage: { getItem: k => sessionStore.get(k) ?? null, setItem: (k, v) => sessionStore.set(k, String(v)), removeItem: k => sessionStore.delete(k) },
+        // Ghi lại hàm xử lý theo tên sự kiện (ví dụ beforeunload) để test gọi thử.
+        listeners: {},
         matchMedia: () => ({ matches: false, addEventListener() {} }),
         requestAnimationFrame: cb => cb(),
         scrollTo() {},
         scrollY: 0,
-        addEventListener() {},
+        addEventListener(type, fn) { browser.listeners[type] = fn; },
     };
     browser.window = browser;
     return browser;

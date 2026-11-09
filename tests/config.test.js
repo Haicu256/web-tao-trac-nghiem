@@ -62,3 +62,8 @@ test('regex có \\p{L} trong index.html đều có cờ u (thiếu cờ u thì \
     const missing = [...scripts.matchAll(literal)].filter(m => /\\[pP]\{/.test(m[2]) && !/[uv]/.test(m[3])).map(m => m[0].trim());
     assert.deepEqual(missing, []);
 });
+
+test('ý đúng/sai: chữ có độ rộng gốc > 0 để ô Đúng/Sai xuống dòng dưới trên màn hình hẹp (điện thoại: chữ từng bị ép thành cột 100px)', () => {
+    const rule = html.match(/\.tf-text\s*\{([^}]*)\}/)?.[1] || '';
+    assert.match(rule, /flex:\s*1\s+1\s+\d+px/);
+});
