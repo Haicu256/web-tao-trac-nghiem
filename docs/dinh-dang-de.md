@@ -3147,6 +3147,53 @@ câu 1: B
 câu 1 phương án C: $a*b$
 ```
 
+### Chữ cái phương án ghi hai lần ("A. A. Huế", "B. B. Hà Nội") chỉ giữ một lần
+Đề xuất từ trang thi trực tuyến hay ghi chữ cái hai lần. Chỉ bỏ lần thứ hai khi từ hai phương án trở lên của câu cùng bị
+và chữ trùng chữ của phương án; một phương án lẻ như "A. A. Edison" giữ nguyên.
+```de
+Câu 1: Thủ đô của Việt Nam là gì?
+A. A. Huế
+B. B. Hà Nội
+C. C. Đà Nẵng
+D. D. Cần Thơ
+Đáp án: B
+Câu 2: Ai phát minh ra bóng đèn?
+A. A. Edison
+B. Tesla
+C. Newton
+D. Einstein
+Đáp án: A
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án A: Huế
+câu 1 phương án D: Cần Thơ
+câu 2: A
+câu 2 phương án A: A. Edison
+```
+
+### Đơn vị giây "1 s", "2 s" trong lời giải không phải đáp án Đúng/Sai của ý 1, ý 2
+Cặp "số + chữ s" chỉ là đáp án khi cả dòng là dòng đáp án ("Đáp án: 1 đ 2 s 3 đ 4 s"). Trong câu lời giải có chữ khác thì bỏ qua.
+```de
+câu hỏi đúng sai: Câu 1: Vật rơi tự do. Xét các phát biểu:
+a) Rơi trong 1 giây
+b) Rơi trong 2 giây
+c) Rơi trong 3 giây
+d) Rơi trong 4 giây
+Lời giải: ta có 1 s + 2 s + 3 s + 4 s = 10 s.
+câu hỏi đúng sai: Câu 2: Xét các số
+a) 2 là số chẵn
+b) 3 là số chẵn
+c) 4 là số chẵn
+d) 5 là số chẵn
+Đáp án: 1 đ 2 s 3 đ 4 s
+```
+```ket-qua
+số câu: 1
+câu 1: ĐSĐS
+```
+
 ### Công thức trong câu đúng/sai
 ```de
 câu hỏi đúng sai: Câu 1: Cho hàm số $y = x^{3} - 3x$.
@@ -3193,6 +3240,12 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   - Chữ màu chỉ phủ một phần phương án (chữ cái không tô, sau đáp án có ghi chú không tô) thì không coi là đáp án.
   - Dòng quảng cáo dính trước tiêu đề (`TÀI LIỆU ĐƯỢC CHIA SẺ TẠI … ĐÁP ÁN`): bộ gắn nhãn dự phòng không thấy bảng
     đáp án (AI thì thấy).
+- Phương án nhiều đoạn cách nhau **dòng trống**: đoạn sau dòng trống được xem là phần dẫn của câu kế tiếp (xem "Đoạn văn
+  sau dòng trống thuộc về câu kế tiếp"). Bỏ dòng trống giữa các đoạn của phương án.
+- Câu tổ hợp viết hai lượt A–D liền nhau (lượt đầu là các ý, lượt sau là "A. B,C", "B. A,B"…) chưa đọc: câu bị bỏ và báo
+  thiếu đáp án. Gộp các ý vào đề bài (bỏ chữ A–D đầu dòng) hoặc đánh số các ý bằng 1, 2, 3.
+- Đáp án Đúng/Sai viết chữ **hoa** ngay sau số trong lời giải ("B = 3 T", "C = 2 F" với T, F là tesla, fara) vẫn có thể bị
+  đọc là ý Đúng/Sai; chữ thường ("2 s", "1 đ") thì đã bỏ qua khi dòng còn chữ khác.
 - PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font VNI viết đủ dấu (`xeùt xöû`) không đọc
   được; dùng file Word gốc bằng Unicode. Font TCVN3 (`C©u 1`) và chữ `ñ`, `ð` thay cho đ, Đ thì đã đổi được.
 - Đáp án để ở file riêng: dán bảng đáp án vào cuối đề rồi mới tạo đề.

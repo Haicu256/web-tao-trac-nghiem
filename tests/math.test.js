@@ -184,3 +184,16 @@ test('renderMathInHtml vẽ được hai công thức viết liền nhau "$a$$b$
     const out = render('Tính $a$$b$ nhé');
     assert.equal((out.match(/class="katex"/g) || []).length, 2, out);
 });
+
+test('renderMathInHtml vẽ công thức "$$…$$" thành một công thức hiển thị, không vẽ lại HTML của KaTeX', () => {
+    const out = render('Cho $$x + 1$$ nhé');
+    assert.equal((out.match(/class="katex-display"/g) || []).length, 1, out.slice(0, 300));
+    assert.ok(out.length < 8000, `HTML phình to: ${out.length} byte`);
+    assert.doesNotMatch(out, /<mi>s<\/mi><mi>p<\/mi><mi>a<\/mi><mi>n<\/mi>/);
+});
+
+test('renderMathInHtml: "$$…$$" và "$…$" trong cùng một câu đều được vẽ', () => {
+    const out = render('Với $a$ thì $$a^{2}+1$$ và $b$');
+    assert.equal((out.match(/class="katex"/g) || []).length, 3, out.slice(0, 300));
+    assert.equal((out.match(/class="katex-display"/g) || []).length, 1);
+});

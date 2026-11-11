@@ -195,3 +195,12 @@ test('nộp bài thì lưu trạng thái đã nộp để tải lại vẫn th�
     assert.deepEqual(s.selectedAnswers, { 0: 1 });
     resetProgressState();
 });
+
+test('hai phương án cách nhau bằng khoảng trắng Unicode (em-space, cách ngang rộng) vẫn được tách', () => {
+    for (const gap of ['  ', '　　', '  ', '  ']) {
+        const p = app.parse(`Câu 1: Thủ đô của Việt Nam?\nA. Huế${gap}*B. Hà Nội${gap}C. Đà Nẵng${gap}D. Cần Thơ`);
+        assert.equal(p.ok, true, JSON.stringify(gap));
+        assert.equal(p.questions[0].options.length, 4, JSON.stringify(gap));
+        assert.equal(p.questions[0].options[1].isCorrect, true, JSON.stringify(gap));
+    }
+});

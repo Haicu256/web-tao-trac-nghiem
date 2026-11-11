@@ -570,6 +570,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return markBareOptionLetters(fixLegacyVietnamese((str || '')
                 .normalize('NFC'))
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                // Em-space, c\u00E1ch ngang r\u1ED9ng\u2026 (ch\u00E9p t\u1EEB Word/PDF) nh\u01B0 d\u1EA5u c\u00E1ch th\u01B0\u1EDDng, \u0111\u1EC3 "A. x\u2423\u2423B. y" v\u1EABn t\u00E1ch \u0111\u01B0\u1EE3c.
+                .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
                 .replace(/\r\n/g, '\n')
                 .replace(/\r/g, '\n')
                 // Dấu toàn chiều rộng (bộ gõ Trung/Nhật) như dấu thường: "A．", "（*）".
@@ -1245,7 +1247,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 let assigned = 0;
                 let clauses = 0;
                 let listedTrue = false;
+                // Dòng có chữ khác ngoài các cặp "ý + Đ/S" (lời giải): "1 s + 2 s" là đơn vị giây, không phải ý 1 Sai, ý 2 Sai.
+                // Chỉ bỏ cặp "số/chữ + dấu cách + một chữ thường"; dòng đáp án thuần như "1 đ 2 s 3 đ 4 s" vẫn đọc.
+                const leftover = clean.replace(clauseRegex, ' ').replace(/(?:các\s*ý|các\s*câu|ý|câu)(?![\p{L}])\s*\d*/giu, ' ').replace(/[\s,;.:|\-–—()\[\]\/]+/g, '');
                 for (const m of clean.matchAll(clauseRegex)) {
+                    if (leftover !== '' && /[a-fA-F1-6]\s+[sdtfđ]$/.test(m[0])) continue;
                     clauses++;
                     // "a, c đúng": một mệnh đề liệt kê nhiều ý Đúng (quy ước: các ý còn lại là Sai).
                     if (lettersIn(m[1]).length >= 2 && /^(?:đ|đúng|true|t|d)$/i.test(m[2])) listedTrue = true;
@@ -1257,7 +1263,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     }
                 }
                 if (assigned > 0) {
-                    const leftover = clean.replace(clauseRegex, ' ').replace(/(?:các\s*ý|các\s*câu|ý|câu)(?![\p{L}])\s*\d*/giu, ' ').replace(/[\s,;.:|\-–—()\[\]\/]+/g, '');
                     if (hasKeyword || leftover === '') return { verdicts, assigned, kind: 'clauses', listedTrue: listedTrue && clauses === 1, pure: leftover === '' };
                 }
 
@@ -2126,6 +2131,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
                 const lead = sharedPassage.lines.join('<br>');
                 if (!q.title.startsWith(lead)) q.title = [lead, q.title].filter(Boolean).join('<br>');
+            });
+
+            // "A. A. Huế", "B. B. Hà Nội" (chép từ trang thi trực tuyến): chữ cái ghi hai lần. Chỉ bỏ lần thứ hai khi từ hai
+            // phương án của câu cùng bị và chữ trùng chữ của phương án, nên "A. A. Edison" đứng một mình giữ nguyên.
+            parsedQuestions.forEach(q => {
+                if (!q || q.type === 'true_false') return;
+                const again = q.options.map(o => {
+                    const m = /^([A-Fa-f])\s*[.)]\s+(?=\S)/.exec(o.text || '');
+                    return m && m[1].toUpperCase() === String(o.optLetter || '').toUpperCase() ? m[0].length : 0;
+                });
+                if (again.filter(Boolean).length < 2) return;
+                q.options.forEach((o, i) => { if (again[i]) o.text = o.text.slice(again[i]); });
             });
 
             // Dấu * viết liền cuối phương án ("Hà Nội*") là bằng chứng yếu nhất: chỉ dùng khi câu chưa có đáp án nào khác và
@@ -2999,6 +3016,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         // Không dùng lookbehind (Safari dưới 16.4 không hỗ trợ): bắt luôn ký tự đứng trước "$" rồi trả lại.
         const MATH_SEGMENT_REGEX = /(^|[^\d\\])\$(?=[^\s$])((?:\\\$|[^$])*?[^\s$\\])\$(?!\d)/g;
         const MATH_DETECT_REGEX = new RegExp(MATH_SEGMENT_REGEX.source);
+        const DISPLAY_MATH_REGEX = /(^|[^\d\\$])\$\$(?=[^\s$])((?:\\\$|[^$])*?[^\s$\\])\$\$(?!\d)/g;
         const KATEX_VERSION = '0.18.11';
         const KATEX_BASE_URL = `https://cdnjs.cloudflare.com/ajax/libs/KaTeX/${KATEX_VERSION}/`;
         const KATEX_CSS_SRI = 'sha512-P0yrJ9fZYAz71mx0p68JgoPBpvjXPW2H0m+AXYSzzL9kT6AyDQ9eDQNLfqdjSYgphq4Hi6llKmesa6mdQgZOHw==';
@@ -3007,17 +3025,30 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         function renderMathInHtml(html) {
             if (typeof katex === 'undefined' || !katex || typeof katex.renderToString !== 'function' || !html || !html.includes('$')) return html;
+            const draw = (tex, displayMode) => katex.renderToString(decodeHTMLEntities(tex), { throwOnError: false, strict: 'ignore', trust: false, displayMode });
+            // "$$x$$" vẽ trước và cất đi: nếu để cho lần quét "$…$" thì nó bắt "$x$" bên trong rồi lần quét lại vẽ cả HTML của KaTeX.
+            const shown = [];
+            const withoutDisplay = html.replace(DISPLAY_MATH_REGEX, (whole, lead, tex) => {
+                if (tex.includes('<br>')) return whole;
+                try {
+                    shown.push(draw(tex, true));
+                    return lead + '\u0001' + (shown.length - 1) + '\u0001';
+                } catch (e) {
+                    return whole;
+                }
+            });
             const renderOnce = text => text.replace(MATH_SEGMENT_REGEX, (whole, lead, tex) => {
                 if (tex.includes('<br>')) return whole;
                 try {
-                    return lead + katex.renderToString(decodeHTMLEntities(tex), { throwOnError: false, strict: 'ignore', trust: false });
+                    return lead + draw(tex, false);
                 } catch (e) {
                     return whole;
                 }
             });
             // "$a$$b$": dấu "$" mở của công thức sau đã bị lần quét đầu dùng làm ký tự đứng trước, nên quét lại một lần.
-            const once = renderOnce(html);
-            return html.includes('$$') ? renderOnce(once) : once;
+            const once = renderOnce(withoutDisplay);
+            const out = withoutDisplay.includes('$$') ? renderOnce(once) : once;
+            return out.replace(/\u0001(\d+)\u0001/g, (whole, i) => shown[i]);
         }
 
         function questionsHaveMath(questions) {
