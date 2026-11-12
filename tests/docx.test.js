@@ -146,6 +146,19 @@ test('Số La Mã tự đánh số với w:start rất lớn ghi bằng số th�
     assert.ok(!raw.includes('MMMM'));
 });
 
+test('Bảng ngân hàng câu hỏi trong Word (cột LOẠI ĐÁP ÁN ghi ĐÚNG/SAI, ô mã câu của phương án để trống) đọc được đáp án', async () => {
+    const cell = t => `<w:tc><w:p>${t ? run(t) : ''}</w:p></w:tc>`;
+    const row = (...cells) => `<w:tr>${cells.map(cell).join('')}</w:tr>`;
+    const bank = [['Thủ đô của Việt Nam là gì?', [['Huế', 'SAI'], ['Hà Nội', 'ĐÚNG'], ['Đà Nẵng', 'SAI'], ['Vinh', 'SAI']]],
+        ['Sông nào dài nhất Việt Nam?', [['Sông Hồng', 'SAI'], ['Sông Đà', 'SAI'], ['Sông Mã', 'SAI'], ['Sông Đồng Nai', 'ĐÚNG']]]];
+    const body = '<w:tbl>' + row('MÃ CÂU HỎI', 'NỘI DUNG CÂU HỎI', 'NỘI DUNG ĐÁP ÁN', 'LẦN THI', 'BÀI', 'LOẠI ĐÁP ÁN')
+        + bank.map(([q, opts], k) => row(String(k + 1), q, '', '1', '2', '') + opts.map(([o, v]) => row('', '', o, '1', '2', v)).join('')).join('')
+        + '</w:tbl>';
+    const r = await convert(body);
+    assert.deepEqual(r.questions.map(answerOf), ['B', 'D']);
+    assert.deepEqual([...r.questions[1].options].map(o => plain(o.text)), ['Sông Hồng', 'Sông Đà', 'Sông Mã', 'Sông Đồng Nai']);
+});
+
 test('Ý a) b) c) d) tự đánh số của Word bắt đầu lại ở mỗi câu "câu hỏi đúng sai: Câu N"', async () => {
     const body = [1, 2].map(n => para(run(`câu hỏi đúng sai: Câu ${n}: Xét ${n}`)) + ['một', 'hai', 'ba', 'bốn'].map(t => listPara(1, run(t))).join('')).join('')
         + para(run('BẢNG ĐÁP ÁN')) + para(run('Câu 1: ĐSĐS')) + para(run('Câu 2: SĐSĐ'));

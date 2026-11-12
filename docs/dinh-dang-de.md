@@ -606,6 +606,34 @@ câu 2: C
 câu 2 phương án C: *p
 ```
 
+### Bảng ngân hàng câu hỏi có cột "LOẠI ĐÁP ÁN" ghi ĐÚNG/SAI cho từng phương án (chép từ bảng Word)
+Ngân hàng đề của trường: hàng tiêu đề có cột câu hỏi, cột đáp án và cột ĐÚNG/SAI; mỗi câu một hàng đề bài rồi mỗi phương
+án một hàng (phương án không có chữ A, B, C, D). Ô mã câu của hàng phương án có thể bỏ trống. Phương án ghi ĐÚNG là đáp án.
+Chỉ đọc kiểu này khi có hàng tiêu đề, để không đụng bảng đáp án câu đúng/sai. Word đôi khi dính một hàng rỗng vào đầu
+hàng sau (6 ô trống trước "2"); hàng rỗng đó bị bỏ.
+```de
+MÃ CÂU HỎI	NỘI DUNG CÂU HỎI	NỘI DUNG ĐÁP ÁN	LẦN THI (HỌC PHẦN THI)	NỘI DUNG TRONG BÀI HỌC NÀO (SỐ THỨ TỰ BÀI HỌC)	LOẠI ĐÁP ÁN
+1	Bạo loạn lật đổ gồm có những hình thức nào?		1	2
+1		Bạo loạn chính trị, bạo loạn vũ trang, kết hợp bạo loạn chính trị với vũ trang.	1	2	ĐÚNG
+1		Bạo loạn vũ trang, bạo loạn chính trị.	1	2	SAI
+1		Bạo loạn vũ trang kết hợp với gây rối.	1	2	SAI
+1		Bạo loạn chính trị kết hợp với gây rối.	1	2	SAI
+						2	Nhiệm vụ bảo vệ an ninh chính trị có mấy nhiệm vụ?		2	7
+		02 nhiệm vụ.	2	7	SAI
+		04 nhiệm vụ.	2	7	SAI
+		05 nhiệm vụ.	2	7	SAI
+		Cả 03 đáp án trên.	2	7	ĐÚNG
+```
+```ket-qua
+số câu: 2
+câu 1: A
+câu 1 tiêu đề: Bạo loạn lật đổ gồm có những hình thức nào?
+câu 1 phương án B: Bạo loạn vũ trang, bạo loạn chính trị.
+câu 2: D
+câu 2 tiêu đề: Nhiệm vụ bảo vệ an ninh chính trị có mấy nhiệm vụ?
+câu 2 phương án D: Cả 03 đáp án trên.
+```
+
 ## 5. Đáp án ghi ngay sau câu hỏi
 
 ### Dòng "Đáp án: B"

@@ -569,8 +569,49 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return text;
         }
 
+        // Bảng ngân hàng câu hỏi chép từ Word ("MÃ CÂU HỎI | NỘI DUNG CÂU HỎI | NỘI DUNG ĐÁP ÁN | … | LOẠI ĐÁP ÁN"): mỗi câu
+        // một hàng đề bài rồi mỗi phương án một hàng, cột cuối ghi ĐÚNG/SAI. Viết lại thành "Câu N: …", "A. …", "*B. …" để
+        // parser và bộ gắn nhãn đọc như đề thường; đáp án lấy từ cột ĐÚNG/SAI của file. Chỉ khi có hàng tiêu đề (để không
+        // đụng bảng đáp án câu đúng/sai) và chạy trước khi bỏ khoảng trắng đầu dòng, nên ô trống vẫn giữ đúng vị trí cột.
+        function readQuestionBankTable(text) {
+            const cellsOf = line => stripFormattingTags(line).split('\t').map(c => c.trim());
+            const isQuestionHead = c => /câu\s*hỏi/iu.test(c) && !/^mã/iu.test(c);
+            const isOptionHead = c => /đáp\s*án|phương\s*án/iu.test(c) && !/loại|đúng|sai/iu.test(c);
+            const lines = text.split('\n');
+            const h = lines.findIndex(l => l.includes('\t') && cellsOf(l).some(isQuestionHead) && cellsOf(l).some(isOptionHead));
+            if (h < 0) return text;
+            const head = cellsOf(lines[h]);
+            const qCol = head.findIndex(isQuestionHead);
+            const aCol = head.findIndex(isOptionHead);
+            const vCol = head.findIndex(c => /loại\s*đáp\s*án|đúng\s*\/?\s*sai/iu.test(c));
+            const out = lines.slice(0, h);
+            let n = 0, opt = 0, marked = 0;
+            for (const line of lines.slice(h + 1)) {
+                if (!line.includes('\t')) {
+                    out.push(line);
+                    continue;
+                }
+                const cells = cellsOf(line);
+                // Hàng rỗng bị Word dính vào đầu hàng sau ("⇥⇥⇥⇥⇥⇥4⇥Một trong…"): bỏ nguyên các hàng rỗng đó.
+                while (cells.length > head.length && cells.slice(0, head.length).every(c => c === '')) cells.splice(0, head.length);
+                if (cells.join('|') === head.join('|')) continue; // tiêu đề lặp lại ở mỗi trang
+                if (cells[qCol]) {
+                    n++;
+                    opt = 0;
+                    out.push(`Câu ${n}: ${cells[qCol]}`);
+                } else if (cells[aCol] && n > 0 && opt < 6) {
+                    const correct = /^đúng$/iu.test((vCol >= 0 ? cells[vCol] : cells.filter(Boolean).pop()) || '');
+                    if (correct) marked++;
+                    out.push(`${correct ? '*' : ''}${'ABCDEF'[opt++]}. ${cells[aCol]}`);
+                } else {
+                    out.push(line);
+                }
+            }
+            return marked > 0 ? out.join('\n') : text;
+        }
+
         function cleanInputText(str) {
-            return markBareOptionLetters(fixLegacyVietnamese((str || '')
+            return markBareOptionLetters(readQuestionBankTable(fixLegacyVietnamese((str || '')
                 .normalize('NFC'))
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 // Em-space, cách ngang rộng… (chép từ Word/PDF) như dấu cách thường, để "A. x  B. y" vẫn tách được.
@@ -607,7 +648,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/^[ \t|]*(?:câu[ \t]*)?(\d+)[ \t|]+(a\)[ \t|]*(?:đúng|sai|đ|s)(?:[ \t|]*\n[ \t|]*[b-f]\)[ \t|]*(?:đúng|sai|đ|s))+)[ \t|]*$/gimu,
                     (m, n, rows) => `Câu ${n}: ${rows.replace(/[\s|]+/g, ' ').trim()}`)
                 .replace(/^[ \t|]*câu(?:[ \t|]+[a-f])+[ \t|]*((?:\n[ \t|]*\d+(?:[ \t|]+(?:đúng|sai|đ|s))+[ \t|]*)+)$/gimu,
-                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n')));
+                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n'))));
         }
 
         function escapeHTML(str) {
