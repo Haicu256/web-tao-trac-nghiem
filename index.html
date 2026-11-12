@@ -555,8 +555,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         function fixLegacyVietnamese(text) {
             const legacy = (text.match(TCVN3_ONLY_REGEX) || []).length;
             const viet = (text.match(VIET_UNICODE_REGEX) || []).length;
+            // TCVN3 luôn có ký tự "©", "¸", "¨"… kẹp giữa hai chữ cái ("C©u", "c¸c", "n¨m"); tiếng Bồ Đào Nha, Đức chỉ có
+            // ã, ç, ö, ü (đề "São…", "Gesundheitsförderung" từng bị đổi nát thành "Sóo…" và mất hết câu).
+            const inWord = (text.match(/[A-Za-z][¡-¿−][A-Za-z]/g) || []).length;
             // Cả văn bản rõ là TCVN3 thì đổi; dòng đã có chữ Việt Unicode (tiêu đề gõ sau bằng Unicode) giữ nguyên.
-            if (legacy >= 5 && legacy > 3 * viet) {
+            if (legacy >= 5 && legacy > 3 * viet && inWord >= 3) {
                 return text.split('\n').map(line => (/[ăđơưĩũạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/iu.test(line) ? line
                     : line.replace(/[^\x00-\x7f]/gu, c => TCVN3_MAP[c] || c))).join('\n');
             }
@@ -570,7 +573,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return markBareOptionLetters(fixLegacyVietnamese((str || '')
                 .normalize('NFC'))
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
-                // Em-space, c\u00E1ch ngang r\u1ED9ng\u2026 (ch\u00E9p t\u1EEB Word/PDF) nh\u01B0 d\u1EA5u c\u00E1ch th\u01B0\u1EDDng, \u0111\u1EC3 "A. x\u2423\u2423B. y" v\u1EABn t\u00E1ch \u0111\u01B0\u1EE3c.
+                // Em-space, cách ngang rộng… (chép từ Word/PDF) như dấu cách thường, để "A. x  B. y" vẫn tách được.
                 .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
                 .replace(/\r\n/g, '\n')
                 .replace(/\r/g, '\n')
@@ -883,6 +886,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         const TF_VERDICT_PART_REGEX = /^(?:\(?[a-dA-D]\)?|[a-dA-D]\s*[.:\/\-–—])\s*(?:đúng|sai|đ|s|true|false|t|f)\s*[,;.]?$/iu;
         function isTFAnswerRow(parts) {
             const rest = parts.filter(p => !/^(?:câu|bài|question|q)?\s*\d+\s*[:.)]?$/iu.test(stripFormattingTags(p).trim()));
+            // "A. Đúng⇥B. Sai" không có số câu là hai phương án của câu trắc nghiệm (đề Y Dược), không phải hàng đáp án.
+            if (rest.length === parts.length && rest.length === 2 && /^\*?A/.test(stripFormattingTags(rest[0]).trim())
+                && /^\*?B/.test(stripFormattingTags(rest[1]).trim())) return false;
             return rest.length >= 2 && rest.every(p => TF_VERDICT_PART_REGEX.test(stripFormattingTags(p).trim()));
         }
 
@@ -1184,8 +1190,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 while ((m = mcRegex.exec(tableText)) !== null) {
                     const rawKey = m[1];
                     const qKey = rawKey.includes('.') ? rawKey : parseInt(rawKey, 10);
-                    if (!map.has(qKey)) map.set(qKey, m[2].toUpperCase());
-                    if (!map.has(String(qKey))) map.set(String(qKey), m[2].toUpperCase());
+                    // "Câu 1: A, C", "2. B và D": một câu nhiều đáp án; trước đây chỉ lấy chữ đầu nên chọn C bị chấm sai.
+                    const more = tableText.slice(mcRegex.lastIndex).match(/^(?:[^\S\r\n]*(?:,|\+|&|và|and)[^\S\r\n]*\(?[a-fA-F]\)?(?![\p{L}\d]))+/iu);
+                    const letters = (m[2] + (more ? more[0].replace(/và|and/gi, ' ').replace(/[^a-fA-F]/g, '') : '')).toUpperCase();
+                    if (!map.has(qKey)) map.set(qKey, letters);
+                    if (!map.has(String(qKey))) map.set(String(qKey), letters);
                 }
                 while ((m = compactRegex.exec(tableText)) !== null) {
                     const rawKey = m[1];
@@ -2095,8 +2104,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     // Câu có số thì chỉ tra đúng số đó; chỉ câu không đánh số mới tra theo thứ tự.
                     const lookup = m => m.get(targetNum) || m.get(String(targetNum)) || (q.numbered ? undefined : m.get(idx + 1));
                     if (q.type !== 'true_false' && !q.options.some(o => o.isCorrect)) {
-                        const ansLetter = lookup(map);
-                        if (ansLetter) {
+                        const ansLetters = lookup(map);
+                        for (const ansLetter of ansLetters || '') {
                             const optIdx = optionIndexOf(q, ansLetter);
                             if (optIdx >= 0 && optIdx < q.options.length) {
                                 q.options[optIdx].isCorrect = true;

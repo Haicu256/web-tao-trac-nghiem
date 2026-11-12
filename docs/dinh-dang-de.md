@@ -3147,6 +3147,77 @@ câu 1: B
 câu 1 phương án C: $a*b$
 ```
 
+### Câu hai phương án "A. Đúng⇥B. Sai" cùng dòng là câu trắc nghiệm, không phải dòng đáp án đúng/sai
+Dòng chỉ có "A. Đúng" và "B. Sai" (chữ A, B hoa, không có số câu) là hai phương án. Dòng đáp án đúng/sai có số câu
+("Câu 2⇥a) Đ⇥b) S") hoặc từ ba ý trở lên.
+```de
+Câu 1: Hà Nội là thủ đô của Việt Nam?
+A. Đúng		B. Sai
+Câu 2: Huế là thủ đô của Việt Nam?
+A. Đúng		B. Sai
+ĐÁP ÁN
+1.A 2.B
+```
+```ket-qua
+số câu: 2
+câu 1 loại: trắc nghiệm
+câu 1: A
+câu 1 phương án B: Sai
+câu 2: B
+```
+
+### Bảng đáp án ghi nhiều chữ cho một câu ("Câu 1: A, C", "2. B và D") đánh dấu đủ các chữ
+```de
+Câu 1: Số nào là số chẵn?
+A. 2
+B. 3
+C. 4
+D. 5
+Câu 2: Số nào là số lẻ?
+A. 2
+B. 3
+C. 4
+D. 5
+Câu 3: Số nào bằng 2 + 2?
+A. 3
+B. 4
+C. 5
+D. 6
+Đáp án:
+Câu 1: A, C
+Câu 2: B và D
+Câu 3: B
+```
+```ket-qua
+số câu: 3
+câu 1: A,C
+câu 2: B,D
+câu 3: B
+```
+
+### Đề tiếng nước ngoài có chữ ã, ç, ö, ü không bị đổi như font TCVN3
+Chữ TCVN3 luôn có ký tự như "©", "¸", "¨" nằm giữa chữ cái ("C©u", "c¸c", "n¨m"); tiếng Bồ Đào Nha, Đức không có.
+```de
+Câu 1: São exemplos de Associações de Gerenciamento de Projetos
+A. PMI e IPMA
+*B. Ação e Gestão
+C. Seleção e Priorização
+D. Governança
+Câu 2: Was ist Gesundheit? Zustand für die Bevölkerung
+*A. Ein dynamischer Prozess für Gesundheitsförderung
+B. Ein Prozess, der sich nicht verändert
+C. Prävention ist überflüssig
+D. Größe
+```
+```ket-qua
+số câu: 2
+câu 1 tiêu đề: São exemplos de Associações de Gerenciamento de Projetos
+câu 1: B
+câu 1 phương án C: Seleção e Priorização
+câu 2: A
+câu 2 phương án D: Größe
+```
+
 ### Chữ cái phương án ghi hai lần ("A. A. Huế", "B. B. Hà Nội") chỉ giữ một lần
 Đề xuất từ trang thi trực tuyến hay ghi chữ cái hai lần. Chỉ bỏ lần thứ hai khi từ hai phương án trở lên của câu cùng bị
 và chữ trùng chữ của phương án; một phương án lẻ như "A. A. Edison" giữ nguyên.
@@ -3246,6 +3317,8 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   thiếu đáp án. Gộp các ý vào đề bài (bỏ chữ A–D đầu dòng) hoặc đánh số các ý bằng 1, 2, 3.
 - Đáp án Đúng/Sai viết chữ **hoa** ngay sau số trong lời giải ("B = 3 T", "C = 2 F" với T, F là tesla, fara) vẫn có thể bị
   đọc là ý Đúng/Sai; chữ thường ("2 s", "1 đ") thì đã bỏ qua khi dòng còn chữ khác.
+- Cả dòng phương án in nghiêng kiểu Markdown (`*B. Hà Nội*`): dấu `*` đầu dòng được hiểu là đáp án, dấu `*` cuối còn
+  lại trong chữ phương án. Dùng `*B. Hà Nội` hoặc `**B. Hà Nội**`.
 - PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font VNI viết đủ dấu (`xeùt xöû`) không đọc
   được; dùng file Word gốc bằng Unicode. Font TCVN3 (`C©u 1`) và chữ `ñ`, `ð` thay cho đ, Đ thì đã đổi được.
 - Đáp án để ở file riêng: dán bảng đáp án vào cuối đề rồi mới tạo đề.
