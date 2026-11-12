@@ -44,6 +44,9 @@ export default {
             if (!isAllowedAsset) {
                 return new Response('Not Found', { status: 404 });
             }
+            if (request.method !== 'GET' && request.method !== 'HEAD') {
+                return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+            }
             const res = await env.ASSETS.fetch(request);
             const headers = new Headers(res.headers);
             headers.set('X-Frame-Options', 'DENY');

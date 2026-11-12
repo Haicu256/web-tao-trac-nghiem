@@ -331,6 +331,17 @@ test('file tĩnh: chỉ phục vụ danh sách cho phép, kèm header bảo mậ
     assert.equal(home.headers.get('x-frame-options'), 'DENY');
 });
 
+test('file tĩnh: method khác GET, HEAD trả 405 và không chuyển cho ASSETS', async () => {
+    const assets = fakeAssets();
+    for (const [method, p] of [['POST', '/'], ['PUT', '/index.html'], ['DELETE', '/favicon.png']]) {
+        const res = await worker.fetch(new Request(`https://x${p}`, { method }), { ASSETS: assets });
+        assert.equal(res.status, 405, `${method} ${p}`);
+        assert.equal(res.headers.get('allow'), 'GET, HEAD');
+    }
+    assert.deepEqual(assets.served, []);
+    assert.equal((await worker.fetch(new Request('https://x/', { method: 'HEAD' }), { ASSETS: assets })).status, 200);
+});
+
 test('CSP cho phép CSS và font của KaTeX từ cdnjs, không mở thêm gì khác', async () => {
     const res = await worker.fetch(new Request('https://x/'), { ASSETS: fakeAssets() });
     const csp = Object.fromEntries(res.headers.get('content-security-policy').split(';').map(s => s.trim()).filter(Boolean).map(s => {

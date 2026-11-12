@@ -139,6 +139,13 @@ test('Danh sách tự đánh số La Mã của Word ((I), (II), (III)) giữ s�
     assert.ok(raw.includes('(I) Kim loại có ánh kim') && raw.includes('(III) Kim loại mềm hơn phi kim'), raw);
 });
 
+test('Số La Mã tự đánh số với w:start rất lớn ghi bằng số thường, không dựng chuỗi M dài (file cố ý làm treo tab)', async () => {
+    const raw = await fn('extractTextFromFile')(await docx(para(run('Câu 1: Cho các phát biểu sau:')) + listPara(1, run('Kim loại có ánh kim')),
+        { numbering: numbering('upperRoman', '(%1)', [1]).replace('<w:start w:val="1"/>', '<w:start w:val="1000000000"/>') }));
+    assert.ok(raw.includes('(1000000000) Kim loại có ánh kim'), raw.slice(0, 200));
+    assert.ok(!raw.includes('MMMM'));
+});
+
 test('Ý a) b) c) d) tự đánh số của Word bắt đầu lại ở mỗi câu "câu hỏi đúng sai: Câu N"', async () => {
     const body = [1, 2].map(n => para(run(`câu hỏi đúng sai: Câu ${n}: Xét ${n}`)) + ['một', 'hai', 'ba', 'bốn'].map(t => listPara(1, run(t))).join('')).join('')
         + para(run('BẢNG ĐÁP ÁN')) + para(run('Câu 1: ĐSĐS')) + para(run('Câu 2: SĐSĐ'));
