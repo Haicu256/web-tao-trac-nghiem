@@ -754,7 +754,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             originalQuestions = []; finalQuestions = []; selectedAnswers = {}; answeredCount = {};
             quizSubmitted = false;
             clearQuizProgress();
-            window._loadedQuestions = [];
             sourceText = '';
             sourceTitle = '';
             renderQuizTitle();
@@ -2143,12 +2142,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             });
 
             // "A. A. Huế", "B. B. Hà Nội" (chép từ trang thi trực tuyến): chữ cái ghi hai lần. Chỉ bỏ lần thứ hai khi từ hai
-            // phương án của câu cùng bị và chữ trùng chữ của phương án, nên "A. A. Edison" đứng một mình giữ nguyên.
+            // phương án của câu cùng bị, đúng chữ của mình (cả hoa, thường) và dấu chấm: "A. A. Edison" đứng một mình, hay
+            // "A. a) và b)", "B. B) và C)" nhắc tới phát biểu của đề bài, đều giữ nguyên. Không đòi mọi phương án: đề thật
+            // hay sót ("D. tất cả đúng").
             parsedQuestions.forEach(q => {
                 if (!q || q.type === 'true_false') return;
                 const again = q.options.map(o => {
-                    const m = /^([A-Fa-f])\s*[.)]\s+(?=\S)/.exec(o.text || '');
-                    return m && m[1].toUpperCase() === String(o.optLetter || '').toUpperCase() ? m[0].length : 0;
+                    const m = /^([A-Fa-f])\s*\.\s+(?=\S)/.exec(o.text || '');
+                    return m && m[1] === String(o.optLetter || '') ? m[0].length : 0;
                 });
                 if (again.filter(Boolean).length < 2) return;
                 q.options.forEach((o, i) => { if (again[i]) o.text = o.text.slice(again[i]); });
@@ -2231,7 +2232,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 else UI.configSection.prepend(badge);
                 sourceTitle = title;
                 renderQuizTitle();
-                window._loadedQuestions = originalQuestions;
                 return true;
             } else {
                 if (hasMultipleExamCodes) {
@@ -2416,7 +2416,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (totalAnswered === finalQuestions.length) {
                     clearTimeout(immediateResultTimer);
                     immediateResultTimer = setTimeout(() => {
-                        const result = calculateScoreImmediate();
+                        const result = calculateScore();
                         UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
                         UI.resultBox.style.display = 'block';
                         UI.actionSection.style.display = 'none';
@@ -2452,7 +2452,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (totalAnswered === finalQuestions.length) {
                     clearTimeout(immediateResultTimer);
                     immediateResultTimer = setTimeout(() => {
-                        const result = calculateScoreImmediate();
+                        const result = calculateScore();
                         UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
                         UI.resultBox.style.display = 'block';
                         UI.actionSection.style.display = 'none';
@@ -2509,10 +2509,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             });
             const percentage = total > 0 ? Math.round((earnedPoints / total) * 100) : 0;
             return { points: Math.round(earnedPoints * 100) / 100, total, percentage };
-        }
-
-        function calculateScoreImmediate() {
-            return calculateScore();
         }
 
         let quizStarting = false;
@@ -4484,47 +4480,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             throw lastError || new Error('Không gắn nhãn được.');
         }
 
-        function checkTextHasAnswerHint(text) {
-            if (!text || typeof text !== 'string') return false;
-            text = splitInlineOptions(text.replace(/[\u200B-\u200D\uFEFF]/g, ''));
-            const starHintRe = /^\s*(?:(?:\*(?!\*)\s*|\*{3,}\s*|\*{2}\s*(?!\s*\*{2}))[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|\((?:\*[a-fA-F]\*?|[a-fA-F]\*)\)|\[(?:\*[a-fA-F]\*?|[a-fA-F]\*)\]|\*(?:\([a-fA-F]\)|\[[a-fA-F]\])|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*|[^\s*]\*)\s*$)/im;
-            if (starHintRe.test(text)) return true;
-
-            const answerKeywords = [
-                /(?:^|\n)\s*(?:bảng\s*đáp\s*án|bảng\s*tra\s*cứu\s*đáp\s*án|phần\s*đáp\s*án|answer\s*key|(?:đáp\s*án\s*và\s*)?hướng\s*dẫn\s*(?:chấm|giải)(?:\s*chi\s*tiết)?|lời\s*giải\s*chi\s*tiết)(?!\p{L})/iu,
-                /(?:(?:đáp\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?|chọn(?:\s*(?:đáp|phương)\s*án)?|phương\s*án(?:\s*(?:đúng|cần\s*chọn|chính\s*xác))?)\s*[:.\-–—]\s*(?:[a-fA-F]|\d+[.:\-)–—]?[a-fA-F])|(?:^|\n)\s*(?:đáp\s*án|answer|key)\s*[:.\-–—]?\s*(?:[a-fA-F]|\d+[.:\-)–—]?[a-fA-F]))(?!\p{L})/iu,
-                /(?:[\t|(\[–—\-]\s*(?:đúng|true)(?!\p{L})|(?:đúng|true)\s*[:.\-–—]\s*(?:[a-d](?!\p{L})|\d+)|(?:sai|false)\s*[:.\-–—]\s*(?:[a-d](?!\p{L})|\d+)|(?:^|[^\p{L}\d])\d+\s*[:.\-–—]\s*(?:đúng|sai|true|false)(?!\p{L}))/iu,
-                /(?:(?:^|[^\p{L}\d])(?!(?:nhóm|group|lớp|khối|phòng)\s*)\d+[^\S\r\n]*(?:[:.\-)–—\/|\]][^\S\r\n]*|[ \t]+)[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[^\S\r\n]*(?:[:.\-)–—\/|\]][^\S\r\n]*|[ \t]+)[A-F](?![\p{L}\d])|(?:^|[^\p{L}\d])(?!(?:nhóm|group|lớp|khối|phòng)\s*)\d+[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[A-F](?![\p{L}\d])[\s,;|\/–—\-]+\d+[A-F](?![\p{L}\d]))/iu
-            ];
-            const plainForHint = stripFormattingTags(text);
-            if (starHintRe.test(plainForHint)) return true;
-            if (answerKeywords.some(regex => regex.test(plainForHint))) return true;
-
-            for (const tag of ['U', 'HL', 'CLR']) {
-                const stripOthers = new RegExp(`⟦\\/?(?!${tag}⟧)(?:B|U|HL|CLR)⟧`, 'g');
-                const cleaned = mergeAdjacentFormattingTags(text.replace(stripOthers, ''));
-                const tagOptionRe = new RegExp(`(?:⟦${tag}⟧\\s*[A-D]\\s*(?:⟦\\/${tag}⟧)?\\s*[\\.\\)\\-\\/]|[A-D][\\.\\)\\-\\/]\\s*⟦${tag}⟧)`, 'i');
-                if (tagOptionRe.test(cleaned)) return true;
-            }
-
-            const boldOnlyText = mergeAdjacentFormattingTags(text.replace(/⟦\/?(?:U|HL|CLR)⟧/g, ''));
-            if (/(?:⟦B⟧\s*[A-D][\.\)\-\/]\s*[^⟦\n\t]+⟦\/B⟧|[A-D][\.\)\-\/]\s*⟦B⟧[^⟦\n\t]+⟦\/B⟧)/i.test(boldOnlyText)) {
-                return true;
-            }
-
-            const boldPrefixes = (boldOnlyText.match(/⟦B⟧\s*[A-D]\s*(?:[\.\)\-\/]\s*⟦\/B⟧|⟦\/B⟧\s*[\.\)\-\/])/gi) || []).length;
-            if (boldPrefixes > 0) {
-                const plainText = boldOnlyText.replace(/⟦\/?B⟧/g, '');
-                const totalPrefixes = (plainText.match(/(?:^|[\n\t])\s*[A-D][\.\)\-\/]\s*/gi) || []).length;
-                const unboldedPrefixes = totalPrefixes - boldPrefixes;
-                if (unboldedPrefixes > 0 && boldPrefixes <= totalPrefixes * 0.8) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         async function convertRawFile(file) {
             const myJobId = ++convertJobId;
             UI.convertResultCard.style.display = 'block';
@@ -4646,28 +4601,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             }
 
             const content = splitInlineOptions(rawContent);
-            // Parser là nơi quyết định đề có đáp án hay không (dấu *, dòng đáp án, lời giải "Chọn B", bảng đáp án), nên
-            // chạy parser trước; hộp "Không có đáp án" chỉ hiện khi parser không tạo được đề và không thấy dấu hiệu nào.
+            // Parser là nơi quyết định đề có đáp án hay không; đọc không được thì parser đã tự báo lý do
+            // ("… câu trắc nghiệm thiếu đáp án *").
             if (parseQuizData(content, null, convertedTitle)) {
                 closeConvertResult();
                 scrollToTop();
-                return;
             }
-            const hasMarkedAnswers = /^\s*(?:\*+\s*(?:\*{2,3}\s*)?(?:[a-fA-F]\*?[\.\)\-\/:]|[a-fA-F]\*?(?:\s+\S|$))|[a-fA-F]\*(?:[\.\)\-\/:]|\s+|$)|[a-fA-F][\.\)\-\/:]\s*(?:\(\*\)|\*(?!\s*\d+\s*[=+\-\/]))|[a-fA-F][\.\)\-\/:].*(?:\(\*\)|\s\*|[^\s*]\*)\s*$)/im.test(content)
-                || (typeof checkTextHasAnswerHint === 'function' && checkTextHasAnswerHint(content))
-                || /(?:(?:bảng\s*đáp\s*án|đáp\s*án|answer|key)\s*[:.\-–—]\s*(?:[a-fA-F]|đúng|sai|[đs]{2,4})|(?:^|\n)\s*(?:đáp\s*án|answer|key)\s*[:.\-–—]?\s*(?:[a-fA-F]|đúng|sai|[đs]{2,4})|chọn\s*(?:đáp|phương)\s*án\s*[:.\-–—]\s*[a-fA-F])\b/iu.test(content);
-            if (!hasMarkedAnswers) {
-                showModal({
-                    icon: '🚫',
-                    title: 'Không có đáp án!',
-                    desc: 'Đề thi này <b>chưa có đáp án</b> (không có câu nào được đánh dấu <b>*</b>).<br><br>Hệ thống không thể chấm điểm nếu không có đáp án đúng.<br>Vui lòng thêm dấu <b>*</b> trước đáp án đúng trong khung văn bản phía trên, hoặc tải file .txt về để bổ sung.',
-                    cancelText: 'Đóng',
-                    confirmText: 'Đã hiểu',
-                    onConfirm: () => {}
-                });
-                return;
-            }
-
         }
 
         function downloadConvertedTxt() {

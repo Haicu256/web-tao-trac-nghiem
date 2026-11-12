@@ -38,74 +38,6 @@ function fakeGeminiSequence(steps) {
 const overloaded = { status: 503, body: { error: { code: 503, message: 'This model is currently experiencing high demand.' } } };
 const FALLBACK_ENV = { ...AI_ENV, GEMINI_MODEL: 'gemini-3.1-flash-lite', GEMINI_FALLBACK_MODEL: 'gemini-3.5-flash-lite' };
 
-test('convert: Gemini quá tải (503) thì thử lại bằng model dự phòng', async () => {
-    const calls = fakeGeminiSequence([overloaded, { status: 200, body: okReply(QUIZ) }]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal(res.status, 200);
-    assert.equal(calls.length, 2);
-    assert.match(calls[0].url, /models\/gemini-3\.1-flash-lite:/);
-    assert.match(calls[1].url, /models\/gemini-3\.5-flash-lite:/);
-    const data = await res.json();
-    assert.equal(data.text, QUIZ);
-    assert.equal(data.model, 'gemini-3.5-flash-lite');
-});
-
-test('convert: model chính quá thời gian chờ thì cũng thử model dự phòng', async () => {
-    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
-    const calls = fakeGeminiSequence([timeout, { status: 200, body: okReply(QUIZ) }]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal(res.status, 200);
-    assert.equal(calls.length, 2);
-});
-
-test('convert: Gemini báo 429 (hết hạn ngạch model) thì thử model dự phòng', async () => {
-    const calls = fakeGeminiSequence([{ status: 429, body: { error: 'quota' } }, { status: 200, body: okReply(QUIZ) }]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal(res.status, 200);
-    assert.equal(calls.length, 2);
-});
-
-test('convert: lỗi xác thực không thử model dự phòng', async () => {
-    const calls = fakeGeminiSequence([{ status: 401, body: { error: 'bad key' } }]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal(res.status, 401);
-    assert.equal(calls.length, 1);
-});
-
-test('convert: không cấu hình model dự phòng thì báo lỗi như cũ', async () => {
-    const calls = fakeGeminiSequence([overloaded]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
-    assert.equal(res.status, 503);
-    assert.equal(calls.length, 1);
-});
-
-test('convert: cả hai model đều quá tải thì báo lỗi quá tải', async () => {
-    const calls = fakeGeminiSequence([overloaded, overloaded]);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal(res.status, 503);
-    assert.equal(calls.length, 2);
-    assert.match((await res.json()).error, /quá tải|không khả dụng/);
-});
-
-test('convert: model dự phòng dùng cấu hình riêng theo tên model', async () => {
-    const calls = fakeGeminiSequence([overloaded, { status: 200, body: okReply(QUIZ) }]);
-    await worker.fetch(post('/api/convert', { text: QUIZ }), { ...FALLBACK_ENV, GEMINI_FALLBACK_MODEL: 'gemini-2.5-flash' });
-    assert.deepEqual(calls[0].body.generationConfig, { temperature: 1, maxOutputTokens: 16384 });
-    assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 1024 });
-});
-
-test('convert: kết quả ghi rõ model nào đã trả lời', async () => {
-    fakeGemini(okReply(QUIZ));
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), FALLBACK_ENV);
-    assert.equal((await res.json()).model, 'gemini-3.1-flash-lite');
-});
-
-test('convert: prompt cấm thêm dấu * khi đề không có dấu hiệu đáp án', async () => {
-    const calls = fakeGemini(okReply(QUIZ));
-    await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
-    assert.match(calls[0].body.contents[0].parts[0].text, /KHÔNG thêm dấu \* vào bất kỳ dòng nào/);
-});
-
 function fakeKV(initial = {}) {
     const data = new Map(Object.entries(initial).map(([k, v]) => [k, JSON.stringify(v)]));
     const puts = [];
@@ -117,34 +49,12 @@ function fakeKV(initial = {}) {
     };
 }
 
-test('convert: gọi Gemini qua AI Gateway với model trong GEMINI_MODEL', async () => {
+test('convert: kiểu cũ { text } (AI viết lại đề, tự đánh dấu đáp án) bị từ chối và không gọi AI', async () => {
     const calls = fakeGemini(okReply(QUIZ));
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), { ...AI_ENV, GEMINI_MODEL: 'gemini-3.1-flash-lite' });
-    assert.equal(res.status, 200);
-    assert.equal((await res.json()).text, QUIZ);
-    assert.equal(calls[0].url, 'https://gateway.ai.cloudflare.com/v1/acc/default/google-ai-studio/v1beta/models/gemini-3.1-flash-lite:generateContent');
-});
-
-test('convert: Gemini 3.x không nhận thinkingBudget, Gemini 2.5 thì có', async () => {
-    const calls = fakeGemini(okReply(QUIZ));
-    await worker.fetch(post('/api/convert', { text: QUIZ }), { ...AI_ENV, GEMINI_MODEL: 'gemini-3.1-flash-lite' });
-    await worker.fetch(post('/api/convert', { text: QUIZ }), { ...AI_ENV, GEMINI_MODEL: 'gemini-2.5-flash' });
-    assert.deepEqual(calls[0].body.generationConfig, { temperature: 1, maxOutputTokens: 16384 });
-    assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 1024 });
-});
-
-test('convert: không đặt GEMINI_MODEL thì dùng gemini-3.1-flash-lite', async () => {
-    const calls = fakeGemini(okReply(QUIZ));
-    await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
-    assert.match(calls[0].url, /models\/gemini-3\.1-flash-lite:/);
-});
-
-test('convert: prompt yêu cầu AI giữ nguyên công thức $...$', async () => {
-    const calls = fakeGemini(okReply(QUIZ));
-    await worker.fetch(post('/api/convert', { text: 'Câu 1: Tính $\\frac{1}{2}$\nA. 1\n*B. 2' }), AI_ENV);
-    const prompt = calls[0].body.contents[0].parts[0].text;
-    assert.match(prompt, /\$\.\.\.\$/);
-    assert.ok(prompt.includes('Câu 1: Tính $\\frac{1}{2}$'));
+    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).text, undefined);
+    assert.equal(calls.length, 0);
 });
 
 // ===== Chế độ gắn nhãn dòng (docs/thiet-ke/gan-nhan-dong.md) =====
@@ -219,39 +129,92 @@ test('gắn nhãn: model chính quá tải thì dùng model dự phòng', async 
     assert.equal((await res.json()).model, 'gemini-3.5-flash-lite');
 });
 
-test('convert: bỏ khối ``` mà AI lỡ bọc quanh kết quả', async () => {
-    fakeGemini(okReply('```text\n' + QUIZ + '\n```'));
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
-    assert.equal((await res.json()).text, QUIZ);
+const labelsOk = { status: 200, body: labelReply(GOOD_LABELS) };
+const convert = env => worker.fetch(post('/api/convert', { lines: LINES }), env);
+
+test('gắn nhãn: model chính quá thời gian chờ thì cũng thử model dự phòng', async () => {
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const calls = fakeGeminiSequence([timeout, labelsOk]);
+    const res = await convert(FALLBACK_ENV);
+    assert.equal(res.status, 200);
+    assert.equal(calls.length, 2);
+});
+
+test('gắn nhãn: Gemini báo 429 (hết hạn ngạch model) thì thử model dự phòng', async () => {
+    const calls = fakeGeminiSequence([{ status: 429, body: { error: 'quota' } }, labelsOk]);
+    assert.equal((await convert(FALLBACK_ENV)).status, 200);
+    assert.equal(calls.length, 2);
+});
+
+test('gắn nhãn: lỗi xác thực không thử model dự phòng', async () => {
+    const calls = fakeGeminiSequence([{ status: 401, body: { error: 'bad key' } }]);
+    assert.equal((await convert(FALLBACK_ENV)).status, 401);
+    assert.equal(calls.length, 1);
+});
+
+test('gắn nhãn: không cấu hình model dự phòng thì báo lỗi như cũ', async () => {
+    const calls = fakeGeminiSequence([overloaded]);
+    assert.equal((await convert(AI_ENV)).status, 503);
+    assert.equal(calls.length, 1);
+});
+
+test('gắn nhãn: cả hai model đều quá tải thì báo lỗi quá tải', async () => {
+    const calls = fakeGeminiSequence([overloaded, overloaded]);
+    const res = await convert(FALLBACK_ENV);
+    assert.equal(res.status, 503);
+    assert.equal(calls.length, 2);
+    assert.match((await res.json()).error, /quá tải|không khả dụng/);
+});
+
+test('gắn nhãn: model dự phòng dùng cấu hình riêng theo tên model', async () => {
+    const calls = fakeGeminiSequence([overloaded, labelsOk]);
+    await convert({ ...FALLBACK_ENV, GEMINI_FALLBACK_MODEL: 'gemini-2.5-flash' });
+    assert.equal(calls[0].body.generationConfig.temperature, 1);
+    assert.equal(calls[0].body.generationConfig.thinkingConfig, undefined);
+    assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 1024 });
+});
+
+test('gắn nhãn: gọi Gemini qua AI Gateway với model trong GEMINI_MODEL, mặc định gemini-3.1-flash-lite', async () => {
+    const calls = fakeGemini(labelReply(GOOD_LABELS));
+    assert.equal((await convert({ ...AI_ENV, GEMINI_MODEL: 'gemini-2.5-flash' })).status, 200);
+    await convert(AI_ENV);
+    assert.equal(calls[0].url, 'https://gateway.ai.cloudflare.com/v1/acc/default/google-ai-studio/v1beta/models/gemini-2.5-flash:generateContent');
+    assert.match(calls[1].url, /models\/gemini-3\.1-flash-lite:/);
+});
+
+test('gắn nhãn: Gemini 3.x không nhận thinkingBudget, Gemini 2.5 thì có', async () => {
+    const calls = fakeGemini(labelReply(GOOD_LABELS));
+    await convert({ ...AI_ENV, GEMINI_MODEL: 'gemini-3.1-flash-lite' });
+    await convert({ ...AI_ENV, GEMINI_MODEL: 'gemini-2.5-flash' });
+    assert.equal(calls[0].body.generationConfig.temperature, 1);
+    assert.equal(calls[0].body.generationConfig.thinkingConfig, undefined);
+    assert.deepEqual(calls[1].body.generationConfig.thinkingConfig, { thinkingBudget: 1024 });
 });
 
 test('convert: thiếu cấu hình thì báo rõ thiếu biến nào', async () => {
     for (const missing of ['GEMINI_API_KEY', 'CF_AIG_TOKEN', 'CF_AIG_ACCOUNT_ID']) {
         const env = { ...AI_ENV };
         delete env[missing];
-        const res = await worker.fetch(post('/api/convert', { text: QUIZ }), env);
+        const res = await convert(env);
         assert.equal(res.status, 500);
         assert.match((await res.json()).error, new RegExp(missing));
     }
 });
 
-test('convert: từ chối sai Content-Type, văn bản rỗng và văn bản quá dài', async () => {
+test('convert: từ chối sai Content-Type', async () => {
     assert.equal((await worker.fetch(post('/api/convert', 'x', { 'Content-Type': 'text/plain' }), AI_ENV)).status, 415);
-    assert.equal((await worker.fetch(post('/api/convert', { text: '   ' }), AI_ENV)).status, 400);
-    assert.equal((await worker.fetch(post('/api/convert', { text: 'a'.repeat(50_001) }), AI_ENV)).status, 413);
 });
 
-test('convert: Gemini báo 429 thì trả 429 kèm lời nhắn dễ hiểu', async () => {
+test('gắn nhãn: Gemini báo 429 thì trả 429 kèm lời nhắn dễ hiểu', async () => {
     fakeGemini({ error: 'quota' }, 429);
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
+    const res = await convert(AI_ENV);
     assert.equal(res.status, 429);
     assert.match((await res.json()).error, /quá tải|hạn ngạch/);
 });
 
-test('convert: nội dung bị bộ lọc an toàn chặn thì trả 422', async () => {
+test('gắn nhãn: nội dung bị bộ lọc an toàn chặn thì trả 422', async () => {
     fakeGemini({ promptFeedback: { blockReason: 'SAFETY' }, candidates: [] });
-    const res = await worker.fetch(post('/api/convert', { text: QUIZ }), AI_ENV);
-    assert.equal(res.status, 422);
+    assert.equal((await convert(AI_ENV)).status, 422);
 });
 
 test('share: cùng tên và nội dung luôn ra cùng một link 11 ký tự', async () => {
@@ -340,6 +303,53 @@ test('file tĩnh: method khác GET, HEAD trả 405 và không chuyển cho ASSET
     }
     assert.deepEqual(assets.served, []);
     assert.equal((await worker.fetch(new Request('https://x/', { method: 'HEAD' }), { ASSETS: assets })).status, 200);
+});
+
+// HTMLRewriter chỉ có trên Cloudflare: bản giả ghi lại các hàm xử lý để test gọi thử với thẻ giả.
+class FakeRewriter {
+    constructor() { this.handlers = []; FakeRewriter.last = this; }
+    on(selector, handler) { this.handlers.push([selector, handler]); return this; }
+    transform(res) { return res; }
+}
+function rewrites() {
+    const out = {};
+    for (const [selector, h] of FakeRewriter.last.handlers) {
+        h.element({ replace: (html, opt) => { out[selector] = { html, opt }; }, setInnerContent: (text, opt) => { out[selector] = { text, opt }; } });
+    }
+    return out;
+}
+
+test('trang /share: link chia sẻ có tên đề cho bản xem trước, tên đề được thoát ký tự HTML', async () => {
+    globalThis.HTMLRewriter = FakeRewriter;
+    try {
+        const kv = fakeKV({ AAAAAAAAAAA: { v: 1, title: 'Đề <script>alert(1)</script> "x"', text: QUIZ, c: Math.floor(Date.now() / 1000) } });
+        const assets = fakeAssets();
+        const res = await worker.fetch(new Request('https://x/share?s=AAAAAAAAAAA'), { ASSETS: assets, SHARES: kv });
+        assert.equal(res.status, 200);
+        assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
+        assert.equal(res.headers.get('x-frame-options'), 'DENY');
+        assert.deepEqual(assets.served, ['/']);
+        const r = rewrites();
+        assert.equal(r.title.text, 'Đề trắc nghiệm: Đề <script>alert(1)</script> "x"');
+        assert.equal(r.title.opt, undefined, 'tên đề là chữ, không phải HTML');
+        const og = r['meta[property="og:title"]'];
+        assert.equal(og.html, '<meta property="og:title" content="Đề trắc nghiệm: Đề &lt;script&gt;alert(1)&lt;/script&gt; &quot;x&quot;">');
+        assert.match(r['link[rel="canonical"]'].html, /href="https:\/\/x\/share\?s=AAAAAAAAAAA"/);
+        const head = await worker.fetch(new Request('https://x/share?s=AAAAAAAAAAA', { method: 'HEAD' }), { ASSETS: assets, SHARES: kv });
+        assert.equal(head.status, 200);
+        assert.equal(head.body, null);
+    } finally {
+        delete globalThis.HTMLRewriter;
+    }
+});
+
+test('trang /share: mã không có trong KV vẫn trả trang (trang tự báo không tìm thấy đề); link cũ /?s= chuyển sang /share', async () => {
+    const res = await worker.fetch(new Request('https://x/share?s=AAAAAAAAAAA'), { ASSETS: fakeAssets(), SHARES: fakeKV() });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
+    const old = await worker.fetch(new Request('https://x/?s=AAAAAAAAAAA'), { ASSETS: fakeAssets() });
+    assert.equal(old.status, 301);
+    assert.equal(old.headers.get('location'), 'https://x/share?s=AAAAAAAAAAA');
 });
 
 test('CSP cho phép CSS và font của KaTeX từ cdnjs, không mở thêm gì khác', async () => {

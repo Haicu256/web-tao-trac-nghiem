@@ -3219,8 +3219,8 @@ câu 2 phương án D: Größe
 ```
 
 ### Chữ cái phương án ghi hai lần ("A. A. Huế", "B. B. Hà Nội") chỉ giữ một lần
-Đề xuất từ trang thi trực tuyến hay ghi chữ cái hai lần. Chỉ bỏ lần thứ hai khi từ hai phương án trở lên của câu cùng bị
-và chữ trùng chữ của phương án; một phương án lẻ như "A. A. Edison" giữ nguyên.
+Đề xuất từ trang thi trực tuyến hay ghi chữ cái hai lần. Chỉ bỏ lần thứ hai khi từ hai phương án trở lên của câu cùng bị,
+chữ trùng hẳn chữ của phương án (cả hoa, thường) và có dấu chấm; một phương án lẻ như "A. A. Edison" giữ nguyên.
 ```de
 Câu 1: Thủ đô của Việt Nam là gì?
 A. A. Huế
@@ -3242,6 +3242,34 @@ câu 1 phương án A: Huế
 câu 1 phương án D: Cần Thơ
 câu 2: A
 câu 2 phương án A: A. Edison
+```
+
+### Phương án bắt đầu bằng tên phát biểu ("A. a) và b)", "B. b) và c)") giữ nguyên chữ
+Phương án nhắc tới các phát biểu a), b), c) hay A), B), C) của đề bài không phải chữ cái ghi hai lần: chữ ghi hai lần
+phải trùng hẳn chữ của phương án (cả hoa, thường) và theo sau là dấu chấm.
+```de
+Câu 1: Cho các phát biểu: a) Nước sôi ở 100 độ C; b) Sắt dẫn điện; c) Muối ăn tan trong nước; d) Dầu nặng hơn nước. Các phát biểu đúng là
+A. a) và b)
+B. b) và c)
+C. c) và d)
+D. a) và d)
+Đáp án: B
+Câu 2: Cho các phát biểu A) Đồng dẫn điện; B) Nhôm nhẹ hơn sắt; C) Vàng bị gỉ; D) Bạc là phi kim. Các phát biểu đúng là
+A. A) và B)
+B. B) và C)
+C. C) và D)
+D. A) và D)
+Đáp án: A
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án A: a) và b)
+câu 1 phương án B: b) và c)
+câu 1 phương án C: c) và d)
+câu 2: A
+câu 2 phương án A: A) và B)
+câu 2 phương án C: C) và D)
 ```
 
 ### Đơn vị giây "1 s", "2 s" trong lời giải không phải đáp án Đúng/Sai của ý 1, ý 2

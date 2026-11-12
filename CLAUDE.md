@@ -3,7 +3,7 @@
 Web tạo đề và làm bài trắc nghiệm: https://web-tao-trac-nghiem.haicu25699652.workers.dev
 
 - `index.html`: toàn bộ giao diện, CSS và JS trong **một file** (giữ nguyên như vậy, quyết định ngày 7/11/2026).
-- `worker.js`: Cloudflare Worker. `/api/convert` với `{ lines }` nhờ Gemini **gắn nhãn từng dòng** theo JSON schema (AI không viết chữ), `/api/share` lưu đề vào KV để chia sẻ, và phục vụ file tĩnh theo danh sách cho phép. Kiểu cũ `{ text }` (AI viết lại đề) chỉ còn để trang mở từ trước không hỏng; sẽ bỏ.
+- `worker.js`: Cloudflare Worker. `/api/convert` với `{ lines }` nhờ Gemini **gắn nhãn từng dòng** theo JSON schema (AI không viết chữ), `/api/share` lưu đề vào KV để chia sẻ, và phục vụ file tĩnh theo danh sách cho phép. Kiểu cũ `{ text }` (AI viết lại đề) đã bỏ ngày 12/11/2026, gửi lên thì trả 400.
 - `docs/dinh-dang-de.md`: các kiểu đề web phải đọc được. Đây cũng là test.
 - `docs/thiet-ke/gan-nhan-dong.md`: vì sao AI chỉ gắn nhãn, còn code dựng đề và quyết định đáp án. **Không bao giờ cho AI tự đánh dấu đáp án** (đo ngày 7/11/2026: AI bịa 15/40 đáp án ở đề không có đáp án dù prompt cấm).
 
@@ -24,7 +24,7 @@ Thư mục này là nơi phát triển chính. `~/Desktop/wtn` (Antigravity/Gemi
 2. Commit rồi `git push` lên `main` (đã cấu hình SSH deploy key `~/.ssh/wtn_deploy_ed25519` qua `core.sshCommand`).
 3. Cloudflare Workers Builds tự chạy `npx wrangler deploy` và **lên web thật luôn**, không có môi trường thử.
 4. Xem check "Workers Builds" của commit trên GitHub. Build lỗi thì Cloudflare giữ bản cũ và không báo gì khác, nên luôn phải xem.
-5. Thử web thật: `GET /` có header `content-security-policy`; `POST /api/convert` với một đề nhỏ trả 200.
+5. Thử web thật: `GET /` có header `content-security-policy`; `POST /api/convert` với `{ "lines": ["Câu 1: Thủ đô?", "A. Huế", "B. Hà Nội"] }` trả 200 và có `doan`.
 
 Không có môi trường thử với secret thật: Cloudflare không tạo preview URL cho worker có Durable Object
 (`USProxy`), đã thử ngày 7/11/2026. Thay đổi ở `worker.js` phải được test bằng `tests/worker.test.js` rồi

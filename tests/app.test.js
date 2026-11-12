@@ -33,12 +33,12 @@ test('chọn chỉ số đáp án không tồn tại không làm lỗi và khôn
     assert.equal(app.fn('calculateScore')().points, 0);
 });
 
-test('nhận biết đề đã có đáp án', () => {
-    const hasHint = app.fn('checkTextHasAnswerHint');
-    assert.equal(hasHint('Câu 1: a?\nA. x\n*B. y'), true);
-    assert.equal(hasHint('Câu 1: a?\nA. x\nB. y\nĐáp án: B'), true);
-    assert.equal(hasHint('Câu 1: a?\nA. x\n⟦U⟧B. y⟦/U⟧\nC. z'), true);
-    assert.equal(hasHint('Câu 1: a?\nA. x\nB. y\nC. z'), false);
+test('"Làm bài ngay" với đề chưa có đáp án thì báo rõ là thiếu đáp án', () => {
+    app.run('originalQuestions = []');
+    app.run(`UI.convertedText.value = ${JSON.stringify('Câu 1: Thủ đô?\nA. Huế\nB. Hà Nội\nCâu 2: 1 + 1 = ?\nA. 1\nB. 2')}`);
+    app.fn('useConvertedTextImmediately')();
+    assert.equal(app.run('originalQuestions.length'), 0);
+    assert.match(app.lastToast, /thiếu đáp án/);
 });
 
 test('tên đề lấy từ tên file, bỏ đuôi file', () => {
