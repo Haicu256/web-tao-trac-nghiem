@@ -4148,6 +4148,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const plainLines = lines.map(l => stripFormattingTags(l).trim());
             const nextAfter = i => { for (let j = i + 1; j < lines.length; j++) if (out[j] !== 'bo_qua') return j; return -1; };
             const nextLabelAfter = i => { const j = nextAfter(i); return j < 0 ? null : out[j]; };
+            const onlyTrueFalseOptions = i => {
+                const opts = [];
+                for (let j = i + 1; j < lines.length && !['cau_hoi', 'cau_hoi_dung_sai', 'bang_dap_an'].includes(out[j]); j++) {
+                    if (out[j] === 'phuong_an') opts.push(plainLines[j]);
+                }
+                return opts.length === 2 && opts.every(o => /^\*?\s*[A-B]\s*[.)]\s*\*?\s*(?:đúng|sai|true|false)\s*\*?\s*\.?$/iu.test(o));
+            };
             lines.forEach((raw, i) => {
                 const plain = stripFormattingTags(raw).trim();
                 if (PAGE_FURNITURE_REGEX.test(plain)) { out[i] = 'bo_qua'; return; }
@@ -4174,6 +4181,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 // đúng/sai dù AI gắn là câu trắc nghiệm.
                 if (partHeader) tfPart = partTitleSaysTF(plainLines, i);
                 if (out[i] === 'cau_hoi' && (TF_PREFIX_REGEX.test(plain) || tfPart)) out[i] = 'cau_hoi_dung_sai';
+                // "Câu 1: … / A. Đúng / B. Sai" là câu trắc nghiệm hai phương án (đề Y Dược, bảng đáp án "1.A"). AI hay gắn là
+                // câu đúng/sai, rồi câu bị bỏ vì bảng chữ cái không dùng cho câu đúng/sai (YD400-079 mất 11/27 câu).
+                if (out[i] === 'cau_hoi_dung_sai' && !TF_PREFIX_REGEX.test(plain) && !tfPart && onlyTrueFalseOptions(i)) out[i] = 'cau_hoi';
                 const strong = plain.match(STRONG_QUESTION_START_REGEX);
                 // Dòng "Câu N: …" gắn là dòng nối tiếp, bỏ qua, phương án không có chữ cái, hay dòng đáp án mà phần sau
                 // không phải đáp án ("Câu 2: B", "Câu 2: Chọn B" là dòng đáp án thật) thì có thể là đầu câu bị gắn nhầm.

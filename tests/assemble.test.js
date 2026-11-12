@@ -731,3 +731,16 @@ test('Đề xuất từ phần mềm trộn đề: phương án "a 3000 b 2000" 
     assert.equal(plainText(r.questions[0].options[3].text), 'Cả a và b đều đúng.');
     assert.equal(plainText(r.questions[1].options[2].text), 'Sản lượng tăng');
 });
+
+test('AI gắn câu "A. Đúng / B. Sai" là câu đúng/sai thì code sửa thành câu trắc nghiệm hai phương án (đề Y Dược YD400-079)', () => {
+    const lines = ['Câu 1: Thuốc an thần là thuốc điều trị nguyên nhân', 'A. Đúng', 'B. Sai',
+        'Câu 2: Chu sa tương đương thần sa', 'A. Đúng', 'B. Sai', 'ĐÁP ÁN', '1.B 2.A'];
+    assert.deepEqual([...fn('reconcileLabels')(lines, labels('TOOTOOKK'))], labels('QOOQOOKK'));
+    const r = app.parse(fn('assembleQuizText')(lines, fn('reconcileLabels')(lines, labels('TOOTOOKK'))).text);
+    assert.deepEqual([...r.questions].map(q => q.type + ':' + answerOf(q)), ['multiple_choice:B', 'multiple_choice:A']);
+});
+
+test('Câu đúng/sai thật (ý là phát biểu, hoặc ghi "câu hỏi đúng sai:") vẫn giữ là câu đúng/sai', () => {
+    const lines = ['Câu 1: Xét', 'a) 2 là số chẵn', 'b) 3 là số chẵn', 'câu hỏi đúng sai: Câu 2: Xét', 'A. Đúng', 'B. Sai'];
+    assert.deepEqual([...fn('reconcileLabels')(lines, labels('TOOTOO'))], labels('TOOTOO'));
+});
