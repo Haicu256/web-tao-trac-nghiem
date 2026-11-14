@@ -233,6 +233,9 @@
         .tf-prefix { font-weight: bold; color: var(--title-color); min-width: 24px; }
         /* Độ rộng gốc 200px (không phải 0): màn hình hẹp thì ô Đúng/Sai xuống dòng dưới, chữ không bị ép thành cột hẹp. */
         .tf-text { flex: 1 1 200px; overflow-wrap: break-word; word-break: break-word; }
+        /* Hình trong đề: nền trắng vì công thức hoá học thường là nét đen trên nền trong suốt, không thấy ở giao diện tối. */
+        .quiz-img { display: block; max-width: 100%; height: auto; background: #fff; padding: 4px; border-radius: 6px; margin: 6px 0; }
+        .img-missing { color: var(--incorrect-text); font-style: italic; font-size: 13px; }
         .tf-checkbox-group {
             display: flex;
             gap: 12px;
@@ -333,6 +336,7 @@
                 <button class="btn-convert-action btn-download" onclick="downloadConvertedTxt()">⬇️ Tải xuống .txt</button>
                 <button class="btn-convert-action btn-convert-cancel" onclick="closeConvertResult()">❌ Đóng</button>
             </div>
+            <small id="txtImageNote" style="display:none; color: var(--title-color);">File .txt không chứa hình.</small>
         </div>
 
         <div id="free-message" class="free-message-outside">
@@ -457,6 +461,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             convertResultCard: document.getElementById('convert-result-card'),
             convertedText: document.getElementById('convertedText'),
             convertStatus: document.getElementById('convertStatus'),
+            txtImageNote: document.getElementById('txtImageNote'),
             shareCreateBtn: document.getElementById('shareCreateBtn'),
             shareResult: document.getElementById('shareResult'),
             shareLinkInput: document.getElementById('shareLinkInput'),
@@ -497,6 +502,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
         const SHARE_MAX_CHARS = 300000;
+        // Giới hạn hình của một đề chia sẻ, giống worker (kiểm trước để báo lỗi dễ hiểu).
+        const SHARE_MAX_IMAGES = 100;
+        const SHARE_MAX_IMAGE_BYTES = 2000000;
+        const IMAGES_KEY = 'quizImages';
         const SHARE_TITLE_MAX = 100;
         const SHARE_BTN_LABEL = '🔗 Tạo link chia sẻ';
 
@@ -569,6 +578,271 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             return text;
         }
 
+        // Hình xếp lưới trong Word: một dòng chỉ có các ký hiệu hình, ngay dưới (hay ngay trên) là một dòng chỉ có đúng chừng
+        // ấy chữ cái A–F → mỗi cặp thành "X. [[hình:…]]". Cả loạt dòng liền nhau phải cùng một chiều (chữ dưới hình hay trên
+        // hình), mỗi cặp cùng số lượng, chữ cái đi đúng thứ tự A, B, C… và không có hình nổi; không thì giữ nguyên (không đoán).
+        const floatingImageIds = new Set();
+        // Chữ của phương án mà hình chưa ghép được (giữ chỗ cho câu để câu sau không bị nối vào); parser bỏ câu có chữ này.
+        const UNPAIRED_IMAGE_TEXT = '(hình chưa ghép)';
+        function pairImageRows(text, floating = new Set()) {
+            if (!text.includes('[[hình:')) return text;
+            const partsOf = line => stripFormattingTags(line).trim().split(/\s+/);
+            const tokensOf = line => {
+                const ids = partsOf(line).map(p => (p.match(/^\[\[hình:([0-9a-f]{12})\]\]$/) || [])[1]);
+                return ids.length >= 2 && ids.every(Boolean) ? ids : null;
+            };
+            const lettersOf = line => {
+                const letters = partsOf(line).map(p => (p.match(/^\(?([A-F])[.)]?$/) || [])[1]);
+                return letters.length >= 2 && letters.every(Boolean) ? letters : null;
+            };
+            const pairRun = run => {
+                if (run.length % 2 !== 0) return null;
+                const tokensFirst = !!run[0].ids;
+                const out = [];
+                let letters = '';
+                for (let k = 0; k < run.length; k += 2) {
+                    const ids = (tokensFirst ? run[k] : run[k + 1]).ids;
+                    const marks = (tokensFirst ? run[k + 1] : run[k]).letters;
+                    if (!ids || !marks || ids.length !== marks.length || ids.some(id => floating.has(id))) return null;
+                    ids.forEach((id, n) => out.push(`${marks[n]}. [[hình:${id}]]`));
+                    letters += marks.join('');
+                }
+                return letters === 'ABCDEF'.slice(0, letters.length) ? out : null;
+            };
+            const lines = text.split('\n');
+            const out = [];
+            for (let i = 0; i < lines.length;) {
+                const run = [];
+                let j = i;
+                for (; j < lines.length; j++) {
+                    const ids = tokensOf(lines[j]);
+                    const letters = ids ? null : lettersOf(lines[j]);
+                    if (!ids && !letters) break;
+                    run.push({ ids, letters });
+                }
+                if (run.length === 0) {
+                    out.push(lines[i++]);
+                    continue;
+                }
+                const paired = pairRun(run);
+                if (paired) {
+                    out.push(...paired);
+                } else {
+                    // Không ghép được: nếu ngay sau loạt là câu mới, dòng đáp án hay hết thì mỗi chữ cái thành phương án giữ chỗ
+                    // (chữ cái đứng một mình sẽ bị parser nối với dòng sau, làm câu sau dính vào câu này); còn lại giữ nguyên.
+                    const next = stripFormattingTags(lines[j] || '').trim();
+                    const ends = run.some(r => r.ids) && (next === '' || /^(?:(?:câu\s*hỏi\s*đúng\s*sai\s*:\s*)?(?:câu|question|bài)\s*\d+|\d+\s*[.:)\/]\s|đáp\s*án|chọn|lời\s*giải)/iu.test(next));
+                    lines.slice(i, j).forEach((line, n) => {
+                        if (ends && run[n].letters) out.push(...run[n].letters.map(letter => `${letter}. ${UNPAIRED_IMAGE_TEXT}`));
+                        else out.push(line);
+                    });
+                }
+                i = j;
+            }
+            return out.join('\n');
+        }
+
+        // PDF: chèn ký hiệu hình của một trang vào đúng chỗ theo thứ tự đọc và ghép hình với chữ cái phương án theo ô lưới
+        // (docs/thiet-ke/hinh-anh.md, mục PDF). Không ghép theo khoảng cách gần nhất: trên file thật chữ "A" gần hình của C
+        // hơn hình của nó. lines: các dòng chữ của trang kèm toạ độ từng mục { s, x, y }; images: { id, x, y, w, h } (góc
+        // dưới trái, y tăng lên trên). Đoạn trước dòng đề bài đầu tiên của trang thuộc câu ở trang trước.
+        function pairPdfImages(lines, images) {
+            if (!images.length) return lines.map(l => l.text);
+            const yOf = line => (line.items.length ? Math.max(...line.items.map(it => it.y)) : null);
+            const isStart = line => /^(?:(?:câu|question|bài)\s*)?\d+\s*[.:)\/]/iu.test(line.text.trim());
+            const solid = line => line.items.filter(it => it.s.trim());
+            const isLetterLine = line => solid(line).length > 0 && solid(line).every(it => /^\(?[A-F][.)]?$/.test(it.s.trim()));
+            const center = img => img.y + img.h / 2;
+            const rowsOf = (list, yOfItem, tol) => {
+                const out = [];
+                for (const it of [...list].sort((a, b) => yOfItem(b) - yOfItem(a))) {
+                    const row = out[out.length - 1];
+                    if (row && Math.abs(yOfItem(row[0]) - yOfItem(it)) <= tol) row.push(it);
+                    else out.push([it]);
+                }
+                return out.map(row => row.sort((a, b) => a.x - b.x));
+            };
+            const starts = lines.map((l, i) => (isStart(l) && yOf(l) !== null ? i : -1)).filter(i => i >= 0);
+            const bounds = [Infinity, ...starts.map(i => yOf(lines[i])), -Infinity];
+            const optionLines = new Map();
+            const consumed = new Set();
+            const paired = new Set();
+            for (let s = 0; s + 1 < bounds.length; s++) {
+                const [top, bottom] = [bounds[s], bounds[s + 1]];
+                const imgs = images.filter(img => center(img) < top && center(img) > bottom);
+                if (!imgs.length) continue;
+                const tol = Math.max(8, Math.min(...imgs.map(img => img.h)) / 2);
+                // Chỉ chữ cái nằm trong dải chiều cao của lưới hình mới là nhãn của hình (bảng đáp án "B A A" bên dưới thì không).
+                const lo = Math.min(...imgs.map(img => img.y)) - tol;
+                const hi = Math.max(...imgs.map(img => img.y + img.h)) + tol;
+                const letterIdx = lines.map((l, i) => i).filter(i => !starts.includes(i) && isLetterLine(lines[i]) && yOf(lines[i]) < top && yOf(lines[i]) > bottom
+                    && yOf(lines[i]) >= lo && yOf(lines[i]) <= hi);
+                if (!letterIdx.length) continue;
+                const letters = letterIdx.flatMap(i => solid(lines[i]).map(it => ({ x: it.x, y: it.y, letter: it.s.replace(/[^A-F]/g, '') })));
+                const imgRows = rowsOf(imgs, center, tol);
+                const letterRows = rowsOf(letters, it => it.y, tol);
+                const order = letterRows.flat().map(it => it.letter).join('');
+                if (imgRows.length !== letterRows.length || imgRows.some((row, k) => row.length !== letterRows[k].length) || order !== 'ABCDEF'.slice(0, order.length)) {
+                    // Không ghép được: chữ cái đứng một mình sẽ bị parser coi là chữ cái phương án có nội dung ở dòng sau và nối
+                    // câu kế tiếp vào câu này, nên mỗi chữ cái thành phương án giữ chỗ. Chỉ khi chúng là nhãn của lưới (liền nhau,
+                    // sau đó là câu mới, dòng đáp án hay hết đoạn), không đụng kiểu "A" rồi xuống dòng ghi nội dung.
+                    const last = letterIdx[letterIdx.length - 1];
+                    const blank = i => solid(lines[i]).length === 0;
+                    const contiguous = lines.slice(letterIdx[0], last + 1).every((line, n) => letterIdx.includes(letterIdx[0] + n) || blank(letterIdx[0] + n));
+                    let after = last + 1;
+                    while (after < lines.length && blank(after)) after++;
+                    const next = lines[after];
+                    if (contiguous && (!next || starts.includes(after) || yOf(next) <= bottom || /^(?:đáp\s*án|chọn|lời\s*giải)/iu.test(next.text.trim()))) {
+                        letterIdx.forEach(i => optionLines.set(i, solid(lines[i]).sort((a, b) => a.x - b.x).map(it => `${it.s.replace(/[^A-F]/g, '')}. ${UNPAIRED_IMAGE_TEXT}`)));
+                    }
+                    continue;
+                }
+                optionLines.set(letterIdx[0], letterRows.flatMap((row, k) => row.map((it, n) => `${it.letter}. [[hình:${imgRows[k][n].id}]]`)));
+                letterIdx.forEach(i => consumed.add(i));
+                imgs.forEach(img => paired.add(img));
+            }
+            // Hình chưa ghép: mỗi hình một dòng ký hiệu, đặt sau mọi dòng nằm trên tâm hình.
+            const loose = images.filter(img => !paired.has(img)).sort((a, b) => center(b) - center(a) || a.x - b.x);
+            const out = [];
+            let k = 0;
+            lines.forEach((line, i) => {
+                const y = yOf(line);
+                while (k < loose.length && y !== null && y < center(loose[k])) out.push(`[[hình:${loose[k++].id}]]`);
+                if (optionLines.has(i)) out.push(...optionLines.get(i));
+                else if (!consumed.has(i)) out.push(line.text);
+            });
+            while (k < loose.length) out.push(`[[hình:${loose[k++].id}]]`);
+            return out;
+        }
+
+        // Hình của một trang PDF: vị trí lấy từ ma trận hiện hành lúc vẽ (paintImageXObject), điểm ảnh từ page.objs. Hình
+        // nhỏ hơn 8 pt (đường kẻ, chấm trang trí) bỏ qua.
+        // Vị trí từng hình theo ma trận hiện hành lúc vẽ. Form XObject (PDF in "vừa trang", 2 trang một tờ) mang ma trận riêng
+        // trong tham số của paintFormXObjectBegin; bỏ qua thì hình lệch sang hệ toạ độ khác chữ và rơi vào câu khác.
+        function imageBoxesFromOps(ops, O) {
+            const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+            const found = [];
+            let ctm = [1, 0, 0, 1, 0, 0];
+            const stack = [];
+            for (let i = 0; i < ops.fnArray.length; i++) {
+                const op = ops.fnArray[i];
+                const args = ops.argsArray[i];
+                if (op === O.save) stack.push(ctm);
+                else if (op === O.restore) ctm = stack.pop() || ctm;
+                else if (op === O.transform) ctm = mul(ctm, args);
+                else if (op === O.paintFormXObjectBegin) {
+                    stack.push(ctm);
+                    if (Array.isArray(args && args[0]) && args[0].length === 6) ctm = mul(ctm, args[0]);
+                } else if (op === O.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+                else if (op === O.paintImageXObject) found.push({ name: args[0], box: ctm });
+                else if (op === O.paintInlineImageXObject) found.push({ data: args[0], box: ctm });
+            }
+            return found;
+        }
+
+        async function readPdfPageImages(page) {
+            let found;
+            try {
+                found = imageBoxesFromOps(await page.getOperatorList(), pdfjsLib.OPS);
+            } catch (e) {
+                return [];
+            }
+            const images = [];
+            for (const f of found) {
+                const [a, , , d, e, y] = f.box;
+                if (Math.abs(a) < 8 || Math.abs(d) < 8) continue;
+                const obj = f.data || await pdfObject(page, f.name);
+                const img = obj ? await shrinkImage(obj.bitmap || toRGBA(obj)) : null;
+                if (!img) {
+                    unreadableImageCount++;
+                    continue;
+                }
+                rememberImage(img);
+                images.push({ id: img.id, x: Math.min(e, e + a), y: Math.min(y, y + d), w: Math.abs(a), h: Math.abs(d) });
+            }
+            return images;
+        }
+
+        function pdfObject(page, name) {
+            const objs = String(name).startsWith('g_') ? page.commonObjs : page.objs;
+            return new Promise(resolve => {
+                const timer = setTimeout(() => resolve(null), 3000);
+                try {
+                    objs.get(name, obj => { clearTimeout(timer); resolve(obj); });
+                } catch (e) {
+                    clearTimeout(timer);
+                    resolve(null);
+                }
+            });
+        }
+
+        // Điểm ảnh pdf.js (kind 1: đen trắng 1 bit, bit 1 là trắng; 2: RGB; 3: RGBA) → RGBA cho canvas.
+        function toRGBA(img) {
+            if (!img || !img.data || !img.width || !img.height) return null;
+            const { width, height, data, kind } = img;
+            const out = new Uint8ClampedArray(width * height * 4);
+            if (kind === 3) {
+                out.set(data.subarray(0, out.length));
+            } else if (kind === 2) {
+                for (let i = 0, j = 0; j < out.length; i += 3, j += 4) {
+                    out[j] = data[i]; out[j + 1] = data[i + 1]; out[j + 2] = data[i + 2]; out[j + 3] = 255;
+                }
+            } else if (kind === 1) {
+                const rowBytes = (width + 7) >> 3;
+                for (let row = 0; row < height; row++) {
+                    for (let col = 0; col < width; col++) {
+                        const v = data[row * rowBytes + (col >> 3)] & (128 >> (col & 7)) ? 255 : 0;
+                        const j = (row * width + col) * 4;
+                        out[j] = out[j + 1] = out[j + 2] = v;
+                        out[j + 3] = 255;
+                    }
+                }
+            } else {
+                return null;
+            }
+            return { width, height, data: out };
+        }
+
+        // Ghi chú về hình sau khi chuyển file. Câu chưa ghép tính trên các dòng trước bước dựng đề, vì câu không còn phương án
+        // bị bỏ khỏi đề đã dựng.
+        function imageNotes(lines) {
+            const notes = [];
+            const unpaired = findUnpairedImageQuestions(lines.join('\n'));
+            if (unpaired.length > 0) notes.push(`ℹ️ Câu ${unpaired.join(', ')}: chưa ghép được hình với phương án, hãy chuyển ký hiệu hình vào đúng dòng A, B, C, D.`);
+            if (unreadableImageCount > 0) notes.push(`⚠️ Có ${unreadableImageCount} hình không đọc được (hình EMF/WMF từ Word): hãy lưu file thành PDF rồi tải lên.`);
+            return notes;
+        }
+
+        // Câu trong đề đã dựng còn ký hiệu hình ở đề bài trong khi phương án chỉ có chữ cái (hay để trống): hình chưa ghép
+        // được với phương án, cần thầy cô chuyển ký hiệu vào đúng dòng.
+        function findUnpairedImageQuestions(quizText) {
+            const result = [];
+            let q = null;
+            const finish = () => { if (q && q.looseImage && (q.letterOnly || q.options === 0)) result.push(q.num); };
+            const hasToken = line => /\[\[hình:[0-9a-f]{12}\]\]/.test(line);
+            for (const raw of String(quizText).split('\n')) {
+                const line = stripFormattingTags(raw).trim();
+                const start = line.match(/^(?:câu\s*hỏi\s*đúng\s*sai\s*:\s*)?(?:câu|question|bài)\s*(\d+)\s*[:.]/iu) || line.match(/^(\d+)\s*[.:)]\s/);
+                if (start) {
+                    finish();
+                    q = { num: Number(start[1]), looseImage: hasToken(line), letterOnly: false, options: 0 };
+                    continue;
+                }
+                if (!q) continue;
+                const opt = line.match(/^\*?\s*[A-F]\s*[.)]\s*(.*)$/);
+                if (opt) {
+                    q.options++;
+                    if (/^(?:[A-F](?:\s+|$))*$/.test(opt[1].trim()) || opt[1].trim() === UNPAIRED_IMAGE_TEXT) q.letterOnly = true;
+                } else if (/^(?:\(?[A-F][.)]?\s+)+\(?[A-F][.)]?$/.test(line)) {
+                    q.letterOnly = true;
+                } else if (hasToken(line)) {
+                    q.looseImage = true;
+                }
+            }
+            finish();
+            return result;
+        }
+
         // Bảng ngân hàng câu hỏi chép từ Word ("MÃ CÂU HỎI | NỘI DUNG CÂU HỎI | NỘI DUNG ĐÁP ÁN | … | LOẠI ĐÁP ÁN"): mỗi câu
         // một hàng đề bài rồi mỗi phương án một hàng, cột cuối ghi ĐÚNG/SAI. Viết lại thành "Câu N: …", "A. …", "*B. …" để
         // parser và bộ gắn nhãn đọc như đề thường; đáp án lấy từ cột ĐÚNG/SAI của file. Chỉ khi có hàng tiêu đề (để không
@@ -611,7 +885,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         }
 
         function cleanInputText(str) {
-            return markBareOptionLetters(readQuestionBankTable(fixLegacyVietnamese((str || '')
+            return markBareOptionLetters(readQuestionBankTable(pairImageRows(fixLegacyVietnamese((str || '')
                 .normalize('NFC'))
                 .replace(/[\u200B-\u200D\uFEFF]/g, '')
                 // Em-space, cách ngang rộng… (chép từ Word/PDF) như dấu cách thường, để "A. x  B. y" vẫn tách được.
@@ -648,7 +922,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 .replace(/^[ \t|]*(?:câu[ \t]*)?(\d+)[ \t|]+(a\)[ \t|]*(?:đúng|sai|đ|s)(?:[ \t|]*\n[ \t|]*[b-f]\)[ \t|]*(?:đúng|sai|đ|s))+)[ \t|]*$/gimu,
                     (m, n, rows) => `Câu ${n}: ${rows.replace(/[\s|]+/g, ' ').trim()}`)
                 .replace(/^[ \t|]*câu(?:[ \t|]+[a-f])+[ \t|]*((?:\n[ \t|]*\d+(?:[ \t|]+(?:đúng|sai|đ|s))+[ \t|]*)+)$/gimu,
-                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n'))));
+                    (m, rows) => rows.trim().split('\n').map(r => { const [n, ...v] = r.replace(/\|/g, ' ').trim().split(/\s+/); return `Câu ${n}: ${v.map(x => x[0].toUpperCase()).join('')}`; }).join('\n')), floatingImageIds)));
         }
 
         function escapeHTML(str) {
@@ -839,6 +1113,16 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && UI.modal.classList.contains('show')) closeModal(true);
         });
+
+        // Ảnh tải lỗi (đề chưa chia sẻ mà không còn hình trong bộ nhớ, hay R2 không còn hình): ghi chữ thay cho ảnh vỡ.
+        UI.quizContainer.addEventListener('error', (e) => {
+            const img = e.target;
+            if (!img || !img.classList || !img.classList.contains('quiz-img')) return;
+            const note = document.createElement('span');
+            note.className = 'img-missing';
+            note.textContent = '(hình chưa lưu)';
+            img.replaceWith(note);
+        }, true);
 
         UI.modal.addEventListener('click', (e) => {
             if (e.target === UI.modal) closeModal(true);
@@ -2207,8 +2491,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 glued[0].text = glued[0].text.replace(/\s*\*$/, '');
             });
 
-            const validQuestions = parsedQuestions.filter(q => q.options.length >= 2);
-            const droppedNoOptionCount = parsedQuestions.length - validQuestions.length;
+            // Câu mà hình chưa ghép được với phương án (thầy cô chưa sửa trong ô kết quả): bỏ, không cho học sinh làm câu hỏng.
+            const unpairedImageQs = parsedQuestions.filter(q => q.options.some(o => stripFormattingTags(String(o.text)).includes(UNPAIRED_IMAGE_TEXT)));
+            const validQuestions = parsedQuestions.filter(q => q.options.length >= 2 && !unpairedImageQs.includes(q));
+            const droppedNoOptionCount = parsedQuestions.filter(q => q.options.length < 2 && !unpairedImageQs.includes(q)).length;
             // Câu đúng/sai phải có bằng chứng (dấu * hoặc dòng/bảng đáp án như "Đáp án: SSSS"); không có thì bỏ như câu
             // trắc nghiệm thiếu đáp án, không tự coi mọi ý là Sai (quyết định ngày 7/11/2026).
             const hasAnswer = q => q.options.some(o => o.isCorrect) || (q.type === 'true_false' && q.hasExplicitTFAnswer);
@@ -2219,6 +2505,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
             const dropMsgs = [];
             const nonStandardTFCount = withCorrectAnswer.filter(q => q.type === 'true_false' && q.options.length !== 4).length;
+            if (unpairedImageQs.length > 0) dropMsgs.push(`${unpairedImageQs.length} câu chưa ghép được hình với phương án`);
             if (droppedMCCount > 0) dropMsgs.push(`${droppedMCCount} câu trắc nghiệm thiếu đáp án *`);
             if (droppedNoOptionCount > 0) dropMsgs.push(`${droppedNoOptionCount} câu không có phương án`);
             if (unstarredTFCount > 0) dropMsgs.push(`${unstarredTFCount} câu Đúng/Sai chưa có đáp án`);
@@ -2305,7 +2592,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 qBox.id = `qbox-${qIndex}`;
                 const qTitle = document.createElement('div');
                 qTitle.className = 'question-title';
-                qTitle.innerHTML = `Câu ${qIndex + 1}: ${renderMathInHtml(q.title)}`;
+                qTitle.innerHTML = `Câu ${qIndex + 1}: ${renderRich(q.title)}`;
                 qBox.appendChild(qTitle);
 
                 const optionsDiv = document.createElement('div');
@@ -2326,7 +2613,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
                         const textSpan = document.createElement('span');
                         textSpan.className = 'tf-text';
-                        textSpan.innerHTML = renderMathInHtml(opt.text);
+                        textSpan.innerHTML = renderRich(opt.text);
                         statementDiv.appendChild(textSpan);
 
                         const checkboxGroup = document.createElement('div');
@@ -2425,7 +2712,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                         const prefix = String.fromCharCode(65 + oIndex);
                         const cleanAriaText = decodeHTMLEntities(opt.text.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
                         btn.setAttribute('aria-label', `Câu ${qIndex + 1}, đáp án ${prefix}: ${cleanAriaText}`);
-                        btn.innerHTML = `<b>${prefix}.</b> ${renderMathInHtml(opt.text)}`;
+                        btn.innerHTML = `<b>${prefix}.</b> ${renderRich(opt.text)}`;
                         btn.onclick = () => handleSelection(btn, optionsDiv, qIndex, oIndex, mode);
                         optionsDiv.appendChild(btn);
                     });
@@ -2620,10 +2907,18 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             try {
                 sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ at: location.pathname + location.search, text: sourceText, title: sourceTitle, mode: quizMode, submitted: quizSubmitted, finalQuestions, selectedAnswers }));
             } catch (e) { /* hết chỗ hoặc bị chặn: chỉ mất khả năng khôi phục, bài vẫn làm bình thường */ }
+            // Hình chưa chia sẻ lưu riêng: hết chỗ thì xoá bản cũ (không để hình của đề trước), tải lại trang hiện "(hình chưa lưu)".
+            try {
+                const { dataUrls, count } = imagesForShare(sourceText);
+                if (count > 0) sessionStorage.setItem(IMAGES_KEY, JSON.stringify(dataUrls));
+                else sessionStorage.removeItem(IMAGES_KEY);
+            } catch (e) {
+                try { sessionStorage.removeItem(IMAGES_KEY); } catch (e2) { }
+            }
         }
 
         function clearQuizProgress() {
-            try { sessionStorage.removeItem(PROGRESS_KEY); } catch (e) { }
+            try { sessionStorage.removeItem(PROGRESS_KEY); sessionStorage.removeItem(IMAGES_KEY); } catch (e) { }
         }
 
         // Bài đã lưu chỉ dùng khi đủ dạng và đúng địa chỉ trang (mở link chia sẻ khác thì không dùng bài của đề khác).
@@ -2642,6 +2937,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const s = readQuizProgress(raw, location.pathname + location.search);
             if (!s) return false;
             const id = (new URLSearchParams(location.search).get('s') || '').trim();
+            try {
+                for (const [imageId, dataUrl] of Object.entries(JSON.parse(sessionStorage.getItem(IMAGES_KEY) || '{}'))) rememberImage({ id: imageId, dataUrl });
+            } catch (e) { }
             // Dựng lại đề từ văn bản gốc như khi mở link chia sẻ; thứ tự câu và phương án đã trộn lấy từ bản đã lưu.
             if (!parseQuizData(s.text, SHARE_ID_REGEX.test(id) ? id : null, s.title || '') || originalQuestions.length !== s.finalQuestions.length) {
                 clearQuizProgress();
@@ -3069,6 +3367,126 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         const KATEX_JS_SRI = 'sha512-hqULNlSWGNtoWUsYyRSpdOdww05s2hqNof5e1P4WxIVfLpL8ThFH/QqNNtax5fElgRkNZGkFyeKAmVvdZ/kpSA==';
         let katexLoading = null;
 
+        // Hình trong đề (docs/thiet-ke/hinh-anh.md): ký hiệu [[hình:<mã>]] nằm trong chữ, byte hình giữ trong quizImages
+        // (mã → data: URL). Không có trong bộ nhớ thì lấy hình đã lưu ở R2 qua /img/<mã>.
+        const IMAGE_TOKEN_REGEX = /\[\[hình:([0-9a-f]{12})\]\]/g;
+        let quizImages = {};
+        // Số hình không đọc được ở lần trích file gần nhất (EMF/WMF, hình hỏng): báo cho thầy cô sau khi chuyển.
+        let unreadableImageCount = 0;
+
+        // Thu nhỏ hình còn rộng tối đa 480 px, nén WebP (trình duyệt không nén được WebP thì canvas trả PNG); mã = 12 ký tự
+        // đầu SHA-256 của đúng byte đã nén (worker tính lại để kiểm). source: Blob (Word), ImageBitmap hay
+        // { width, height, data: RGBA } (PDF). Không đọc được → null. Test thay hàm này vì Node không có canvas.
+        async function shrinkImage(source) {
+            try {
+                const drawable = source instanceof Blob ? await createImageBitmap(source) : (source && source.data ? null : source);
+                const width = drawable ? drawable.width : source.width;
+                const height = drawable ? drawable.height : source.height;
+                if (!width || !height) return null;
+                const scale = Math.min(1, 480 / width);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(width * scale));
+                canvas.height = Math.max(1, Math.round(height * scale));
+                let image = drawable;
+                if (!image) {
+                    image = document.createElement('canvas');
+                    image.width = width;
+                    image.height = height;
+                    image.getContext('2d').putImageData(new ImageData(source.data, width, height), 0, 0);
+                }
+                canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.85));
+                if (!blob) return null;
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+                const id = Array.from(digest.slice(0, 6), b => b.toString(16).padStart(2, '0')).join('');
+                let binary = '';
+                for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                return { id, dataUrl: `data:${blob.type};base64,${btoa(binary)}` };
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Hình mammoth đọc được trong file Word → src "wtnimg:<mã>" (htmlToFormattedText đổi thành ký hiệu). Hình nổi
+        // (preprocessDocxFormat đánh dấu alt text "wtn:float") ghi vào floatingImageIds để không bị ghép với phương án.
+        async function readDocxImage(image) {
+            try {
+                if (/(?:emf|wmf)$/i.test(image.contentType || '')) {
+                    unreadableImageCount++;
+                    return '';
+                }
+                const img = await shrinkImage(new Blob([await image.read()], { type: image.contentType || '' }));
+                if (!img) {
+                    unreadableImageCount++;
+                    return '';
+                }
+                rememberImage(img);
+                if (image.altText === 'wtn:float') floatingImageIds.add(img.id);
+                return 'wtnimg:' + img.id;
+            } catch (e) {
+                unreadableImageCount++;
+                return '';
+            }
+        }
+
+        // Hình nổi trong Word (wp:anchor) không có chỗ đứng rõ ràng: chuyển ký hiệu của chúng khỏi phần phương án lên ngay
+        // dưới đề bài, để parser không nối hình vào phương án đứng trước. Chạy lúc dựng đề (assembleQuizText), nên thầy cô
+        // sửa tay trong ô kết quả sau đó vẫn giữ nguyên.
+        function moveFloatingImages(quizText, floating) {
+            if (!floating.size || !quizText.includes('[[hình:')) return quizText;
+            const isStart = line => /^(?:câu\s*hỏi\s*đúng\s*sai\s*:\s*)?câu\s*\d+\s*[:.]/iu.test(stripFormattingTags(line).trim());
+            const isOption = line => /^\*?\s*[A-Fa-f]\s*[.)]/.test(stripFormattingTags(line).trim());
+            const out = [];
+            let block = [];
+            const flush = () => {
+                const first = block.findIndex(isOption);
+                if (first < 0) {
+                    out.push(...block);
+                } else {
+                    const moved = [];
+                    const rest = [];
+                    for (const line of block.slice(first)) {
+                        const kept = line.replace(IMAGE_TOKEN_REGEX, (whole, id) => (floating.has(id) ? (moved.push(whole), '') : whole)).replace(/[ \t]+$/, '');
+                        if (kept.trim() !== '' || kept === line) rest.push(kept);
+                    }
+                    out.push(...block.slice(0, first), ...moved, ...rest);
+                }
+                block = [];
+            };
+            for (const line of quizText.split('\n')) {
+                if (isStart(line)) flush();
+                block.push(line);
+            }
+            flush();
+            return out.join('\n');
+        }
+        function rememberImage(img) {
+            if (img && /^[0-9a-f]{12}$/.test(img.id) && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(img.dataUrl)) quizImages[img.id] = img.dataUrl;
+        }
+        function renderImages(html) {
+            return String(html).replace(IMAGE_TOKEN_REGEX, (whole, id) => `<img class="quiz-img" alt="Hình" loading="lazy" src="${quizImages[id] || '/img/' + id}">`);
+        }
+        // Hình đề đang dùng (có ký hiệu trong chữ) và đang có trong bộ nhớ: base64 để gửi kèm khi tạo link, và data: URL để
+        // lưu khi tải lại trang. Hình không có trong bộ nhớ (đề mở từ link) không gửi: worker dùng bản đã lưu trong R2.
+        function imagesForShare(text) {
+            const images = {};
+            const dataUrls = {};
+            let bytes = 0;
+            for (const m of String(text).matchAll(IMAGE_TOKEN_REGEX)) {
+                const url = quizImages[m[1]];
+                if (!url || images[m[1]]) continue;
+                dataUrls[m[1]] = url;
+                images[m[1]] = url.slice(url.indexOf(',') + 1);
+                bytes += Math.floor(images[m[1]].length * 3 / 4);
+            }
+            return { images, dataUrls, bytes, count: Object.keys(images).length };
+        }
+
+        function renderRich(html) {
+            return renderImages(renderMathInHtml(html));
+        }
+
         function renderMathInHtml(html) {
             if (typeof katex === 'undefined' || !katex || typeof katex.renderToString !== 'function' || !html || !html.includes('$')) return html;
             const draw = (tex, displayMode) => katex.renderToString(decodeHTMLEntities(tex), { throwOnError: false, strict: 'ignore', trust: false, displayMode });
@@ -3138,12 +3556,6 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 const zip = await JSZip.loadAsync(arrayBuffer);
                 const docFile = zip.file('word/document.xml');
                 if (!docFile) return arrayBuffer;
-
-                for (const filePath of Object.keys(zip.files)) {
-                    if (filePath.startsWith('word/media/')) {
-                        zip.remove(filePath);
-                    }
-                }
 
                 const xmlText = await docFile.async('string');
                 const parser = new DOMParser();
@@ -3347,6 +3759,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
 
                 for (const dEl of drawings) {
+                    // Hình (DrawingML có a:blip, không phải hộp chữ) giữ lại cho mammoth đọc; hình nổi đánh dấu alt text
+                    // "wtn:float". Còn lại (w:pict, w:object như công thức MathType, hộp chữ) vẫn bỏ như trước.
+                    const localOf = e => e.localName || String(e.nodeName || '').replace(/^.*:/, '');
+                    const inner = Array.from(dEl.getElementsByTagName('*'));
+                    if (localOf(dEl) === 'drawing' && inner.some(e => localOf(e) === 'blip') && !inner.some(e => localOf(e) === 'txbxContent')) {
+                        if (inner.some(e => localOf(e) === 'anchor')) inner.filter(e => localOf(e) === 'docPr').forEach(e => e.setAttribute('descr', 'wtn:float'));
+                        continue;
+                    }
                     if (dEl.parentNode) dEl.parentNode.removeChild(dEl);
                 }
 
@@ -3567,7 +3987,11 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     return '';
                 }
                 const tag = node.tagName.toLowerCase();
-                if (tag === 'script' || tag === 'style' || tag === 'img') return '';
+                if (tag === 'script' || tag === 'style') return '';
+                if (tag === 'img') {
+                    const m = /^wtnimg:([0-9a-f]{12})$/.exec((node.getAttribute && node.getAttribute('src')) || '');
+                    return m ? `[[hình:${m[1]}]]` : '';
+                }
                 // Chú thích cuối trang/cuối bài của Word (mammoth đưa xuống cuối thành danh sách đánh số, kèm dấu [1] trong
                 // chữ): không phải phương án hay câu hỏi.
                 if (/^(?:footnote|endnote)-(?:ref-)?\d+$/.test((node.getAttribute && node.getAttribute('id')) || '')) return '';
@@ -3701,6 +4125,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         async function extractTextFromFile(file) {
             const ext = file.name.split('.').pop().toLowerCase();
+            floatingImageIds.clear();
+            unreadableImageCount = 0;
+            quizImages = {};
 
             if (ext === 'txt' || ext === 'md') {
                 const raw = await readFileAsText(file);
@@ -3731,7 +4158,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     arrayBuffer = null;
                     const mammothOptions = { styleMap: ["u => u", "sup => sup", "sub => sub"] };
                     if (mammoth.images && typeof mammoth.images.imgElement === 'function') {
-                        mammothOptions.convertImage = mammoth.images.imgElement(() => Promise.resolve({ src: '' }));
+                        mammothOptions.convertImage = mammoth.images.imgElement(async image => ({ src: await readDocxImage(image) }));
                     }
                     const docxResult = await mammoth.convertToHtml({ arrayBuffer: processedBuffer }, mammothOptions);
                     return htmlToFormattedText(docxResult.value);
@@ -3765,11 +4192,15 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                             try {
                                 const content = await page.getTextContent();
                                 let pageText = '';
+                                // Toạ độ từng mục chữ theo từng dòng, để đặt hình đúng chỗ và ghép với chữ cái phương án.
+                                const lineItems = [[]];
                                 for (let j = 0; j < content.items.length; j++) {
                                     const item = content.items[j];
                                     pageText += item.str;
+                                    if (item.str && item.transform) lineItems[lineItems.length - 1].push({ s: item.str, x: item.transform[4], y: item.transform[5] });
                                     if (item.hasEOL) {
                                         pageText += '\n';
+                                        lineItems.push([]);
                                     } else if (j < content.items.length - 1) {
                                         const next = content.items[j + 1];
                                         const currY = (item.transform && item.transform[5] !== undefined) ? item.transform[5] : null;
@@ -3777,6 +4208,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                                         const lineH = Math.max(item.height || 0, next.height || 0) || (item.transform ? Math.abs(item.transform[3]) : 10) || 10;
                                         if (currY !== null && nextY !== null && Math.abs(nextY - currY) > lineH * 0.65) {
                                             pageText += '\n';
+                                            lineItems.push([]);
                                         } else if (item.str && next.str && !/[\s\t]$/.test(item.str) && !/^[\s\t]/.test(next.str)) {
                                             const currentEndX = (item.transform && item.transform[4] !== undefined && item.width !== undefined)
                                                 ? (item.transform[4] + item.width) : null;
@@ -3791,6 +4223,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                                             }
                                         }
                                     }
+                                }
+                                const images = await readPdfPageImages(page);
+                                if (images.length) {
+                                    const texts = pageText.split('\n');
+                                    pageText = texts.length === lineItems.length
+                                        ? pairPdfImages(texts.map((text, k) => ({ text, items: lineItems[k] })), images).join('\n')
+                                        : [pageText, ...images.map(img => `[[hình:${img.id}]]`)].join('\n');
                                 }
                                 fullText += pageText + '\n';
                             } finally {
@@ -4485,12 +4924,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const tableText = tableLines.join('\n');
             const inTable = (n) => new RegExp(`(?:^|[^\\d.])${String(n).replace('.', '\\.')}(?:[^\\d]|$)`).test(tableText);
             const unanswered = tableText ? missing.filter(n => !inTable(n)) : missing;
-            return { text: out.join('\n'), questions: count, unanswered, withoutOptions };
+            return { text: moveFloatingImages(out.join('\n'), floatingImageIds), questions: count, unanswered, withoutOptions };
         }
 
         // Worker đã tự thử model dự phòng, nên trình duyệt chỉ gọi lại một lần. Dừng ngay khi người dùng đóng/đổi file.
         async function labelChunkWithAI(chunkLinesArr, isCancelled = () => false) {
-            const plainLines = chunkLinesArr.map(l => stripFormattingTags(l).trim());
+            // AI chỉ cần biết dòng có hình, không nhận mã hay byte hình.
+            const plainLines = chunkLinesArr.map(l => stripFormattingTags(l).replace(IMAGE_TOKEN_REGEX, '[hình]').trim());
             let lastError = null;
             for (let attempt = 1; attempt <= 2; attempt++) {
                 if (isCancelled()) throw new Error('Đã huỷ.');
@@ -4592,6 +5032,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 if (assembled.withoutOptions > 0) {
                     notes.push(`ℹ️ Bỏ qua ${assembled.withoutOptions} câu không có phương án A, B, C, D (tự luận hoặc trả lời ngắn).`);
                 }
+                notes.push(...imageNotes(lines));
+                UI.txtImageNote.style.display = convertedContent.includes('[[hình:') ? '' : 'none';
                 if (localParts.length > 0) {
                     notes.push(`⚠️ Phần ${localParts.join(', ')} không gọi được AI nên được đọc bằng quy tắc có sẵn, hãy kiểm tra kỹ.`);
                 }
@@ -4629,6 +5071,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.convertResultCard.style.display = 'none';
             UI.convertedText.value = '';
             UI.convertStatus.innerHTML = '';
+            UI.txtImageNote.style.display = 'none';
             convertedContent = '';
             convertedTitle = '';
             UI.convertFileInput.value = '';
@@ -4721,13 +5164,19 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 showToast(`Đề quá lớn để chia sẻ (tối đa ${SHARE_MAX_CHARS.toLocaleString('vi-VN')} ký tự).`, 4500);
                 return;
             }
+            const share = imagesForShare(sourceText);
+            const tokenCount = new Set([...sourceText.matchAll(IMAGE_TOKEN_REGEX)].map(m => m[1])).size;
+            if (tokenCount > SHARE_MAX_IMAGES || share.bytes > SHARE_MAX_IMAGE_BYTES) {
+                showToast(`Đề có quá nhiều hình để chia sẻ (tối đa ${SHARE_MAX_IMAGES} hình, 2 MB).`, 5000);
+                return;
+            }
             UI.shareCreateBtn.disabled = true;
             UI.shareCreateBtn.textContent = '⏳ Đang tạo link...';
             try {
                 const res = await fetch('/api/share', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: sourceText, title: sourceTitle })
+                    body: JSON.stringify({ text: sourceText, title: sourceTitle, ...(share.count > 0 ? { images: share.images } : {}) })
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok || typeof data.id !== 'string' || !SHARE_ID_REGEX.test(data.id)) {

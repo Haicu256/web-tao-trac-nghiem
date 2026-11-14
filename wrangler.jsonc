@@ -27,6 +27,9 @@
   "kv_namespaces": [
     { "binding": "SHARES", "id": "4eba8ce34e9b4c8992e8fb7cf7d247e5" }
   ],
+  "r2_buckets": [
+    { "binding": "IMAGES", "bucket_name": "wtn-images" }
+  ],
   "durable_objects": {
     "bindings": [
       { "name": "US_PROXY", "class_name": "USProxy" }

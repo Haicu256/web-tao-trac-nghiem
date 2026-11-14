@@ -1,13 +1,22 @@
+import { Buffer } from 'node:buffer';
 
 const SHARE_TTL_SECONDS = 60 * 60 * 24 * 90;
 const SHARE_RENEW_AFTER_SECONDS = 60 * 60 * 24 * 30;
 const MAX_SHARE_CHARS = 300_000;
 const SHARE_ID_REGEX = /^[0-9A-Za-z]{11}$/;
 const MAX_TITLE_CHARS = 100;
+// Hình trong đề (docs/thiet-ke/hinh-anh.md): ký hiệu [[hình:<mã>]] trong chữ, byte hình lưu ở R2 (binding IMAGES), khoá img/<mã>.
+const IMAGE_TOKEN_REGEX = /\[\[hình:([0-9a-f]{12})\]\]/g;
+const IMAGE_ID_REGEX = /^[0-9a-f]{12}$/;
+const MAX_IMAGE_BYTES = 300_000;
+const MAX_SHARE_IMAGE_BYTES = 2_000_000;
+const MAX_SHARE_IMAGES = 100;
+// Luật vòng đời trên kho xoá hình 92 ngày sau lần ghi cuối; hình ghi trong vòng 1 ngày thì không cần ghi lại.
+const IMAGE_REFRESH_AFTER_MS = 24 * 3600 * 1000;
 const CSP_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; media-src 'self'; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; img-src 'self' data:; frame-ancestors 'none';";
 
 export default {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
         const url = new URL(request.url);
 
         if (url.pathname === '/api/convert' && request.method === 'POST') {
@@ -32,7 +41,12 @@ export default {
         if (shareMatch && request.method === 'GET') {
             let id = shareMatch[1];
             try { id = decodeURIComponent(id); } catch {}
-            return handleShareGet(id.trim(), env, request);
+            return handleShareGet(id.trim(), env, request, ctx);
+        }
+
+        const imgMatch = url.pathname.match(/^\/img\/([^/]+)$/);
+        if (imgMatch) {
+            return handleImage(imgMatch[1], request, env);
         }
 
         if (url.pathname.startsWith('/api/')) {
@@ -421,7 +435,7 @@ async function handleShareCreate(request, env) {
             }
         }
 
-        const maxShareBytes = MAX_SHARE_CHARS * 4 + 1024;
+        const maxShareBytes = MAX_SHARE_CHARS * 4 + Math.ceil(MAX_SHARE_IMAGE_BYTES * 4 / 3) + MAX_SHARE_IMAGES * 64 + 1024;
         const parseResult = await readJsonWithLimit(request, maxShareBytes);
         if (parseResult.errorStatus === 415) {
             return jsonResponse({ error: 'Chỉ chấp nhận Content-Type: application/json.' }, 415);
@@ -448,6 +462,9 @@ async function handleShareCreate(request, env) {
         }
 
         const title = cleanTitle(body?.title);
+        // Hình trước, đề sau: lỗi ghi hình thì không tạo link thiếu hình.
+        const imageResult = await storeShareImages(text, body?.images, env);
+        if (imageResult.error) return imageResult.error;
         const id = await makeShareId(title, text);
 
         try {
@@ -483,7 +500,7 @@ async function handleShareCreate(request, env) {
     }
 }
 
-async function handleShareGet(id, env, request = null) {
+async function handleShareGet(id, env, request = null, ctx = null) {
     try {
         if (!env.SHARES) {
             return jsonResponse({ error: 'Server chưa cấu hình tính năng chia sẻ (thiếu KV binding SHARES).' }, 500);
@@ -507,11 +524,13 @@ async function handleShareGet(id, env, request = null) {
 
         const nowSec = Math.floor(Date.now() / 1000);
         if (c === null || nowSec - c > SHARE_RENEW_AFTER_SECONDS) {
-            try {
+            // Đề có hình: ghi lại hình trước, xong hết mới gia hạn đề, để link không sống lâu hơn hình (chạy nền khi có ctx).
+            const renew = (async () => {
+                if (imageIdsIn(text).length > 0 && !(await refreshImages(text, env))) return;
                 await env.SHARES.put(id, JSON.stringify({ v: 1, title, text, c: nowSec }), { expirationTtl: SHARE_TTL_SECONDS });
-            } catch (renewErr) {
-                console.error('KV share renew error:', renewErr);
-            }
+            })().catch(renewErr => console.error('KV share renew error:', renewErr));
+            if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(renew);
+            else await renew;
         }
 
         const clientEtag = request?.headers?.get('if-none-match');
@@ -741,3 +760,116 @@ export class USProxy {
     }
 }
 
+
+function imageIdsIn(text) {
+    return [...new Set([...String(text).matchAll(IMAGE_TOKEN_REGEX)].map(m => m[1]))];
+}
+
+// Loại hình theo byte đầu (không tin loại trình duyệt gửi): chỉ PNG, JPEG, WebP.
+function imageTypeOf(bytes) {
+    const at = (i, ...vals) => vals.every((v, k) => bytes[i + k] === v);
+    if (at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return 'image/png';
+    if (at(0, 0xff, 0xd8, 0xff)) return 'image/jpeg';
+    if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'image/webp';
+    return null;
+}
+
+async function imageIdOf(bytes) {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    return Array.from(digest.slice(0, 6), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function rewriteImage(env, key) {
+    const obj = await env.IMAGES.get(key);
+    if (!obj) return false;
+    await env.IMAGES.put(key, await obj.arrayBuffer(), { httpMetadata: { contentType: obj.httpMetadata?.contentType } });
+    return true;
+}
+
+// Kiểm tra và ghi hình của đề vào R2 trước khi ghi đề vào KV. Trả { error: Response } khi phải từ chối.
+async function storeShareImages(text, images, env) {
+    const ids = imageIdsIn(text);
+    if (ids.length === 0) return {};
+    if (!env.IMAGES) return { error: jsonResponse({ error: 'Server chưa cấu hình kho hình (thiếu R2 binding IMAGES).' }, 500) };
+    if (ids.length > MAX_SHARE_IMAGES) return { error: jsonResponse({ error: `Đề có quá nhiều hình (tối đa ${MAX_SHARE_IMAGES} hình).` }, 413) };
+    const given = images && typeof images === 'object' ? images : {};
+    const decoded = new Map();
+    let total = 0;
+    for (const id of ids) {
+        if (typeof given[id] !== 'string') continue;
+        // Buffer (nodejs_compat) giải base64 nhanh hơn Uint8Array.from(atob) hàng trăm lần (2 MB: ~2 ms so với ~0,5 s CPU).
+        // Ký tự rác bị bỏ qua, nhưng kiểm loại hình và mã băm phía sau vẫn chặn byte sai.
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(given[id])) return { error: jsonResponse({ error: 'Hình không đúng định dạng.' }, 400) };
+        const bytes = new Uint8Array(Buffer.from(given[id], 'base64'));
+        if (bytes.length > MAX_IMAGE_BYTES) return { error: jsonResponse({ error: 'Hình quá lớn (tối đa 300 KB mỗi hình).' }, 413) };
+        total += bytes.length;
+        if (total > MAX_SHARE_IMAGE_BYTES) return { error: jsonResponse({ error: 'Tổng dung lượng hình quá lớn (tối đa 2 MB mỗi đề).' }, 413) };
+        const type = imageTypeOf(bytes);
+        if (!type) return { error: jsonResponse({ error: 'Chỉ nhận hình PNG, JPEG hoặc WebP.' }, 400) };
+        if (await imageIdOf(bytes) !== id) return { error: jsonResponse({ error: 'Mã hình không khớp với hình.' }, 400) };
+        decoded.set(id, { bytes, type });
+    }
+    try {
+        const heads = new Map();
+        for (const id of ids) heads.set(id, await env.IMAGES.head(`img/${id}`));
+        if (ids.some(id => !decoded.has(id) && !heads.get(id))) {
+            return { error: jsonResponse({ error: 'Đề thiếu hình, hãy tải lại file đề rồi tạo link.' }, 400) };
+        }
+        for (const id of ids) {
+            const head = heads.get(id);
+            if (head && Date.now() - new Date(head.uploaded).getTime() < IMAGE_REFRESH_AFTER_MS) continue;
+            // Mã đã có trong kho: chỉ ghi lại đúng byte trong kho, không bao giờ ghi byte trình duyệt gửi (mã 48 bit có thể bị
+            // dò trùng để thay hình của đề khác).
+            if (head) await rewriteImage(env, `img/${id}`);
+            else await env.IMAGES.put(`img/${id}`, decoded.get(id).bytes, { httpMetadata: { contentType: decoded.get(id).type } });
+        }
+    } catch (err) {
+        console.error('R2 image error:', err);
+        return { error: jsonResponse({ error: 'Không lưu được hình lúc này. Vui lòng thử lại sau.' }, 503) };
+    }
+    return {};
+}
+
+// Gia hạn hình của đề (ghi lại để đặt lại hạn 92 ngày). Thiếu hình hay R2 lỗi → false (không gia hạn đề).
+async function refreshImages(text, env) {
+    if (!env.IMAGES) return false;
+    try {
+        for (const id of imageIdsIn(text)) {
+            const head = await env.IMAGES.head(`img/${id}`);
+            if (!head) return false;
+            if (Date.now() - new Date(head.uploaded).getTime() >= IMAGE_REFRESH_AFTER_MS && !(await rewriteImage(env, `img/${id}`))) return false;
+        }
+        return true;
+    } catch (err) {
+        console.error('R2 image refresh error:', err);
+        return false;
+    }
+}
+
+async function handleImage(id, request, env) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+    }
+    if (!IMAGE_ID_REGEX.test(id) || !env.IMAGES) return new Response('Not Found', { status: 404 });
+    let obj;
+    try {
+        obj = await env.IMAGES.get(`img/${id}`);
+    } catch (err) {
+        console.error('R2 image read error:', err);
+        return new Response('Service Unavailable', { status: 503 });
+    }
+    if (!obj) return new Response('Not Found', { status: 404 });
+    const headers = new Headers({
+        'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        // Trình duyệt không cho web khác nhúng hình (không dùng kho làm chỗ chứa ảnh).
+        'Cross-Origin-Resource-Policy': 'same-origin',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+    });
+    if (request.method === 'HEAD') {
+        await obj.body?.cancel?.();
+        return new Response(null, { headers });
+    }
+    return new Response(obj.body, { headers });
+}
