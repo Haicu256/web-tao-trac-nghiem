@@ -112,6 +112,24 @@
         .hint-text { display: block; font-size: 13px; color: #888; margin-top: 5px; font-style: italic; }
         .btn-start { background-color: #1a73e8; color: white; border: none; padding: 12px 25px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 15px; }
         .btn-start:hover { background-color: #1557b0; }
+        .study-part-box { margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border-color); }
+        .btn-study-expand { background: var(--bg-secondary); color: var(--title-color); border: 1px dashed var(--border-color); padding: 9px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; width: 100%; }
+        .btn-study-expand:hover { background: var(--hover-bg); border-color: var(--hover-border); }
+        .study-preset-row, .study-range-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+        .study-chip { padding: 6px 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); border-radius: 16px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .study-chip:hover { background: var(--hover-bg); }
+        .study-chip.active { background: var(--selected-bg); border-color: var(--selected-border); color: var(--selected-text); }
+        .study-custom-input { width: 72px; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font-size: 14px; text-align: center; }
+        .study-parts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 8px; margin-top: 12px; }
+        .study-part-btn { padding: 9px 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color); border-radius: 8px; cursor: pointer; text-align: left; font-size: 13px; line-height: 1.35; transition: all 0.15s; }
+        .study-part-btn:hover { background: var(--hover-bg); border-color: var(--hover-border); }
+        .study-part-btn.active { background: var(--selected-bg); border-color: var(--selected-border); color: var(--selected-text); box-shadow: 0 0 0 1px var(--selected-border); }
+        .study-part-btn.done { border-color: var(--correct-border); }
+        .study-part-badge { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--correct-text); }
+        .study-done-bar { display: flex; justify-content: flex-end; margin-top: 8px; }
+        .btn-clear-done { background: transparent; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 4px 2px; }
+        .btn-clear-done:hover { color: var(--text-color); }
+        .study-scope-banner { text-align: center; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--title-color); padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-bottom: 16px; }
 
         
         .share-box { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-color); }
@@ -143,6 +161,12 @@
         .btn-submit:hover { background-color: #2b8c44; }
         #result-box { display: none; text-align: center; background: var(--selected-bg); border: 1px solid var(--selected-border); color: var(--selected-text); padding: 20px; border-radius: 12px; font-size: 20px; font-weight: bold; margin-bottom: 30px; animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .result-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 15px; }
+        .result-actions .btn-top { margin-top: 0 !important; padding: 10px 20px; }
+        .btn-next-part { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-next-part:hover { background: #1557b0; }
+        .btn-retry-wrong { background: #d97706; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-retry-wrong:hover { background: #b45309; }
 
         .floating-btn {
             display: none;
@@ -387,7 +411,37 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                     <label for="shuffleOptions"><input type="checkbox" id="shuffleOptions" checked> Trộn thứ tự đáp án</label>
                 </div>
             </div>
-            <button type="button" class="btn-start" onclick="startQuiz()">Bắt Đầu Làm Bài</button>
+            <div class="study-part-box" id="study-part-group">
+                <button type="button" id="studyPartExpandBtn" class="btn-study-expand" onclick="expandStudyPartsForShortExam()" style="display:none;">📚 Chia phần để học</button>
+                <div id="studyPartPanel" style="display:none;">
+                    <span class="config-label">Phạm vi làm bài:</span>
+                    <div class="radio-group">
+                        <label for="studyModeAll"><input type="radio" id="studyModeAll" name="studyScope" value="all" checked onchange="setStudyScopeMode('all')"> Toàn bộ</label>
+                        <label for="studyModeParts"><input type="radio" id="studyModeParts" name="studyScope" value="parts" onchange="setStudyScopeMode('parts')"> Chia phần để học</label>
+                        <label for="studyModeRange"><input type="radio" id="studyModeRange" name="studyScope" value="range" onchange="setStudyScopeMode('range')"> Từ câu – đến câu</label>
+                    </div>
+                    <div id="studyPartsBox" style="display:none;">
+                        <div class="study-preset-row">
+                            <span>Mỗi phần:</span>
+                            <button type="button" id="studyChip20" class="study-chip" onclick="setStudyPartSize(20)">20 câu</button>
+                            <button type="button" id="studyChip30" class="study-chip active" onclick="setStudyPartSize(30)">30 câu</button>
+                            <button type="button" id="studyChip50" class="study-chip" onclick="setStudyPartSize(50)">50 câu</button>
+                            <label for="studyCustomSize" style="display:inline-flex; align-items:center; gap:6px; font-weight:500; margin:0;">
+                                Tùy chọn: <input type="number" id="studyCustomSize" class="study-custom-input" min="1" value="30" oninput="setStudyPartSize(this.value)"> câu
+                            </label>
+                        </div>
+                        <div id="studyPartsGrid" class="study-parts-grid"></div>
+                        <div id="studyDoneBar" class="study-done-bar" style="display:none;">
+                            <button type="button" class="btn-clear-done" onclick="clearCurrentExamStudyDone()">Xóa đánh dấu đã học</button>
+                        </div>
+                    </div>
+                    <div id="studyRangeBox" class="study-range-row" style="display:none;">
+                        <label for="studyRangeStartInput" style="display:inline-flex; align-items:center; gap:6px; font-weight:500; margin:0;">Từ câu <input type="number" id="studyRangeStartInput" class="study-custom-input" min="1" value="1" oninput="onStudyRangeInput()"></label>
+                        <label for="studyRangeEndInput" style="display:inline-flex; align-items:center; gap:6px; font-weight:500; margin:0;">đến câu <input type="number" id="studyRangeEndInput" class="study-custom-input" min="1" value="1" oninput="onStudyRangeInput()"></label>
+                    </div>
+                </div>
+            </div>
+            <button type="button" id="startQuizBtn" class="btn-start" onclick="startQuiz()">Bắt Đầu Làm Bài</button>
 
             <div id="share-box" class="share-box">
                 <h3>🔗 Chia sẻ đề này</h3>
@@ -406,8 +460,13 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
 
         <div id="result-box">
             <div id="resultText"></div>
-            <button type="button" id="retryBtn" class="btn-top" style="display:none; margin-top: 15px; padding: 10px 22px;" onclick="retryQuiz()">🔄 Làm lại bài này</button>
+            <div class="result-actions">
+                <button type="button" id="retryWrongBtn" class="btn-retry-wrong" style="display:none;" onclick="retryWrongQuestions()">🎯 Làm lại câu sai</button>
+                <button type="button" id="nextPartBtn" class="btn-next-part" style="display:none;" onclick="startNextStudyPart()">➡️ Học tiếp</button>
+                <button type="button" id="retryBtn" class="btn-top" style="display:none; margin-top: 15px; padding: 10px 22px;" onclick="retryQuiz()">🔄 Làm lại bài này</button>
+            </div>
         </div>
+        <div id="studyScopeBanner" class="study-scope-banner" style="display:none;"></div>
         <div id="quizContainer"></div>
         <div id="action-section">
             <button type="button" class="btn-submit" onclick="submitQuiz()">Nộp Bài & Xem Kết Quả</button>
@@ -473,6 +532,19 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             shareNativeBtn: document.getElementById('shareNativeBtn'),
             shareTitleRow: document.getElementById('shareTitleRow'),
             shareTitleText: document.getElementById('shareTitleText'),
+            startQuizBtn: document.getElementById('startQuizBtn'),
+            studyPartExpandBtn: document.getElementById('studyPartExpandBtn'),
+            studyPartPanel: document.getElementById('studyPartPanel'),
+            studyPartsBox: document.getElementById('studyPartsBox'),
+            studyRangeBox: document.getElementById('studyRangeBox'),
+            studyPartsGrid: document.getElementById('studyPartsGrid'),
+            studyCustomSize: document.getElementById('studyCustomSize'),
+            studyRangeStartInput: document.getElementById('studyRangeStartInput'),
+            studyRangeEndInput: document.getElementById('studyRangeEndInput'),
+            studyDoneBar: document.getElementById('studyDoneBar'),
+            studyScopeBanner: document.getElementById('studyScopeBanner'),
+            retryWrongBtn: document.getElementById('retryWrongBtn'),
+            nextPartBtn: document.getElementById('nextPartBtn'),
         };
 
         let _audio = null;
@@ -1086,6 +1158,12 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             const oldBadge = document.getElementById('questionCountBadge');
             if (oldBadge) oldBadge.remove();
             UI.retryBtn.style.display = 'none';
+            if (UI.retryWrongBtn) UI.retryWrongBtn.style.display = 'none';
+            if (UI.nextPartBtn) UI.nextPartBtn.style.display = 'none';
+            if (UI.studyScopeBanner) UI.studyScopeBanner.style.display = 'none';
+            activeStudyScope = null;
+            studyScopeMode = 'all';
+            studySelectedPart = 0;
             UI.uploadCard.style.display = 'block';
             UI.configSection.style.display = 'none';
             UI.actionSection.style.display = 'none';
@@ -2567,6 +2645,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 selectedAnswers = {};
                 answeredCount = {};
                 UI.retryBtn.style.display = 'none';
+                if (UI.retryWrongBtn) UI.retryWrongBtn.style.display = 'none';
+                if (UI.nextPartBtn) UI.nextPartBtn.style.display = 'none';
+                if (UI.studyScopeBanner) UI.studyScopeBanner.style.display = 'none';
                 UI.resultBox.style.display = 'none';
                 UI.resultText.innerHTML = '';
                 UI.quizContainer.innerHTML = '';
@@ -2588,6 +2669,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 else UI.configSection.prepend(badge);
                 sourceTitle = title;
                 renderQuizTitle();
+                initStudyPartsUI();
                 return true;
             } else {
                 if (hasMultipleExamCodes) {
@@ -2771,18 +2853,26 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
                 if (totalAnswered === finalQuestions.length) {
                     clearTimeout(immediateResultTimer);
-                    immediateResultTimer = setTimeout(() => {
-                        const result = calculateScore();
-                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
-                        UI.resultBox.style.display = 'block';
-                        UI.actionSection.style.display = 'none';
-                        UI.retryBtn.style.display = 'inline-block';
-                        UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 600);
+                    immediateResultTimer = setTimeout(showImmediateResult, 600);
                 }
             } else {
                 answeredCount[qIndex] = false;
             }
+        }
+
+        function showImmediateResult() {
+            const result = calculateScore();
+            UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
+            UI.resultBox.style.display = 'block';
+            UI.actionSection.style.display = 'none';
+            UI.retryBtn.style.display = 'inline-block';
+            if (activeStudyScope && (activeStudyScope.mode === 'parts' || activeStudyScope.mode === 'range')) {
+                saveStudyDonePart(sourceText, activeStudyScope.start, activeStudyScope.end, result.points, result.total, result.percentage);
+            }
+            updateResultExtraButtons();
+            quizSubmitted = true;
+            saveQuizProgress();
+            UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function handleSelection(clickedBtn, optionsContainer, qIndex, oIndex, mode) {
@@ -2807,14 +2897,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 }
                 if (totalAnswered === finalQuestions.length) {
                     clearTimeout(immediateResultTimer);
-                    immediateResultTimer = setTimeout(() => {
-                        const result = calculateScore();
-                        UI.resultText.innerHTML = `🎉 Kết quả của bạn: <span style="font-size:24px; font-weight: bold;">${result.points}/${result.total}</span> điểm (Đạt ${result.percentage}%)`;
-                        UI.resultBox.style.display = 'block';
-                        UI.actionSection.style.display = 'none';
-                        UI.retryBtn.style.display = 'inline-block';
-                        UI.resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 600);
+                    immediateResultTimer = setTimeout(showImmediateResult, 600);
                 }
             } else {
                 buttons.forEach(btn => btn.classList.remove('selected'));
@@ -2885,28 +2968,340 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             }
         }
 
+        const STUDY_PART_PRESETS = [20, 30, 50];
+        const SHORT_EXAM_THRESHOLD = 20;
+        const STUDY_PROGRESS_PREFIX = 'wtnStudyDone:';
+        let studyScopeMode = 'all';
+        let studyPartSize = 30;
+        let studySelectedPart = 0;
+        let studyRangeStart = 1;
+        let studyRangeEnd = 1;
+        let activeStudyScope = null;
+
+        function examFingerprint(text) {
+            const str = String(text || '');
+            let h1 = 0x811c9dc5;
+            let h2 = 0x9e3779b1;
+            for (let i = 0; i < str.length; i++) {
+                const ch = str.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 0x01000193);
+                h2 = Math.imul(h2 ^ ((ch + i) & 0xffff), 0x01000193);
+            }
+            return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+        }
+
+        function readStudyDoneMap(text) {
+            if (!text) return {};
+            try {
+                const raw = localStorage.getItem(STUDY_PROGRESS_PREFIX + examFingerprint(text));
+                if (!raw) return {};
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveStudyDonePart(text, start, end, points, total, pct) {
+            if (!text) return;
+            try {
+                const map = readStudyDoneMap(text);
+                map[`${start}-${end}`] = { points, total, pct };
+                localStorage.setItem(STUDY_PROGRESS_PREFIX + examFingerprint(text), JSON.stringify(map));
+            } catch (e) { }
+        }
+
+        function clearStudyDoneMap(text) {
+            if (!text) return;
+            try {
+                const key = STUDY_PROGRESS_PREFIX + examFingerprint(text);
+                if (typeof localStorage.removeItem === 'function') localStorage.removeItem(key);
+                else localStorage.setItem(key, '');
+            } catch (e) { }
+        }
+
+        function clearCurrentExamStudyDone() {
+            clearStudyDoneMap(sourceText);
+            renderStudyPartsGrid();
+            showToast('Đã xóa đánh dấu các phần đã học.', 2500);
+        }
+
+        function computeStudyParts(totalQuestions, partSize) {
+            const total = Math.max(0, Math.floor(Number(totalQuestions) || 0));
+            if (total === 0) return [];
+            const size = Math.max(1, Math.min(total, Math.floor(Number(partSize) || 1)));
+            const parts = [];
+            for (let start = 0, idx = 0; start < total; start += size, idx++) {
+                parts.push({ index: idx, start, end: Math.min(total, start + size) });
+            }
+            return parts;
+        }
+
+        function normalizeStudyRange(startInput, endInput, totalQuestions) {
+            const total = Math.max(1, Math.floor(Number(totalQuestions) || 1));
+            const clamp = v => Math.max(1, Math.min(total, Math.floor(Number(v) || 1)));
+            let a = clamp(startInput);
+            let b = clamp(endInput);
+            if (a > b) { const tmp = a; a = b; b = tmp; }
+            return { from: a, to: b, start: a - 1, end: b };
+        }
+
+        function getWrongQuestions(questions, answers) {
+            const wrong = [];
+            (questions || []).forEach((q, qIndex) => {
+                if (q.type === 'true_false') {
+                    let okCount = 0;
+                    for (let i = 0; i < q.options.length; i++) {
+                        const st = answers?.[qIndex]?.[i];
+                        const isCorrect = q.options[i].isCorrect;
+                        const dung = st?.dung || false;
+                        const sai = st?.sai || false;
+                        if (isCorrect ? (dung && !sai) : (sai && !dung)) okCount++;
+                    }
+                    if (okCount < q.options.length) wrong.push(q);
+                } else {
+                    const choice = answers?.[qIndex];
+                    if (choice === undefined || !q.options?.[choice]?.isCorrect) wrong.push(q);
+                }
+            });
+            return wrong;
+        }
+
+        function describeStudyScope(scope) {
+            if (!scope) return '';
+            if (scope.mode === 'parts') return `Phần ${scope.partIndex + 1}/${scope.totalParts} (Câu ${scope.start + 1}–${scope.end})`;
+            if (scope.mode === 'range') return `Khoảng câu ${scope.start + 1}–${scope.end} (${scope.end - scope.start} câu)`;
+            if (scope.mode === 'wrong') return `Ôn lại ${scope.expectedCount} câu sai${scope.sourceLabel ? ` (${scope.sourceLabel})` : ''}`;
+            return '';
+        }
+
+        function renderStudyPartsGrid() {
+            const grid = UI.studyPartsGrid;
+            if (!grid) return;
+            grid.innerHTML = '';
+            STUDY_PART_PRESETS.forEach(p => {
+                const chip = document.getElementById(`studyChip${p}`);
+                if (chip && chip.classList) {
+                    if (studyPartSize === p) chip.classList.add('active');
+                    else chip.classList.remove('active');
+                }
+            });
+            const parts = computeStudyParts(originalQuestions.length, studyPartSize);
+            if (studySelectedPart >= parts.length) studySelectedPart = 0;
+            const doneMap = readStudyDoneMap(sourceText);
+            parts.forEach(part => {
+                const key = `${part.start}-${part.end}`;
+                const done = doneMap[key];
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `study-part-btn${part.index === studySelectedPart ? ' active' : ''}${done ? ' done' : ''}`;
+                btn.onclick = () => selectStudyPart(part.index);
+                const labelEl = document.createElement('strong');
+                labelEl.textContent = `Phần ${part.index + 1} (${part.start + 1}–${part.end})`;
+                btn.appendChild(labelEl);
+                if (done) {
+                    const badgeEl = document.createElement('span');
+                    badgeEl.className = 'study-part-badge';
+                    badgeEl.textContent = `✅ ${done.points}/${done.total}`;
+                    btn.appendChild(badgeEl);
+                }
+                grid.appendChild(btn);
+            });
+            if (UI.studyDoneBar) {
+                UI.studyDoneBar.style.display = Object.keys(doneMap).length > 0 ? 'flex' : 'none';
+            }
+        }
+
+        function updateStartButtonLabel() {
+            if (!UI.startQuizBtn) return;
+            if (studyScopeMode === 'parts') {
+                const parts = computeStudyParts(originalQuestions.length, studyPartSize);
+                const p = parts[studySelectedPart] || parts[0];
+                UI.startQuizBtn.textContent = p ? `Bắt Đầu Phần ${p.index + 1} (Câu ${p.start + 1}–${p.end})` : 'Bắt Đầu Làm Bài';
+            } else if (studyScopeMode === 'range') {
+                const r = normalizeStudyRange(studyRangeStart, studyRangeEnd, originalQuestions.length);
+                UI.startQuizBtn.textContent = `Bắt Đầu Câu ${r.from}–${r.to} (${r.end - r.start} câu)`;
+            } else {
+                UI.startQuizBtn.textContent = 'Bắt Đầu Làm Bài';
+            }
+        }
+
+        function initStudyPartsUI() {
+            studyScopeMode = 'all';
+            studySelectedPart = 0;
+            studyRangeStart = 1;
+            studyRangeEnd = Math.max(1, originalQuestions.length);
+            activeStudyScope = null;
+            if (UI.studyCustomSize) UI.studyCustomSize.value = String(studyPartSize);
+            if (UI.studyRangeStartInput) UI.studyRangeStartInput.value = '1';
+            if (UI.studyRangeEndInput) UI.studyRangeEndInput.value = String(studyRangeEnd);
+            if (UI.studyPartPanel && UI.studyPartExpandBtn) {
+                if (originalQuestions.length <= SHORT_EXAM_THRESHOLD) {
+                    UI.studyPartPanel.style.display = 'none';
+                    UI.studyPartExpandBtn.style.display = 'block';
+                } else {
+                    UI.studyPartPanel.style.display = 'block';
+                    UI.studyPartExpandBtn.style.display = 'none';
+                }
+            }
+            setStudyScopeMode('all');
+        }
+
+        function expandStudyPartsForShortExam() {
+            if (UI.studyPartExpandBtn) UI.studyPartExpandBtn.style.display = 'none';
+            if (UI.studyPartPanel) UI.studyPartPanel.style.display = 'block';
+        }
+
+        function setStudyScopeMode(mode) {
+            studyScopeMode = mode === 'parts' || mode === 'range' ? mode : 'all';
+            const rAll = document.getElementById('studyModeAll');
+            const rParts = document.getElementById('studyModeParts');
+            const rRange = document.getElementById('studyModeRange');
+            if (rAll) rAll.checked = studyScopeMode === 'all';
+            if (rParts) rParts.checked = studyScopeMode === 'parts';
+            if (rRange) rRange.checked = studyScopeMode === 'range';
+            if (UI.studyPartsBox) UI.studyPartsBox.style.display = studyScopeMode === 'parts' ? 'block' : 'none';
+            if (UI.studyRangeBox) UI.studyRangeBox.style.display = studyScopeMode === 'range' ? 'flex' : 'none';
+            renderStudyPartsGrid();
+            updateStartButtonLabel();
+        }
+
+        function setStudyPartSize(val) {
+            const parsed = parseInt(val, 10);
+            if (!Number.isFinite(parsed) || parsed < 1) return;
+            studyPartSize = parsed;
+            studySelectedPart = 0;
+            if (UI.studyCustomSize && String(UI.studyCustomSize.value) !== String(parsed)) {
+                UI.studyCustomSize.value = String(parsed);
+            }
+            renderStudyPartsGrid();
+            updateStartButtonLabel();
+        }
+
+        function selectStudyPart(index) {
+            const parts = computeStudyParts(originalQuestions.length, studyPartSize);
+            if (parts.length === 0) return;
+            studySelectedPart = Math.max(0, Math.min(parts.length - 1, Math.floor(Number(index) || 0)));
+            renderStudyPartsGrid();
+            updateStartButtonLabel();
+        }
+
+        function onStudyRangeInput() {
+            const r = normalizeStudyRange(UI.studyRangeStartInput?.value, UI.studyRangeEndInput?.value, originalQuestions.length);
+            studyRangeStart = r.from;
+            studyRangeEnd = r.to;
+            updateStartButtonLabel();
+        }
+
+        function updateStudyScopeBanner() {
+            if (!UI.studyScopeBanner) return;
+            const label = describeStudyScope(activeStudyScope);
+            if (label) {
+                UI.studyScopeBanner.textContent = `📚 ${label}`;
+                UI.studyScopeBanner.style.display = 'block';
+            } else {
+                UI.studyScopeBanner.textContent = '';
+                UI.studyScopeBanner.style.display = 'none';
+            }
+        }
+
+        function updateResultExtraButtons() {
+            if (UI.retryWrongBtn) {
+                const wrongs = getWrongQuestions(finalQuestions, selectedAnswers);
+                if (wrongs.length > 0) {
+                    UI.retryWrongBtn.textContent = `🎯 Làm lại ${wrongs.length} câu sai`;
+                    UI.retryWrongBtn.style.display = 'inline-block';
+                } else {
+                    UI.retryWrongBtn.style.display = 'none';
+                }
+            }
+            if (UI.nextPartBtn) {
+                const pScope = activeStudyScope?.mode === 'parts'
+                    ? activeStudyScope
+                    : (activeStudyScope?.mode === 'wrong' && activeStudyScope.parentScope?.mode === 'parts' ? activeStudyScope.parentScope : null);
+                const next = pScope ? computeStudyParts(originalQuestions.length, pScope.partSize)[pScope.partIndex + 1] : null;
+                if (next) {
+                    UI.nextPartBtn.textContent = `➡️ Học tiếp Phần ${next.index + 1} (${next.start + 1}–${next.end})`;
+                    UI.nextPartBtn.style.display = 'inline-block';
+                } else {
+                    UI.nextPartBtn.style.display = 'none';
+                }
+            }
+            if (UI.retryBtn) {
+                UI.retryBtn.textContent = activeStudyScope ? '📋 Chọn phần khác' : '🔄 Làm lại bài này';
+            }
+        }
+
+        function retryWrongQuestions() {
+            const wrongs = getWrongQuestions(finalQuestions, selectedAnswers);
+            if (wrongs.length === 0) return;
+            const parentScope = activeStudyScope?.mode === 'wrong'
+                ? activeStudyScope.parentScope
+                : (activeStudyScope ? { ...activeStudyScope } : null);
+            const sourceLabel = parentScope ? describeStudyScope(parentScope) : '';
+            startQuizNow({ mode: 'wrong', questions: wrongs, expectedCount: wrongs.length, sourceLabel, parentScope });
+        }
+
+        function startNextStudyPart() {
+            const pScope = activeStudyScope?.mode === 'parts'
+                ? activeStudyScope
+                : (activeStudyScope?.mode === 'wrong' && activeStudyScope.parentScope?.mode === 'parts' ? activeStudyScope.parentScope : null);
+            if (!pScope) return;
+            const parts = computeStudyParts(originalQuestions.length, pScope.partSize);
+            const next = parts[pScope.partIndex + 1];
+            if (!next) return;
+            studyPartSize = pScope.partSize;
+            studySelectedPart = next.index;
+            if (UI.studyCustomSize) UI.studyCustomSize.value = String(studyPartSize);
+            setStudyScopeMode('parts');
+            startQuizNow({ mode: 'parts', partIndex: next.index, partSize: pScope.partSize, totalParts: parts.length, start: next.start, end: next.end });
+        }
+
         // Màn hình làm bài (dùng chung cho bắt đầu mới và khôi phục sau khi tải lại trang): dùng finalQuestions và quizMode.
         function showQuiz() {
             clearTimeout(immediateResultTimer);
+            UI.resultBox.style.display = 'none';
+            UI.retryBtn.style.display = 'none';
+            if (UI.retryWrongBtn) UI.retryWrongBtn.style.display = 'none';
+            if (UI.nextPartBtn) UI.nextPartBtn.style.display = 'none';
             UI.footer.style.display = 'none';
             UI.freeMessage.style.display = 'none';
             UI.usageGuide.style.display = 'none';
             showMusicButton();
             UI.configSection.style.display = 'none';
+            updateStudyScopeBanner();
             selectedAnswers = {};
             answeredCount = {};
             renderQuiz(quizMode);
         }
 
-        function startQuizNow() {
+        function startQuizNow(overrideScope = null) {
             const viewMode = document.querySelector('input[name="viewMode"]:checked')?.value || 'immediate';
             const isShuffleQ = document.getElementById('shuffleQuestions')?.checked ?? true;
             const isShuffleO = document.getElementById('shuffleOptions')?.checked ?? true;
 
+            let scope = overrideScope;
+            if (!scope) {
+                if (studyScopeMode === 'parts') {
+                    const parts = computeStudyParts(originalQuestions.length, studyPartSize);
+                    const p = parts[studySelectedPart] || parts[0];
+                    scope = p ? { mode: 'parts', partIndex: p.index, partSize: studyPartSize, totalParts: parts.length, start: p.start, end: p.end } : null;
+                } else if (studyScopeMode === 'range') {
+                    const r = normalizeStudyRange(studyRangeStart, studyRangeEnd, originalQuestions.length);
+                    scope = { mode: 'range', start: r.start, end: r.end };
+                } else {
+                    scope = null;
+                }
+            }
+
+            const sourceSlice = scope?.mode === 'wrong'
+                ? scope.questions
+                : (scope ? originalQuestions.slice(scope.start, scope.end) : originalQuestions);
+
             try {
-                finalQuestions = structuredClone(originalQuestions);
+                finalQuestions = structuredClone(sourceSlice);
             } catch (e) {
-                finalQuestions = JSON.parse(JSON.stringify(originalQuestions));
+                finalQuestions = JSON.parse(JSON.stringify(sourceSlice));
             }
 
             if (isShuffleQ) shuffle(finalQuestions);
@@ -2923,6 +3318,7 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 });
             }
 
+            activeStudyScope = scope ? { ...scope, questions: undefined, expectedCount: finalQuestions.length } : null;
             quizMode = viewMode;
             quizSubmitted = false;
             showQuiz();
@@ -2933,7 +3329,8 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
         function saveQuizProgress() {
             if (restoringQuiz || finalQuestions.length === 0) return;
             try {
-                sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ at: location.pathname + location.search, text: sourceText, title: sourceTitle, mode: quizMode, submitted: quizSubmitted, finalQuestions, selectedAnswers }));
+                const scopeSave = activeStudyScope ? { ...activeStudyScope, questions: undefined } : null;
+                sessionStorage.setItem(PROGRESS_KEY, JSON.stringify({ at: location.pathname + location.search, text: sourceText, title: sourceTitle, mode: quizMode, submitted: quizSubmitted, studyScope: scopeSave, finalQuestions, selectedAnswers }));
             } catch (e) { /* hết chỗ hoặc bị chặn: chỉ mất khả năng khôi phục, bài vẫn làm bình thường */ }
             // Hình chưa chia sẻ lưu riêng: hết chỗ thì xoá bản cũ (không để hình của đề trước), tải lại trang hiện "(hình chưa lưu)".
             try {
@@ -2969,7 +3366,14 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                 for (const [imageId, dataUrl] of Object.entries(JSON.parse(sessionStorage.getItem(IMAGES_KEY) || '{}'))) rememberImage({ id: imageId, dataUrl });
             } catch (e) { }
             // Dựng lại đề từ văn bản gốc như khi mở link chia sẻ; thứ tự câu và phương án đã trộn lấy từ bản đã lưu.
-            if (!parseQuizData(s.text, SHARE_ID_REGEX.test(id) ? id : null, s.title || '') || originalQuestions.length !== s.finalQuestions.length) {
+            if (!parseQuizData(s.text, SHARE_ID_REGEX.test(id) ? id : null, s.title || '')) {
+                clearQuizProgress();
+                return false;
+            }
+            const hasScope = s.studyScope && typeof s.studyScope === 'object' && Number.isInteger(s.studyScope.expectedCount)
+                && s.studyScope.expectedCount > 0 && s.studyScope.expectedCount <= originalQuestions.length;
+            const expectedLen = hasScope ? s.studyScope.expectedCount : originalQuestions.length;
+            if (s.finalQuestions.length !== expectedLen) {
                 clearQuizProgress();
                 return false;
             }
@@ -2977,6 +3381,23 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             try {
                 if (questionsHaveMath(originalQuestions)) {
                     try { await ensureKatex(); } catch (e) { }
+                }
+                activeStudyScope = hasScope ? s.studyScope : null;
+                const uiScope = activeStudyScope?.mode === 'wrong' ? activeStudyScope.parentScope : activeStudyScope;
+                if (uiScope?.mode === 'parts') {
+                    expandStudyPartsForShortExam();
+                    studyPartSize = Math.max(1, Math.floor(Number(uiScope.partSize) || studyPartSize));
+                    studySelectedPart = Math.max(0, Math.floor(Number(uiScope.partIndex) || 0));
+                    if (UI.studyCustomSize) UI.studyCustomSize.value = String(studyPartSize);
+                    setStudyScopeMode('parts');
+                } else if (uiScope?.mode === 'range') {
+                    expandStudyPartsForShortExam();
+                    const r = normalizeStudyRange((uiScope.start ?? 0) + 1, uiScope.end ?? originalQuestions.length, originalQuestions.length);
+                    studyRangeStart = r.from;
+                    studyRangeEnd = r.to;
+                    if (UI.studyRangeStartInput) UI.studyRangeStartInput.value = String(r.from);
+                    if (UI.studyRangeEndInput) UI.studyRangeEndInput.value = String(r.to);
+                    setStudyScopeMode('range');
                 }
                 finalQuestions = s.finalQuestions;
                 quizMode = s.mode === 'end' ? 'end' : 'immediate';
@@ -2993,9 +3414,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
                                 if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
                             }
                         }
-                    } else {
+                    } else if (typeof chosen === 'number' && chosen >= 0 && chosen < q.options.length) {
                         const btn = UI.quizContainer.querySelectorAll(`#qbox-${qIndex} .option-btn`)[chosen];
                         if (btn) handleSelection(btn, btn.parentElement, qIndex, chosen, quizMode);
+                        else selectedAnswers[qIndex] = chosen;
                     }
                 });
                 if (s.submitted) forceSubmit();
@@ -3099,6 +3521,10 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.resultBox.style.display = 'block';
             UI.actionSection.style.display = 'none';
             UI.retryBtn.style.display = 'inline-block';
+            if (activeStudyScope && (activeStudyScope.mode === 'parts' || activeStudyScope.mode === 'range')) {
+                saveStudyDonePart(sourceText, activeStudyScope.start, activeStudyScope.end, displayPoints, total, percentage);
+            }
+            updateResultExtraButtons();
             quizSubmitted = true;
             saveQuizProgress();
             scrollToTop();
@@ -3108,6 +3534,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             clearTimeout(immediateResultTimer);
             hideMusicButton();
             UI.retryBtn.style.display = 'none';
+            if (UI.retryWrongBtn) UI.retryWrongBtn.style.display = 'none';
+            if (UI.nextPartBtn) UI.nextPartBtn.style.display = 'none';
+            if (UI.studyScopeBanner) UI.studyScopeBanner.style.display = 'none';
             UI.resultBox.style.display = 'none';
             UI.resultText.innerHTML = '';
             UI.configSection.style.display = 'block';
@@ -3115,6 +3544,9 @@ D. Giá trị nhỏ nhất của hàm số bằng 1
             UI.actionSection.style.display = 'none';
             quizSubmitted = false;
             clearQuizProgress();
+            activeStudyScope = null;
+            renderStudyPartsGrid();
+            updateStartButtonLabel();
             finalQuestions = [];
             selectedAnswers = {};
             answeredCount = {};

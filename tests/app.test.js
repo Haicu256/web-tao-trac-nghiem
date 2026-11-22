@@ -544,3 +544,228 @@ test('rescueWithAI (OCR PDF hỗn hợp & giới hạn 15 trang): chỉ OCR tran
     }
     assert.equal(overRendered.length, 15, 'tối đa 15 trang OCR mỗi lần');
 });
+
+// ===== Chia phần để học (docs/thiet-ke/chia-phan-hoc.md) =====
+function makeNumberedExam(n) {
+    return Array.from({ length: n }, (_, i) => `Câu ${i + 1}: Nội dung số ${i + 1}?\nA. Sai\n*B. Đúng`).join('\n');
+}
+
+function resetStudyState() {
+    resetProgressState();
+    app.run("studyScopeMode = 'all'; studyPartSize = 30; studySelectedPart = 0; activeStudyScope = null;");
+}
+
+test('computeStudyParts: chia 100 câu thành các phần không trùng và xử lý biên an toàn', () => {
+    const compute = app.fn('computeStudyParts');
+    const parts = compute(100, 30);
+    assert.equal(parts.length, 4);
+    assert.deepEqual([...parts].map(p => [p.start, p.end]), [[0, 30], [30, 60], [60, 90], [90, 100]]);
+    assert.equal(parts.reduce((s, p) => s + (p.end - p.start), 0), 100);
+    assert.deepEqual([...compute(0, 30)], []);
+    assert.equal(compute(10, -5)[0].end, 1);
+    assert.equal(compute(10, 999).length, 1);
+    assert.deepEqual([compute(10, 999)[0].start, compute(10, 999)[0].end], [0, 10]);
+});
+
+test('normalizeStudyRange: kẹp [1, N] và tự đảo nếu từ câu > đến câu', () => {
+    const norm = app.fn('normalizeStudyRange');
+    assert.deepEqual({ ...norm(45, 82, 100) }, { from: 45, to: 82, start: 44, end: 82 });
+    assert.deepEqual({ ...norm(80, 20, 100) }, { from: 20, to: 80, start: 19, end: 80 });
+    assert.deepEqual({ ...norm(0, 500, 100) }, { from: 1, to: 100, start: 0, end: 100 });
+});
+
+test('startQuizNow chế độ parts: cắt phần trước rồi mới trộn câu bên trong phần', () => {
+    resetStudyState();
+    app.fn('parseQuizData')(makeNumberedExam(50), null, 'Đề 50 câu');
+    app.run("document.getElementById('shuffleQuestions').checked = true; document.getElementById('shuffleOptions').checked = true;");
+    app.fn('setStudyScopeMode')('parts');
+    app.fn('setStudyPartSize')(20);
+    app.fn('selectStudyPart')(0);
+    app.fn('startQuizNow')();
+    const p1 = [...app.run('finalQuestions.map(q => q.title)')].sort();
+    const exp1 = Array.from({ length: 20 }, (_, i) => `Nội dung số ${i + 1}?`).sort();
+    assert.equal(p1.length, 20);
+    assert.deepEqual(p1, exp1);
+
+    app.fn('retryQuiz')();
+    app.fn('selectStudyPart')(2);
+    app.fn('startQuizNow')();
+    const p3 = [...app.run('finalQuestions.map(q => q.title)')].sort();
+    const exp3 = Array.from({ length: 10 }, (_, i) => `Nội dung số ${i + 41}?`).sort();
+    assert.equal(p3.length, 10);
+    assert.deepEqual(p3, exp3);
+    resetStudyState();
+});
+
+test('startQuizNow chế độ range: lấy đúng khoảng câu đã chọn', () => {
+    resetStudyState();
+    app.fn('parseQuizData')(makeNumberedExam(50), null, '');
+    app.run("document.getElementById('shuffleQuestions').checked = false;");
+    app.fn('setStudyScopeMode')('range');
+    app.run("document.getElementById('studyRangeStartInput').value = '11'; document.getElementById('studyRangeEndInput').value = '25';");
+    app.fn('onStudyRangeInput')();
+    app.fn('startQuizNow')();
+    const titles = [...app.run('finalQuestions.map(q => q.title)')];
+    assert.equal(titles.length, 15);
+    assert.equal(titles[0], 'Nội dung số 11?');
+    assert.equal(titles[14], 'Nội dung số 25?');
+    resetStudyState();
+});
+
+test('đề ngắn (<= 20 câu) tự ẩn bảng chọn phần và mở khi bấm; đề > 20 câu hiện sẵn', () => {
+    resetStudyState();
+    app.fn('parseQuizData')(makeNumberedExam(10), null, '');
+    assert.equal(app.document.getElementById('studyPartPanel').style.display, 'none');
+    assert.notEqual(app.document.getElementById('studyPartExpandBtn').style.display, 'none');
+    app.fn('expandStudyPartsForShortExam')();
+    assert.notEqual(app.document.getElementById('studyPartPanel').style.display, 'none');
+
+    app.fn('parseQuizData')(makeNumberedExam(25), null, '');
+    assert.notEqual(app.document.getElementById('studyPartPanel').style.display, 'none');
+    assert.equal(app.document.getElementById('studyPartExpandBtn').style.display, 'none');
+    assert.equal(app.run('studyScopeMode'), 'all');
+    resetStudyState();
+});
+
+test('getWrongQuestions & retryWrongQuestions: chỉ ôn lại câu sai (MC + TF) và ẩn nút khi đúng hết', () => {
+    resetStudyState();
+    const exam4 = [
+        'Câu 1: MC1?\nA. x\n*B. y',
+        'Câu 2: MC2?\n*A. x\nB. y',
+        'câu hỏi đúng sai: Câu 3: TF1?\n*a) Đ\nb) S\n*c) Đ\nd) S',
+        'câu hỏi đúng sai: Câu 4: TF2?\n*a) Đ\nb) S\n*c) Đ\nd) S',
+    ].join('\n');
+    app.fn('parseQuizData')(exam4, null, '');
+    app.run("document.getElementById('shuffleQuestions').checked = false; document.getElementById('shuffleOptions').checked = false;");
+    app.fn('startQuizNow')();
+    app.run(`selectedAnswers = {
+        0: 0,
+        1: 0,
+        2: { 0: { dung: true, sai: false }, 1: { dung: false, sai: true }, 2: { dung: true, sai: false }, 3: { dung: true, sai: false } },
+        3: { 0: { dung: true, sai: false }, 1: { dung: false, sai: true }, 2: { dung: true, sai: false }, 3: { dung: false, sai: true } }
+    };`);
+    app.fn('forceSubmit')();
+    const retryWrongBtn = app.document.getElementById('retryWrongBtn');
+    assert.notEqual(retryWrongBtn.style.display, 'none');
+    assert.match(retryWrongBtn.textContent, /2 câu sai/);
+
+    app.fn('retryWrongQuestions')();
+    assert.equal(app.run('activeStudyScope.mode'), 'wrong');
+    assert.deepEqual([...app.run('finalQuestions.map(q => q.title)')], ['MC1?', 'TF1?']);
+
+    app.run(`selectedAnswers = {
+        0: 1,
+        1: { 0: { dung: true, sai: false }, 1: { dung: false, sai: true }, 2: { dung: true, sai: false }, 3: { dung: false, sai: true } }
+    };`);
+    app.fn('forceSubmit')();
+    assert.equal(retryWrongBtn.style.display, 'none');
+    resetStudyState();
+});
+
+test('startNextStudyPart: chuyển liền mạch sang phần kế và ẩn nút ở phần cuối', () => {
+    resetStudyState();
+    app.fn('parseQuizData')(makeNumberedExam(50), null, '');
+    app.run("document.getElementById('shuffleQuestions').checked = false; document.getElementById('shuffleOptions').checked = false;");
+    app.fn('setStudyScopeMode')('parts');
+    app.fn('setStudyPartSize')(20);
+    app.fn('selectStudyPart')(0);
+    app.fn('startQuizNow')();
+    app.fn('forceSubmit')();
+    const nextBtn = app.document.getElementById('nextPartBtn');
+    assert.notEqual(nextBtn.style.display, 'none');
+    assert.match(nextBtn.textContent, /Phần 2/);
+    assert.match(nextBtn.textContent, /21–40/);
+
+    app.fn('startNextStudyPart')();
+    assert.equal(app.run('activeStudyScope.partIndex'), 1);
+    assert.equal(app.run('finalQuestions.length'), 20);
+    assert.equal(app.run('finalQuestions[0].title'), 'Nội dung số 21?');
+
+    app.fn('forceSubmit')();
+    app.fn('startNextStudyPart')();
+    assert.equal(app.run('activeStudyScope.partIndex'), 2);
+    assert.equal(app.run('finalQuestions.length'), 10);
+    app.fn('forceSubmit')();
+    assert.equal(nextBtn.style.display, 'none');
+    resetStudyState();
+});
+
+test('localStorage: ghi dấu ✅ phần đã học tách biệt theo đề và xóa sạch an toàn', () => {
+    resetStudyState();
+    const examA = makeNumberedExam(30);
+    const examB = makeNumberedExam(30).replace('Nội dung số 1', 'Đề khác số 1');
+    app.fn('parseQuizData')(examA, null, 'Đề A');
+    app.run("document.getElementById('shuffleQuestions').checked = false;");
+    app.fn('setStudyScopeMode')('parts');
+    app.fn('setStudyPartSize')(20);
+    app.fn('selectStudyPart')(0);
+    app.fn('startQuizNow')();
+    app.run('selectedAnswers = { 0: 1, 1: 1 };');
+    app.fn('forceSubmit')();
+    const doneA = app.fn('readStudyDoneMap')(examA);
+    assert.ok(doneA['0-20']);
+    assert.equal(doneA['0-20'].points, 2);
+    assert.equal(doneA['0-20'].total, 20);
+    assert.deepEqual({ ...app.fn('readStudyDoneMap')(examB) }, {});
+    app.fn('clearStudyDoneMap')(examA);
+    assert.deepEqual({ ...app.fn('readStudyDoneMap')(examA) }, {});
+    resetStudyState();
+});
+
+test('tải lại trang khi đang làm Phần 2: giữ nguyên 20 câu của phần và đáp án đã chọn', async () => {
+    resetStudyState();
+    app.fn('parseQuizData')(makeNumberedExam(50), null, 'Đề F5');
+    app.run("document.getElementById('shuffleQuestions').checked = false; document.getElementById('shuffleOptions').checked = false;");
+    app.fn('setStudyScopeMode')('parts');
+    app.fn('setStudyPartSize')(20);
+    app.fn('selectStudyPart')(1);
+    app.fn('startQuizNow')();
+    app.run('selectedAnswers = { 0: 1 };');
+    app.fn('saveQuizProgress')();
+
+    app.run("originalQuestions = []; finalQuestions = []; selectedAnswers = {}; activeStudyScope = null; UI.configSection.style.display = 'block';");
+    assert.equal(await app.fn('restoreQuizProgress')(), true);
+    assert.equal(app.run('finalQuestions.length'), 20);
+    assert.equal(app.run('finalQuestions[0].title'), 'Nội dung số 21?');
+    assert.equal(app.run('activeStudyScope.mode'), 'parts');
+    assert.equal(app.run('activeStudyScope.partIndex'), 1);
+    assert.equal(app.run('selectedAnswers[0]'), 1);
+    resetStudyState();
+});
+
+test('showImmediateResult và đồng bộ UI sau F5 + retryQuiz ở chế độ immediate', async () => {
+    resetStudyState();
+    const exam = makeNumberedExam(50);
+    app.fn('parseQuizData')(exam, null, 'Đề Immediate');
+    app.run("document.getElementById('shuffleQuestions').checked = false; document.getElementById('shuffleOptions').checked = false; document.getElementById('viewModeImmediate').checked = true;");
+    app.fn('setStudyScopeMode')('parts');
+    app.fn('setStudyPartSize')(20);
+    app.fn('selectStudyPart')(0);
+    app.fn('startQuizNow')();
+    app.run('selectedAnswers = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [i, i === 0 ? 0 : 1]));');
+    app.fn('showImmediateResult')();
+
+    const doneMap = app.fn('readStudyDoneMap')(exam);
+    assert.ok(doneMap['0-20']);
+    assert.equal(doneMap['0-20'].points, 19);
+    assert.equal(doneMap['0-20'].total, 20);
+    assert.notEqual(app.document.getElementById('retryWrongBtn').style.display, 'none');
+    assert.match(app.document.getElementById('retryWrongBtn').textContent, /1 câu sai/);
+    assert.notEqual(app.document.getElementById('nextPartBtn').style.display, 'none');
+    assert.match(app.document.getElementById('nextPartBtn').textContent, /Phần 2/);
+    assert.equal(app.document.getElementById('retryBtn').textContent, '📋 Chọn phần khác');
+    assert.equal(app.run('quizSubmitted'), true);
+
+    app.fn('selectStudyPart')(1);
+    app.fn('startQuizNow')();
+    app.fn('saveQuizProgress')();
+    app.run("originalQuestions = []; finalQuestions = []; selectedAnswers = {}; activeStudyScope = null; studyScopeMode = 'all'; studyPartSize = 30; studySelectedPart = 0; UI.configSection.style.display = 'block';");
+    assert.equal(await app.fn('restoreQuizProgress')(), true);
+    app.fn('retryQuiz')();
+    assert.equal(app.run('studyScopeMode'), 'parts');
+    assert.equal(app.run('studyPartSize'), 20);
+    assert.equal(app.run('studySelectedPart'), 1);
+    assert.equal(app.document.getElementById('studyChip20').classList.contains('active'), true);
+    assert.equal(app.document.getElementById('studyChip30').classList.contains('active'), false);
+    resetStudyState();
+});
