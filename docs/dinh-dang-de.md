@@ -295,6 +295,99 @@ câu 1 phương án D: 6
 câu 2: B
 ```
 
+### Hình trong đề: ký hiệu `[[hình:…]]` ở dòng phương án hay dưới đề bài
+Web lấy hình từ file Word/PDF và đặt vào đề dưới dạng ký hiệu `[[hình:<12 ký tự hệ 16>]]` (xem
+`docs/thiet-ke/hinh-anh.md`). Ký hiệu là chữ thường đối với parser: ở dòng phương án thì là hình của phương án đó, riêng
+một dòng dưới đề bài thì thuộc đề bài.
+```de
+Câu 1: Cấu trúc nào sau đây là Aspirin?
+A. [[hình:aaaaaaaaaaaa]]
+*B. [[hình:bbbbbbbbbbbb]]
+C. [[hình:cccccccccccc]]
+D. [[hình:dddddddddddd]]
+Câu 2: Hình dưới đây là cấu trúc của chất nào?
+[[hình:eeeeeeeeeeee]]
+A. Aspirin
+*B. Paracetamol
+C. Ibuprofen
+D. Morphin
+```
+```ket-qua
+số câu: 2
+câu 1: B
+câu 1 phương án B: [[hình:bbbbbbbbbbbb]]
+câu 1 phương án D: [[hình:dddddddddddd]]
+câu 2: B
+câu 2 tiêu đề: Hình dưới đây là cấu trúc của chất nào? / [[hình:eeeeeeeeeeee]]
+câu 2 phương án A: Aspirin
+```
+
+### Hàng hình rồi hàng chữ cái ("hình⇥hình" rồi "A⇥B"): ghép theo thứ tự trái sang phải
+Hình xếp thành lưới, chữ cái phương án nằm riêng một dòng ngay dưới (hoặc ngay trên) hàng hình. Ghép khi mỗi hàng chữ cái
+có đúng số hình của hàng hình cạnh nó và các chữ cái đi đúng thứ tự A, B, C…
+```de
+Câu 1: Cấu trúc nào sau đây là Aspirin?
+[[hình:aaaaaaaaaaaa]]	[[hình:bbbbbbbbbbbb]]
+A	B
+[[hình:cccccccccccc]]	[[hình:dddddddddddd]]
+C	D
+Đáp án: C
+Câu 2: Cấu trúc nào là Paracetamol?
+A	B
+[[hình:111111111111]]	[[hình:222222222222]]
+C	D
+[[hình:333333333333]]	[[hình:444444444444]]
+Đáp án: B
+```
+```ket-qua
+số câu: 2
+câu 1: C
+câu 1 tiêu đề: Cấu trúc nào sau đây là Aspirin?
+câu 1 số phương án: 4
+câu 1 phương án A: [[hình:aaaaaaaaaaaa]]
+câu 1 phương án C: [[hình:cccccccccccc]]
+câu 2: B
+câu 2 số phương án: 4
+câu 2 phương án B: [[hình:222222222222]]
+câu 2 phương án D: [[hình:444444444444]]
+```
+
+### Hàng hình và hàng chữ cái lệch số lượng thì không ghép
+Ba hình một hàng mà chữ cái chỉ có A, B: không biết hình nào thuộc chữ nào, nên không ghép. Dòng "A⇥B" không có dấu
+chấm nên không phải phương án, câu bị bỏ (khi chuyển file, web ghi chú câu này để thầy cô chuyển ký hiệu vào đúng dòng).
+```de
+Câu 1: Cấu trúc nào là Ibuprofen?
+[[hình:aaaaaaaaaaaa]]	[[hình:bbbbbbbbbbbb]]	[[hình:cccccccccccc]]
+A	B
+Đáp án: A
+```
+```ket-qua
+không đọc được
+```
+
+### Đề có hình vẫn đọc được bảng đáp án hai dòng ("1 2 3" / "B A A")
+Dòng chỉ có chữ cái của bảng đáp án không phải nhãn của hàng hình: chỉ dòng chữ cái nằm cạnh một hàng hình mới được ghép.
+```de
+Câu 1: Thủ đô Pháp?
+[[hình:aaaaaaaaaaaa]]
+A. Berlin
+B. Paris
+Câu 2: Thủ đô Ý?
+A. Rome
+B. Paris
+Câu 3: Thủ đô Đức?
+A. Berlin
+B. Paris
+Đáp án:
+1 2 3
+B A A
+```
+```ket-qua
+câu 1: B
+câu 2: A
+câu 3: A
+```
+
 ## 4. Đánh dấu đáp án đúng ngay trong phương án
 
 ### Dấu * ở cuối phương án
@@ -490,6 +583,25 @@ B. Giảm
 ```ket-qua
 câu 1 tiêu đề: Hiện tượng El Niño làm nhiệt độ mặt nước biển thế nào? (Niño, La Niña: ñ giữ nguyên)
 câu 1: A
+```
+
+### Chữ font cũ VNI-Windows (VNI-Times: "Caâu 1", "Thuû ñoâ")
+Chữ VNI-Windows ghép nguyên âm với ký tự dấu ngay sau ("aâ", "uû", "eá", "oâ") và các chữ đơn "ñ/Ñ", "ô/Ô", "ö/Ö", "æ/Æ", "ó/Ó", "ò/Ò", "î/Î". Không đổi nhầm chữ Unicode có "hoà/hoá/loài" hoặc chữ ngoại ngữ.
+```de
+Caâu 1: Thuû ñoâ cuûa Vieät Nam laø gì?
+A. Hueá
+*B. Haø Noäi
+C. Ñaø Naüng
+D. Caàn Thô
+```
+```ket-qua
+số câu: 1
+câu 1 tiêu đề: Thủ đô của Việt Nam là gì?
+câu 1 phương án A: Huế
+câu 1 phương án B: Hà Nội
+câu 1 phương án C: Đà Nẵng
+câu 1 phương án D: Cần Thơ
+câu 1: B
 ```
 
 ### Dấu tích ✅ cạnh phương án đúng (chép từ chatbot)
@@ -3375,8 +3487,7 @@ câu 1 phương án A: P = (a + b) + (b + c) + (c + d) với a > 0
   đọc là ý Đúng/Sai; chữ thường ("2 s", "1 đ") thì đã bỏ qua khi dòng còn chữ khác.
 - Cả dòng phương án in nghiêng kiểu Markdown (`*B. Hà Nội*`): dấu `*` đầu dòng được hiểu là đáp án, dấu `*` cuối còn
   lại trong chữ phương án. Dùng `*B. Hà Nội` hoặc `**B. Hà Nội**`.
-- PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã) và chữ font VNI viết đủ dấu (`xeùt xöû`) không đọc
-  được; dùng file Word gốc bằng Unicode. Font TCVN3 (`C©u 1`) và chữ `ñ`, `ð` thay cho đ, Đ thì đã đổi được.
+- PDF ảnh scan, PDF mất chữ tiếng Việt (font không có bảng mã): dùng nút **✨ Nhờ AI cứu đề** trên khung kết quả (xem `docs/thiet-ke/cuu-ho-ai.md`). Font TCVN3 (`C©u 1`), chữ `ñ`, `ð` thay cho đ, Đ và bảng mã VNI-Windows đầy đủ dấu (`xeùt xöû`) thì tự đổi ngay bằng JS.
 - Đáp án để ở file riêng: dán bảng đáp án vào cuối đề rồi mới tạo đề.
 
 ## 12. An toàn
